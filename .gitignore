@@ -1,0 +1,5 @@
+postlicyd
+
+*.o
+.*.d
+.*.swp
