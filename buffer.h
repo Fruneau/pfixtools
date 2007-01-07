@@ -33,5 +33,67 @@
  * Copyright © 2006 Pierre Habouzit
  */
 
-#include "policy.h"
+#ifndef MUTT_LIB_LIB_BUFFER_H
+#define MUTT_LIB_LIB_BUFFER_H
 
+#include "mem.h"
+#include "str.h"
+
+typedef struct buffer_t {
+    char *data;
+    ssize_t len;
+    ssize_t size;
+} buffer_t;
+
+DO_INIT(buffer_t, buffer);
+static inline void buffer_wipe(buffer_t *buf) {
+    p_delete(&buf->data);
+}
+DO_NEW(buffer_t, buffer);
+DO_DELETE(buffer_t, buffer);
+
+static inline char *buffer_unwrap(buffer_t **buf) {
+    char *res = (*buf)->data;
+    (*buf)->data = NULL;
+    buffer_delete(buf);
+    return res;
+}
+
+
+void buffer_resize(buffer_t *, ssize_t newsize);
+static inline void buffer_ensure(buffer_t *buf, ssize_t extra) {
+    assert (extra >= 0);
+    if (buf->len + extra >= buf->size) {
+        buffer_resize(buf, buf->len + extra);
+    }
+}
+static inline void buffer_extend(buffer_t *buf, ssize_t extra) {
+    buffer_ensure(buf, extra);
+    buf->len += extra;
+    buf->data[buf->len] = '\0';
+}
+static inline void buffer_extendch(buffer_t *buf, ssize_t extra, int c) {
+    buffer_ensure(buf, extra);
+    memset(buf->data + buf->len, c, extra);
+    buf->len += extra;
+    buf->data[buf->len] = '\0';
+}
+
+
+static inline void buffer_add(buffer_t *buf, const void *data, ssize_t len) {
+    buffer_ensure(buf, len);
+    memcpy(buf->data + buf->len, data, len);
+    buf->len += len;
+    buf->data[buf->len] = '\0';
+}
+static inline void buffer_addstr(buffer_t *buf, const char *s) {
+    buffer_add(buf, s, m_strlen(s));
+}
+static inline void buffer_addbuf(buffer_t *buf, buffer_t *buf2) {
+    buffer_add(buf, buf2->data, buf2->len);
+}
+static inline void buffer_addch(buffer_t *buf, int c) {
+    buffer_extendch(buf, 1, c);
+}
+
+#endif /* MUTT_LIB_LIB_BUFFER_H */

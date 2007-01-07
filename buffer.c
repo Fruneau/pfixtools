@@ -33,5 +33,17 @@
  * Copyright © 2006 Pierre Habouzit
  */
 
-#include "policy.h"
+#include "buffer.h"
+
+#define BUFSIZ_INCREMENT  256
+
+void buffer_resize(buffer_t *buf, ssize_t newsize)
+{
+    if (newsize >= buf->size) {
+        /* rounds newsize to the 1024 multiple just after newsize+1 */
+        newsize = (newsize + BUFSIZ_INCREMENT) & ~(BUFSIZ_INCREMENT - 1);
+        p_realloc(&buf->data, newsize);
+    }
+}
+
 
