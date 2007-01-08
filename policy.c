@@ -38,11 +38,13 @@
 policy_request *pcyrq_init(policy_request *rq)
 {
     p_clear(rq, 1);
-    buffer_init(&rq->buf);
+    buffer_init(&rq->ibuf);
+    buffer_init(&rq->obuf);
     return rq;
 }
 
 void policy_wipe(policy_request *rq)
 {
-    buffer_wipe(&rq->buf);
+    buffer_wipe(&rq->ibuf);
+    buffer_wipe(&rq->obuf);
 }

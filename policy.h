@@ -78,12 +78,13 @@ typedef struct policy_request {
     const char *encryption_keysize;
     const char *etrn_domain;
 
-    buffer_t buf;
+    ssize_t  rqsize;
+    buffer_t ibuf;
+    buffer_t obuf;
 } policy_request;
 
 policy_request *pcyrq_init(policy_request *rq);
 void pcyrq_wipe(policy_request *rq);
-
 DO_NEW(policy_request, pcyrq);
 DO_DELETE(policy_request, pcyrq);
 

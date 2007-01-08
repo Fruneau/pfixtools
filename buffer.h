@@ -33,8 +33,8 @@
  * Copyright © 2006 Pierre Habouzit
  */
 
-#ifndef MUTT_LIB_LIB_BUFFER_H
-#define MUTT_LIB_LIB_BUFFER_H
+#ifndef POSTLICYD_BUFFER_H
+#define POSTLICYD_BUFFER_H
 
 #include "mem.h"
 #include "str.h"
@@ -102,4 +102,4 @@ static inline void buffer_addch(buffer_t *buf, int c) {
 
 void buffer_consume(buffer_t *buf, ssize_t len);
 
-#endif /* MUTT_LIB_LIB_BUFFER_H */
+#endif /* POSTLICYD_BUFFER_H */

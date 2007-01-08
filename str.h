@@ -33,8 +33,8 @@
  * Copyright © 2006 Pierre Habouzit
  */
 
-#ifndef MUTT_LIB_LIB_STR_H
-#define MUTT_LIB_LIB_STR_H
+#ifndef POSTLICYD_STR_H
+#define POSTLICYD_STR_H
 
 #include "mem.h"
 
@@ -364,4 +364,4 @@ m_stristr(const char *haystack, const char *needle) {
 }
 
 /*@}*/
-#endif /* MUTT_LIB_LIB_STR_H */
+#endif /* POSTLICYD_STR_H */
