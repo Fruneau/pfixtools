@@ -52,6 +52,10 @@ static inline void buffer_wipe(buffer_t *buf) {
 DO_NEW(buffer_t, buffer);
 DO_DELETE(buffer_t, buffer);
 
+static inline void buffer_reset(buffer_t *buf) {
+    buf->data[buf->len = 0] = '\0';
+}
+
 static inline char *buffer_unwrap(buffer_t **buf) {
     char *res = (*buf)->data;
     (*buf)->data = NULL;
@@ -95,5 +99,7 @@ static inline void buffer_addbuf(buffer_t *buf, buffer_t *buf2) {
 static inline void buffer_addch(buffer_t *buf, int c) {
     buffer_extendch(buf, 1, c);
 }
+
+void buffer_consume(buffer_t *buf, ssize_t len);
 
 #endif /* MUTT_LIB_LIB_BUFFER_H */

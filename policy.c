@@ -35,3 +35,14 @@
 
 #include "policy.h"
 
+policy_request *pcyrq_init(policy_request *rq)
+{
+    p_clear(rq, 1);
+    buffer_init(&rq->buf);
+    return rq;
+}
+
+void policy_wipe(policy_request *rq)
+{
+    buffer_wipe(&rq->buf);
+}

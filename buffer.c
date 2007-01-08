@@ -46,4 +46,15 @@ void buffer_resize(buffer_t *buf, ssize_t newsize)
     }
 }
 
+void buffer_consume(buffer_t *buf, ssize_t len) {
+    if (len <= 0)
+        return;
 
+    if (len >= buf->len) {
+        buffer_reset(buf);
+        return;
+    }
+
+    memmove(buf->data, buf->data + len, buf->len + 1 - len);
+    buf->len -= len;
+}

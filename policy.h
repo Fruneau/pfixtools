@@ -36,6 +36,8 @@
 #ifndef POSTLICYD_POLICY_H
 #define POSTLICYD_POLICY_H
 
+#include "buffer.h"
+
 enum protocol_state {
     STATE_CONNECT,
     STATE_HELO, /* or EHLO */
@@ -48,7 +50,6 @@ enum protocol_state {
 };
 
 typedef struct policy_request {
-    unsigned ready : 1;
     unsigned state : 4;
     unsigned esmtp : 1;
 
@@ -76,7 +77,14 @@ typedef struct policy_request {
     const char *encryption_cipher;
     const char *encryption_keysize;
     const char *etrn_domain;
+
+    buffer_t buf;
 } policy_request;
 
+policy_request *pcyrq_init(policy_request *rq);
+void pcyrq_wipe(policy_request *rq);
+
+DO_NEW(policy_request, pcyrq);
+DO_DELETE(policy_request, pcyrq);
 
 #endif
