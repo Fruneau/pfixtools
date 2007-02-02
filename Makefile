@@ -46,7 +46,7 @@ all: $(PROGRAMS)
 
 clean:
 	$(RM) $(PROGRAMS)
-	$(RM) *.o
+	$(RM) .*.o
 
 distclean: clean
 
@@ -60,7 +60,7 @@ headers:
 		( echo "package headache not installed" ; exit 1 )
 	@git ls-files | egrep '(\.h|\.c|Makefile|*\.mk)$$' | xargs -t headache $(HEADACHEOPTS)
 
-%.o: %.c Makefile
+.%.o: %.c Makefile
 	$(CC) $(CFLAGS) -MMD -MT ".$*.d $@" -MF .$*.d -g -c -o $@ $<
 
 %.d: %.c Makefile
@@ -68,7 +68,7 @@ headers:
 
 .SECONDEXPANSION:
 
-$(PROGRAMS): $$(patsubst %.c,%.o,$$($$@_SOURCES)) Makefile
+$(PROGRAMS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
 	$(CC) -o $@ $(CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
 -include $(foreach p,$(PROGRAMS),$(patsubst %.c,%.d,$(filter %.c,$p_SOURCES)))
