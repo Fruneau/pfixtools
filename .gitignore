@@ -1,5 +1,6 @@
 postlicyd
 
 *.o
+.tags
 .*.d
 .*.swp
