@@ -68,18 +68,26 @@ CFLAGS += -Wwrite-strings
 CFLAGS += -Wsign-compare
 # warn about unused declared stuff
 CFLAGS += -Wunused
-# don not warn about unused return value
-CFLAGS += -Wno-unused-value
+# do not warn about unused function parameters
+CFLAGS += -Wno-unused-parameter
+# do not warn about unused statement value
+#CFLAGS += -Wno-unused-value
 # warn about variable use before initialization
 CFLAGS += -Wuninitialized
+# warn about variables which are initialized with themselves
+CFLAGS += $(if $(GCC4),-Winit-self)
 # warn about pointer arithmetic on void* and function pointers
 CFLAGS += -Wpointer-arith
 # warn about multiple declarations
 CFLAGS += -Wredundant-decls
 # warn if the format string is not a string literal
 CFLAGS += -Wformat-nonliteral
+# do not warn about zero-length formats.
+CFLAGS += -Wno-format-zero-length
 # do not warn about strftime format with y2k issues
 CFLAGS += -Wno-format-y2k
+# warn about functions without format attribute that should have one
+CFLAGS += -Wmissing-format-attribute
 # barf if we change constness
 #CFLAGS += -Wcast-qual
 
