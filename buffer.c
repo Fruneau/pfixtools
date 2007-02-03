@@ -33,6 +33,9 @@
  * Copyright © 2006 Pierre Habouzit
  */
 
+#include <stdio.h>
+#include <unistd.h>
+
 #include "buffer.h"
 
 #define BUFSIZ_INCREMENT  256
@@ -57,4 +60,23 @@ void buffer_consume(buffer_t *buf, ssize_t len) {
 
     memmove(buf->data, buf->data + len, buf->len + 1 - len);
     buf->len -= len;
+}
+
+ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count)
+{
+    ssize_t res;
+
+    if (count < 0)
+        count = BUFSIZ;
+
+    buffer_ensure(buf, count);
+
+    res = read(fd, buf->data + buf->len, count);
+    if (res < 0) {
+        buf->data[buf->len] = '\0';
+        return res;
+    }
+
+    buffer_extend(buf, res);
+    return res;
 }

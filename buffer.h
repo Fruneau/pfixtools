@@ -102,4 +102,6 @@ static inline void buffer_addch(buffer_t *buf, int c) {
 
 void buffer_consume(buffer_t *buf, ssize_t len);
 
+ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count);
+
 #endif /* POSTLICYD_BUFFER_H */
