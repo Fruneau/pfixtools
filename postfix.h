@@ -30,62 +30,14 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2006 Pierre Habouzit
+ * Copyright © 2006-2007 Pierre Habouzit
  */
 
-#ifndef POSTLICYD_POLICY_H
-#define POSTLICYD_POLICY_H
+#ifndef POSTLICYD_POSTFIX_H
+#define POSTLICYD_POSTFIX_H
 
-#include "buffer.h"
+#include "job.h"
 
-enum protocol_state {
-    STATE_CONNECT,
-    STATE_HELO, /* or EHLO */
-    STATE_MAIL,
-    STATE_RCPT,
-    STATE_DATE,
-    STATE_EOM,
-    STATE_VRFY,
-    STATE_ETRN,
-};
-
-typedef struct policy_request {
-    unsigned state : 4;
-    unsigned esmtp : 1;
-
-    const char *helo_name;
-    const char *queue_id;
-    const char *sender;
-    const char *recipient;
-    const char *recipient_count;
-    const char *client_address;
-    const char *client_name;
-    const char *rclient_name;
-    const char *instance;
-
-    /* postfix 2.2+ */
-    const char *sasl_method;
-    const char *sasl_username;
-    const char *sasl_sender;
-    const char *size;
-    const char *ccert_subject;
-    const char *ccert_issuer;
-    const char *ccsert_fingerprint;
-
-    /* postfix 2.3+ */
-    const char *encryption_protocol;
-    const char *encryption_cipher;
-    const char *encryption_keysize;
-    const char *etrn_domain;
-
-    ssize_t  rqsize;
-    buffer_t ibuf;
-    buffer_t obuf;
-} policy_request;
-
-policy_request *pcyrq_init(policy_request *rq);
-void pcyrq_wipe(policy_request *rq);
-DO_NEW(policy_request, pcyrq);
-DO_DELETE(policy_request, pcyrq);
+extern task_t task_postfix;
 
 #endif

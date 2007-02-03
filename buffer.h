@@ -30,7 +30,7 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2006 Pierre Habouzit
+ * Copyright © 2006-2007 Pierre Habouzit
  */
 
 #ifndef POSTLICYD_BUFFER_H

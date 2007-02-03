@@ -30,53 +30,8 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2006-2007 Pierre Habouzit
+ * Copyright © 2007 Pierre Habouzit
  */
 
-#include <stdio.h>
-#include <unistd.h>
+#include "job.h"
 
-#include "buffer.h"
-
-#define BUFSIZ_INCREMENT  256
-
-void buffer_resize(buffer_t *buf, ssize_t newsize)
-{
-    if (newsize >= buf->size) {
-        /* rounds newsize to the 1024 multiple just after newsize+1 */
-        newsize = (newsize + BUFSIZ_INCREMENT) & ~(BUFSIZ_INCREMENT - 1);
-        p_realloc(&buf->data, newsize);
-    }
-}
-
-void buffer_consume(buffer_t *buf, ssize_t len) {
-    if (len <= 0)
-        return;
-
-    if (len >= buf->len) {
-        buffer_reset(buf);
-        return;
-    }
-
-    memmove(buf->data, buf->data + len, buf->len + 1 - len);
-    buf->len -= len;
-}
-
-ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count)
-{
-    ssize_t res;
-
-    if (count < 0)
-        count = BUFSIZ;
-
-    buffer_ensure(buf, count);
-
-    res = read(fd, buf->data + buf->len, count);
-    if (res < 0) {
-        buf->data[buf->len] = '\0';
-        return res;
-    }
-
-    buffer_extend(buf, res);
-    return res;
-}

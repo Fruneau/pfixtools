@@ -30,21 +30,105 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2006 Pierre Habouzit
+ * Copyright © 2007 Pierre Habouzit
  */
 
-#include "policy.h"
+#ifndef POSTLICYD_JOB_H
+#define POSTLICYD_JOB_H
 
-policy_request *pcyrq_init(policy_request *rq)
-{
+#include "buffer.h"
+
+enum job_state {
+    JOB_FREE   = 0x00,
+    JOB_READ   = 0x01,
+    JOB_WRITE  = 0x02,
+    JOB_RDWR   = 0x03,
+    JOB_CONN   = 0x04,
+    JOB_LISTEN = 0x08,
+    JOB_IDLE   = 0x10,
+};
+
+enum smtp_state {
+    STATE_CONNECT,
+    STATE_HELO, /* or EHLO */
+    STATE_MAIL,
+    STATE_RCPT,
+    STATE_DATE,
+    STATE_EOM,
+    STATE_VRFY,
+    STATE_ETRN,
+};
+
+typedef struct job_t   job_t;
+typedef struct jpriv_t jpriv_t;
+typedef struct task_t  task_t;
+typedef struct query_t query_t;
+
+struct task_t {
+    task_t *(*create)(void);
+    void (*release)(task_t **);
+
+    void (*run)(job_t *, query_t *);
+    void (*done)(job_t *);
+    void (*cancel)(job_t *);
+    void (*process)(job_t *);
+};
+
+struct job_t {
+    unsigned state : 6;
+    unsigned done  : 1;
+    unsigned error : 1;
+
+    int fd;
+
+    task_t *task;
+    jpriv_t *jdata;
+};
+
+struct query_t {
+    unsigned state : 4;
+    unsigned esmtp : 1;
+
+    const char *helo_name;
+    const char *queue_id;
+    const char *sender;
+    const char *recipient;
+    const char *recipient_count;
+    const char *client_address;
+    const char *client_name;
+    const char *rclient_name;
+    const char *instance;
+
+    /* postfix 2.2+ */
+    const char *sasl_method;
+    const char *sasl_username;
+    const char *sasl_sender;
+    const char *size;
+    const char *ccert_subject;
+    const char *ccert_issuer;
+    const char *ccsert_fingerprint;
+
+    /* postfix 2.3+ */
+    const char *encryption_protocol;
+    const char *encryption_cipher;
+    const char *encryption_keysize;
+    const char *etrn_domain;
+
+    buffer_t data;
+
+    job_t *postfix;
+    job_t *current;
+};
+
+static inline query_t *query_init(query_t *rq) {
     p_clear(rq, 1);
-    buffer_init(&rq->ibuf);
-    buffer_init(&rq->obuf);
+    buffer_init(&rq->data);
     return rq;
 }
-
-void policy_wipe(policy_request *rq)
-{
-    buffer_wipe(&rq->ibuf);
-    buffer_wipe(&rq->obuf);
+static inline void query_wipe(query_t *rq) {
+    buffer_wipe(&rq->data);
 }
+DO_NEW(query_t, query);
+DO_DELETE(query_t, query);
+
+#endif

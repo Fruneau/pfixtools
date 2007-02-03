@@ -33,50 +33,80 @@
  * Copyright © 2006-2007 Pierre Habouzit
  */
 
-#include <stdio.h>
+#include <errno.h>
+#include <stdbool.h>
 #include <unistd.h>
 
-#include "buffer.h"
+#include "postfix.h"
 
-#define BUFSIZ_INCREMENT  256
+struct jpriv_t {
+    buffer_t ibuf;
+    buffer_t obuf;
+};
 
-void buffer_resize(buffer_t *buf, ssize_t newsize)
+task_t *postfix_create(void)
 {
-    if (newsize >= buf->size) {
-        /* rounds newsize to the 1024 multiple just after newsize+1 */
-        newsize = (newsize + BUFSIZ_INCREMENT) & ~(BUFSIZ_INCREMENT - 1);
-        p_realloc(&buf->data, newsize);
-    }
+    return NULL;
 }
 
-void buffer_consume(buffer_t *buf, ssize_t len) {
-    if (len <= 0)
-        return;
-
-    if (len >= buf->len) {
-        buffer_reset(buf);
-        return;
-    }
-
-    memmove(buf->data, buf->data + len, buf->len + 1 - len);
-    buf->len -= len;
-}
-
-ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count)
+void postfix_release(task_t **task)
 {
-    ssize_t res;
+    if (task) {
+        *task = NULL;
+    }
+}
 
-    if (count < 0)
-        count = BUFSIZ;
+void postfix_run(job_t *job, query_t *query)
+{
+}
 
-    buffer_ensure(buf, count);
+void postfix_done(job_t *job)
+{
+}
 
-    res = read(fd, buf->data + buf->len, count);
-    if (res < 0) {
-        buf->data[buf->len] = '\0';
-        return res;
+void postfix_process(job_t *job)
+{
+    if (job->state & JOB_LISTEN) {
+        // TODO
     }
 
-    buffer_extend(buf, res);
-    return res;
+    if (job->state & JOB_WRITE) {
+        int nbwritten;
+
+        nbwritten = write(job->fd, job->jdata->obuf.data, job->jdata->obuf.len);
+        if (nbwritten < 0) {
+            job->error = errno != EINTR && errno != EAGAIN;
+            return;
+        }
+
+        buffer_consume(&job->jdata->obuf, nbwritten);
+    }
+
+    if (job->state & JOB_READ) {
+        int nbread;
+
+        nbread = buffer_read(&job->jdata->ibuf, job->fd, -1);
+        if (nbread < 0) {
+            job->error = errno != EINTR && errno != EAGAIN;
+            return;
+        }
+        if (nbread == 0) {
+            job->error = true;
+            return;
+        }
+
+        if (!strstr(job->jdata->ibuf.data, "\r\n\r\n"))
+            return;
+
+        /* TODO: do the parse */
+    }
 }
+
+task_t task_postfix = {
+    postfix_create,
+    postfix_release,
+    postfix_run,
+    postfix_done,
+    NULL,
+    postfix_process
+};
