@@ -34,8 +34,8 @@ include mk/cflags.mk
 PROGRAMS = postlicyd
 
 postlicyd_SOURCES = \
-		str.h buffer.h job.h postfix.h        \
-		str.c buffer.c job.c postfix.c        \
+		str.h buffer.h job.h postfix.h query.h \
+		str.c buffer.c job.c postfix.c         \
 		postlicyd.c
 
 postlicyd_LIBADD = -ludns

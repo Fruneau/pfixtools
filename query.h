@@ -33,103 +33,55 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#include <fcntl.h>
-#include <stdbool.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
+#ifndef POSTLICYD_QUERY_H
+#define POSTLICYD_QUERY_H
 
-#ifndef EPOLLRDHUP
-#  include <linux/poll.h>
-#  ifdef POLLRDHUP
-#    define EPOLLRDHUP POLLRDHUP
-#  else
-#    define EPOLLRDHUP 0
-#  endif
+#include "buffer.h"
+
+typedef struct query_t {
+    unsigned state : 4;
+    unsigned esmtp : 1;
+
+    const char *helo_name;
+    const char *queue_id;
+    const char *sender;
+    const char *recipient;
+    const char *recipient_count;
+    const char *client_address;
+    const char *client_name;
+    const char *rclient_name;
+    const char *instance;
+
+    /* postfix 2.2+ */
+    const char *sasl_method;
+    const char *sasl_username;
+    const char *sasl_sender;
+    const char *size;
+    const char *ccert_subject;
+    const char *ccert_issuer;
+    const char *ccsert_fingerprint;
+
+    /* postfix 2.3+ */
+    const char *encryption_protocol;
+    const char *encryption_cipher;
+    const char *encryption_keysize;
+    const char *etrn_domain;
+
+    buffer_t data;
+} query_t;
+
+static inline query_t *query_init(query_t *rq) {
+    p_clear(rq, 1);
+    buffer_init(&rq->data);
+    return rq;
+}
+static inline void query_wipe(query_t *rq) {
+    buffer_wipe(&rq->data);
+}
+DO_NEW(query_t, query);
+DO_DELETE(query_t, query);
+
+
+job_t *job_accept(job_t *listener, int state);
+
 #endif
-
-
-#include "job.h"
-
-static int epollfd;
-
-static void job_wipe(job_t *job)
-{
-    if (job->fd >= 0) {
-        close(job->fd);
-        job->fd = -1;
-    }
-}
-DO_DELETE(job_t, job);
-
-void job_release(job_t **job)
-{
-    if (*job) {
-        if ((*job)->stop) {
-            (*job)->stop(*job);
-        }
-        job_delete(job);
-    }
-}
-
-static job_t *job_register_fd(job_t *job)
-{
-    struct epoll_event event = { .data.ptr = job, .events = EPOLLRDHUP };
-
-    if (job->state & JOB_READ || job->state & JOB_LISTEN) {
-        event.events |= EPOLLIN;
-    }
-
-    if (job->state & JOB_WRITE || job->state & JOB_CONN) {
-        event.events |= EPOLLIN;
-    }
-
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, job->fd, &event) < 0) {
-        job->error = true;
-        job_release(&job);
-    }
-
-    return job;
-}
-
-void job_update_state(job_t *job, int state)
-{
-    struct epoll_event event = { .data.ptr = job, .events = EPOLLRDHUP };
-
-    if (job->state == state)
-        return;
-
-    job->state = state;
-
-    if (job->state & JOB_READ || job->state & JOB_LISTEN) {
-        event.events |= EPOLLIN;
-    }
-
-    if (job->state & JOB_WRITE || job->state & JOB_CONN) {
-        event.events |= EPOLLIN;
-    }
-
-    epoll_ctl(epollfd, EPOLL_CTL_MOD, job->fd, &event);
-}
-
-job_t *job_accept(job_t *listener, int state)
-{
-    int sock;
-    job_t *res;
-
-    if ((sock = accept(listener->fd, NULL, 0)) < 0) {
-        return NULL;
-    }
-
-    if (fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK)) {
-        return NULL;
-    }
-
-    res          = job_new();
-    res->fd      = sock;
-    res->state   = state;
-    res->process = listener->process;
-    res->stop    = listener->stop;
-    return job_register_fd(res);
-}

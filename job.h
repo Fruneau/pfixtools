@@ -36,7 +36,7 @@
 #ifndef POSTLICYD_JOB_H
 #define POSTLICYD_JOB_H
 
-#include "buffer.h"
+#include "mem.h"
 
 enum job_state {
     JOB_IDLE   = 0x00,
@@ -60,7 +60,6 @@ enum smtp_state {
 
 typedef struct job_t   job_t;
 typedef struct jpriv_t jpriv_t;
-typedef struct query_t query_t;
 
 struct job_t {
     unsigned state : 6;
@@ -69,8 +68,8 @@ struct job_t {
 
     int fd;
 
-    void (*stop)(job_t *);
     void (*process)(job_t *);
+    void (*stop)(job_t *);
 
     jpriv_t *jdata;
 };
@@ -82,55 +81,7 @@ static inline job_t *job_init(job_t *job) {
 }
 DO_NEW(job_t, job);
 void job_release(job_t **job);
-void job_update_events(job_t *job);
-
-struct query_t {
-    unsigned state : 4;
-    unsigned esmtp : 1;
-
-    const char *helo_name;
-    const char *queue_id;
-    const char *sender;
-    const char *recipient;
-    const char *recipient_count;
-    const char *client_address;
-    const char *client_name;
-    const char *rclient_name;
-    const char *instance;
-
-    /* postfix 2.2+ */
-    const char *sasl_method;
-    const char *sasl_username;
-    const char *sasl_sender;
-    const char *size;
-    const char *ccert_subject;
-    const char *ccert_issuer;
-    const char *ccsert_fingerprint;
-
-    /* postfix 2.3+ */
-    const char *encryption_protocol;
-    const char *encryption_cipher;
-    const char *encryption_keysize;
-    const char *etrn_domain;
-
-    buffer_t data;
-
-    job_t *postfix;
-    job_t *current;
-};
-
-static inline query_t *query_init(query_t *rq) {
-    p_clear(rq, 1);
-    buffer_init(&rq->data);
-    return rq;
-}
-static inline void query_wipe(query_t *rq) {
-    buffer_wipe(&rq->data);
-}
-DO_NEW(query_t, query);
-DO_DELETE(query_t, query);
-
-
+void job_update_state(job_t *job, int state);
 job_t *job_accept(job_t *listener, int state);
 
 #endif

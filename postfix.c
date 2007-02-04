@@ -39,48 +39,74 @@
 
 #include "job.h"
 #include "postfix.h"
+#include "buffer.h"
 
 struct jpriv_t {
     buffer_t ibuf;
     buffer_t obuf;
 };
 
-void postfix_start(job_t *job, query_t *query)
+jpriv_t *postfix_jpriv_init(jpriv_t *jp)
 {
+    buffer_init(&jp->ibuf);
+    buffer_init(&jp->obuf);
+    return jp;
+}
+void postfix_jpriv_wipe(jpriv_t *jp)
+{
+    buffer_wipe(&jp->ibuf);
+    buffer_wipe(&jp->obuf);
+}
+DO_NEW(jpriv_t, postfix_jpriv);
+DO_DELETE(jpriv_t, postfix_jpriv);
+
+
+void postfix_start(job_t *listener)
+{
+    job_t *job;
+
+    job = job_accept(listener, JOB_READ);
+    if (!job)
+        return;
+
+    job->jdata = postfix_jpriv_new();
 }
 
 void postfix_stop(job_t *job)
 {
+    postfix_jpriv_delete(&job->jdata);
 }
 
 void postfix_process(job_t *job)
 {
-    if (job->state & JOB_LISTEN) {
-        /* TODO check return code */
-        job_accept(job, JOB_READ);
-    }
+    int nb;
 
-    if (job->state & JOB_WRITE) {
-        int nbwritten;
+    switch (job->state) {
+      case JOB_LISTEN:
+        return postfix_start(job);
 
-        nbwritten = write(job->fd, job->jdata->obuf.data, job->jdata->obuf.len);
-        if (nbwritten < 0) {
+      case JOB_WRITE:
+        nb = write(job->fd, job->jdata->obuf.data, job->jdata->obuf.len);
+        if (nb < 0) {
             job->error = errno != EINTR && errno != EAGAIN;
             return;
         }
 
-        buffer_consume(&job->jdata->obuf, nbwritten);
-    }
+        buffer_consume(&job->jdata->obuf, nb);
+        if (job->jdata->obuf.len)
+            return;
 
-    if (job->state & JOB_READ) {
-        int nbread;
+        job_update_state(job, JOB_READ);
 
-        nbread = buffer_read(&job->jdata->ibuf, job->fd, -1);
-        if (nbread < 0) {
+        /* fall through */
+
+      case JOB_READ:
+        nb = buffer_read(&job->jdata->ibuf, job->fd, -1);
+        if (nb < 0) {
             job->error = errno != EINTR && errno != EAGAIN;
             return;
         }
-        if (nbread == 0) {
+        if (nb == 0) {
             job->error = true;
             return;
         }
@@ -88,8 +114,12 @@ void postfix_process(job_t *job)
         if (!strstr(job->jdata->ibuf.data, "\r\n\r\n"))
             return;
 
-        job->state &= ~JOB_READ;
-
         /* TODO: do the parse */
+        job_update_state(job, JOB_IDLE);
+        return;
+
+      default:
+        job->error = true;
+        return;
     }
 }
