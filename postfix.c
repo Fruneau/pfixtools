@@ -45,10 +45,6 @@ struct jpriv_t {
     buffer_t obuf;
 };
 
-struct tpriv_t {
-    job_t *jobs;
-};
-
 void postfix_start(job_t *job, query_t *query)
 {
 }
@@ -91,6 +87,8 @@ void postfix_process(job_t *job)
 
         if (!strstr(job->jdata->ibuf.data, "\r\n\r\n"))
             return;
+
+        job->state &= ~JOB_READ;
 
         /* TODO: do the parse */
     }

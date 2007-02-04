@@ -60,18 +60,7 @@ enum smtp_state {
 
 typedef struct job_t   job_t;
 typedef struct jpriv_t jpriv_t;
-typedef struct task_t  task_t;
-typedef struct tpriv_t tpriv_t;
 typedef struct query_t query_t;
-
-struct task_t {
-    void (*start)(job_t *, query_t *);
-    void (*stop)(job_t *);
-    void (*cancel)(job_t *);
-    void (*process)(job_t *);
-
-    tpriv_t *tdata;
-};
 
 struct job_t {
     unsigned state : 6;
@@ -80,7 +69,9 @@ struct job_t {
 
     int fd;
 
-    task_t  *task;
+    void (*stop)(job_t *);
+    void (*process)(job_t *);
+
     jpriv_t *jdata;
 };
 

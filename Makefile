@@ -71,6 +71,6 @@ headers:
 $(PROGRAMS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
 	$(CC) -o $@ $(CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
--include $(foreach p,$(PROGRAMS),$(patsubst %.c,%.d,$(filter %.c,$p_SOURCES)))
+-include $(foreach p,$(PROGRAMS),$(patsubst %.c,.%.d,$(filter %.c,$p_SOURCES)))
 
 ###########################################################################}}}

@@ -66,8 +66,8 @@ DO_DELETE(job_t, job);
 void job_release(job_t **job)
 {
     if (*job) {
-        if ((*job)->task && (*job)->task->stop) {
-            (*job)->task->stop(*job);
+        if ((*job)->stop) {
+            (*job)->stop(*job);
         }
         job_delete(job);
     }
@@ -121,9 +121,10 @@ job_t *job_accept(job_t *listener, int state)
         return NULL;
     }
 
-    res        = job_new();
-    res->fd    = sock;
-    res->state = state;
-    res->task  = listener->task;
+    res          = job_new();
+    res->fd      = sock;
+    res->state   = state;
+    res->process = listener->process;
+    res->stop    = listener->stop;
     return job_register_fd(res);
 }
