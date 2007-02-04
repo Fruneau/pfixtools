@@ -37,6 +37,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 
+#include "job.h"
 #include "postfix.h"
 
 struct jpriv_t {
@@ -44,30 +45,23 @@ struct jpriv_t {
     buffer_t obuf;
 };
 
-task_t *postfix_create(void)
-{
-    return NULL;
-}
+struct tpriv_t {
+    job_t *jobs;
+};
 
-void postfix_release(task_t **task)
-{
-    if (task) {
-        *task = NULL;
-    }
-}
-
-void postfix_run(job_t *job, query_t *query)
+void postfix_start(job_t *job, query_t *query)
 {
 }
 
-void postfix_done(job_t *job)
+void postfix_stop(job_t *job)
 {
 }
 
 void postfix_process(job_t *job)
 {
     if (job->state & JOB_LISTEN) {
-        // TODO
+        /* TODO check return code */
+        job_accept(job, JOB_READ);
     }
 
     if (job->state & JOB_WRITE) {
@@ -101,12 +95,3 @@ void postfix_process(job_t *job)
         /* TODO: do the parse */
     }
 }
-
-task_t task_postfix = {
-    postfix_create,
-    postfix_release,
-    postfix_run,
-    postfix_done,
-    NULL,
-    postfix_process
-};

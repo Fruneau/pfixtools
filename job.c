@@ -33,5 +33,97 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
+#include <fcntl.h>
+#include <stdbool.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#ifndef EPOLLRDHUP
+#  include <linux/poll.h>
+#  ifdef POLLRDHUP
+#    define EPOLLRDHUP POLLRDHUP
+#  else
+#    define EPOLLRDHUP 0
+#  endif
+#endif
+
+
 #include "job.h"
 
+static int epollfd;
+
+static void job_wipe(job_t *job)
+{
+    if (job->fd >= 0) {
+        close(job->fd);
+        job->fd = -1;
+    }
+}
+DO_DELETE(job_t, job);
+
+void job_release(job_t **job)
+{
+    if (*job) {
+        if ((*job)->task && (*job)->task->stop) {
+            (*job)->task->stop(*job);
+        }
+        job_delete(job);
+    }
+}
+
+static job_t *job_register_fd(job_t *job)
+{
+    struct epoll_event event = { .data.ptr = job, .events = EPOLLRDHUP };
+
+    if (job->state & JOB_READ || job->state & JOB_LISTEN) {
+        event.events |= EPOLLIN;
+    }
+
+    if (job->state & JOB_WRITE || job->state & JOB_CONN) {
+        event.events |= EPOLLIN;
+    }
+
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, job->fd, &event) < 0) {
+        job->error = true;
+        job_release(&job);
+    }
+
+    return job;
+}
+
+void job_update_events(job_t *job)
+{
+    struct epoll_event event = { .data.ptr = job, .events = EPOLLRDHUP };
+
+    if (job->state & JOB_READ || job->state & JOB_LISTEN) {
+        event.events |= EPOLLIN;
+    }
+
+    if (job->state & JOB_WRITE || job->state & JOB_CONN) {
+        event.events |= EPOLLIN;
+    }
+
+    epoll_ctl(epollfd, EPOLL_CTL_MOD, job->fd, &event);
+}
+
+job_t *job_accept(job_t *listener, int state)
+{
+    int sock;
+    job_t *res;
+
+    if ((sock = accept(listener->fd, NULL, 0)) < 0) {
+        return NULL;
+    }
+
+    if (fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK)) {
+        return NULL;
+    }
+
+    res        = job_new();
+    res->fd    = sock;
+    res->state = state;
+    res->task  = listener->task;
+    return job_register_fd(res);
+}

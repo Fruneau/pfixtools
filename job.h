@@ -39,13 +39,12 @@
 #include "buffer.h"
 
 enum job_state {
-    JOB_FREE   = 0x00,
+    JOB_IDLE   = 0x00,
     JOB_READ   = 0x01,
     JOB_WRITE  = 0x02,
     JOB_RDWR   = 0x03,
     JOB_CONN   = 0x04,
     JOB_LISTEN = 0x08,
-    JOB_IDLE   = 0x10,
 };
 
 enum smtp_state {
@@ -62,16 +61,16 @@ enum smtp_state {
 typedef struct job_t   job_t;
 typedef struct jpriv_t jpriv_t;
 typedef struct task_t  task_t;
+typedef struct tpriv_t tpriv_t;
 typedef struct query_t query_t;
 
 struct task_t {
-    task_t *(*create)(void);
-    void (*release)(task_t **);
-
-    void (*run)(job_t *, query_t *);
-    void (*done)(job_t *);
+    void (*start)(job_t *, query_t *);
+    void (*stop)(job_t *);
     void (*cancel)(job_t *);
     void (*process)(job_t *);
+
+    tpriv_t *tdata;
 };
 
 struct job_t {
@@ -81,9 +80,18 @@ struct job_t {
 
     int fd;
 
-    task_t *task;
+    task_t  *task;
     jpriv_t *jdata;
 };
+
+static inline job_t *job_init(job_t *job) {
+    p_clear(job, 1);
+    job->fd = -1;
+    return job;
+}
+DO_NEW(job_t, job);
+void job_release(job_t **job);
+void job_update_events(job_t *job);
 
 struct query_t {
     unsigned state : 4;
@@ -130,5 +138,8 @@ static inline void query_wipe(query_t *rq) {
 }
 DO_NEW(query_t, query);
 DO_DELETE(query_t, query);
+
+
+job_t *job_accept(job_t *listener, int state);
 
 #endif

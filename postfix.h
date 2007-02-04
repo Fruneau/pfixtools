@@ -36,8 +36,4 @@
 #ifndef POSTLICYD_POSTFIX_H
 #define POSTLICYD_POSTFIX_H
 
-#include "job.h"
-
-extern task_t task_postfix;
-
 #endif
