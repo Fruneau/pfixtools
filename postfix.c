@@ -35,6 +35,7 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "job.h"
@@ -88,7 +89,9 @@ void postfix_process(job_t *job)
       case JOB_WRITE:
         nb = write(job->fd, job->jdata->obuf.data, job->jdata->obuf.len);
         if (nb < 0) {
-            job->error = errno != EINTR && errno != EAGAIN;
+            if ((job->error = errno != EINTR && errno != EAGAIN)) {
+                syslog(LOG_ERR, "unexpected problem on the socket: %m");
+            }
             return;
         }
 
@@ -103,10 +106,13 @@ void postfix_process(job_t *job)
       case JOB_READ:
         nb = buffer_read(&job->jdata->ibuf, job->fd, -1);
         if (nb < 0) {
-            job->error = errno != EINTR && errno != EAGAIN;
+            if ((job->error = errno != EINTR && errno != EAGAIN)) {
+                syslog(LOG_ERR, "unexpected problem on the socket: %m");
+            }
             return;
         }
         if (nb == 0) {
+            syslog(LOG_ERR, "unexpected eof");
             job->error = true;
             return;
         }

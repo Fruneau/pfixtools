@@ -33,11 +33,16 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
+#include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
+#include <syslog.h>
+#include <sysexits.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifndef EPOLLRDHUP
@@ -52,7 +57,8 @@
 
 #include "job.h"
 
-static int epollfd;
+static int epollfd = -1;
+static bool sigint = false;
 
 static void job_wipe(job_t *job)
 {
@@ -86,6 +92,7 @@ static job_t *job_register_fd(job_t *job)
     }
 
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, job->fd, &event) < 0) {
+        syslog(LOG_ERR, "epoll_ctl error: %m");
         job->error = true;
         job_release(&job);
     }
@@ -119,10 +126,12 @@ job_t *job_accept(job_t *listener, int state)
     job_t *res;
 
     if ((sock = accept(listener->fd, NULL, 0)) < 0) {
+        syslog(LOG_ERR, "accept error: %m");
         return NULL;
     }
 
     if (fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK)) {
+        syslog(LOG_ERR, "fcntl error: %m");
         return NULL;
     }
 
@@ -132,4 +141,78 @@ job_t *job_accept(job_t *listener, int state)
     res->process = listener->process;
     res->stop    = listener->stop;
     return job_register_fd(res);
+}
+
+static void job_handler(int sig)
+{
+    static time_t lastintr = 0;
+    time_t now = time(NULL);
+
+    switch (sig) {
+      case SIGINT:
+        if (sigint) {
+            if (now - lastintr >= 1)
+                break;
+        } else {
+            lastintr = now;
+            sigint   = true;
+        }
+        return;
+
+      case SIGTERM:
+        break;
+
+      default:
+        return;
+    }
+
+    syslog(LOG_ERR, "Killed...");
+    exit(-1);
+}
+
+void job_initialize(void)
+{
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, &job_handler);
+    signal(SIGTERM, &job_handler);
+
+    epollfd = epoll_create(128);
+    if (epollfd < 0) {
+        syslog(LOG_ERR, "epoll_create error: %m");
+        exit(EX_OSERR);
+    }
+}
+
+void job_loop(void)
+{
+    while (!sigint) {
+        struct epoll_event events[FD_SETSIZE];
+        int todo = epoll_wait(epollfd, events, countof(events), -1);
+
+        if (todo < 0) {
+            if (errno == EAGAIN || errno == EINTR)
+                continue;
+            syslog(LOG_ERR, "epoll_wait error: %m");
+            exit(EX_OSERR);
+        }
+
+        while (todo) {
+            job_t *job = events[--todo].data.ptr;
+
+            assert (job->process);
+            job->process(job);
+
+            if (job->error || job->done) {
+                job_release(&job);
+            }
+        }
+    }
+}
+
+void job_shutdown(void)
+{
+    if (epollfd >= 0) {
+        close(epollfd);
+        epollfd = -1;
+    }
 }

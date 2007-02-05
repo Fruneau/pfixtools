@@ -33,7 +33,36 @@
  * Copyright © 2006 Pierre Habouzit
  */
 
+#include <stdbool.h>
+#include <stdio.h>
+#include <sysexits.h>
+#include <syslog.h>
+
+#include "job.h"
+
+bool cleanexit = false;
+
+void shutdown(void)
+{
+    syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
+    job_shutdown();
+    closelog();
+}
+
 int main(void)
 {
+    if (atexit(shutdown)) {
+        fputs("Cannot hook my atexit function, quitting !\n", stderr);
+        return EX_CONFIG;
+    }
+
+    openlog("postlicyd", LOG_PID, LOG_MAIL);
+    job_initialize();
+    syslog(LOG_INFO, "Starting...");
+
+    job_loop();
+
+    cleanexit = true;
+    shutdown();
     return 0;
 }

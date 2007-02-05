@@ -84,4 +84,8 @@ void job_release(job_t **job);
 void job_update_state(job_t *job, int state);
 job_t *job_accept(job_t *listener, int state);
 
+void job_initialize(void);
+void job_loop(void);
+void job_shutdown(void);
+
 #endif
