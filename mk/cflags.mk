@@ -29,15 +29,13 @@
 #  THE POSSIBILITY OF SUCH DAMAGE.                                           #
 ##############################################################################
 
-GCCVERSION:=$(shell $(CC) -dumpversion)
-GCCMACHINE:=$(shell $(CC) -dumpmachine)
-OBJSUFFIX:=-$(GCCMACHINE:-linux-gnu=)-$(GCCVERSION)
-
-ifneq (,$(filter 4.%,$(GCCVERSION)))
+ifneq ($(filter 4.%,$(shell gcc -dumpversion)),)
   GCC4=1
 endif
 
 LDFLAGS += -Wl,--warn-common
+
+CFLAGS := -g
 
 # Use pipes and not temp files.
 CFLAGS += -pipe
@@ -68,14 +66,11 @@ CFLAGS += -Wwrite-strings
 CFLAGS += -Wsign-compare
 # warn about unused declared stuff
 CFLAGS += -Wunused
-# do not warn about unused function parameters
 CFLAGS += -Wno-unused-parameter
-# do not warn about unused statement value
-#CFLAGS += -Wno-unused-value
 # warn about variable use before initialization
 CFLAGS += -Wuninitialized
 # warn about variables which are initialized with themselves
-CFLAGS += $(if $(GCC4),-Winit-self)
+CFLAGS += -Winit-self
 # warn about pointer arithmetic on void* and function pointers
 CFLAGS += -Wpointer-arith
 # warn about multiple declarations
@@ -84,8 +79,8 @@ CFLAGS += -Wredundant-decls
 CFLAGS += -Wformat-nonliteral
 # do not warn about zero-length formats.
 CFLAGS += -Wno-format-zero-length
-# do not warn about strftime format with y2k issues
-CFLAGS += -Wno-format-y2k
+# missing prototypes
+CFLAGS += -Wmissing-prototypes
 # warn about functions without format attribute that should have one
 CFLAGS += -Wmissing-format-attribute
 # barf if we change constness
