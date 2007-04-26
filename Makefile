@@ -38,7 +38,7 @@ postlicyd_SOURCES = \
 		str.c buffer.c job.c postfix.c         \
 		postlicyd.c
 
-postlicyd_LIBADD = -ludns
+postlicyd_LIBADD = -lanl
 
 # RULES ###################################################################{{{
 
@@ -71,6 +71,6 @@ headers:
 $(PROGRAMS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
 	$(CC) -o $@ $(CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
--include $(foreach p,$(PROGRAMS),$(patsubst %.c,.%.d,$(filter %.c,$p_SOURCES)))
+-include $(foreach p,$(PROGRAMS),$(patsubst %.c,.%.d,$(filter %.c,$($p_SOURCES))))
 
 ###########################################################################}}}
