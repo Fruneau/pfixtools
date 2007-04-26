@@ -43,8 +43,8 @@ enum job_state {
     JOB_READ   = 0x01,
     JOB_WRITE  = 0x02,
     JOB_RDWR   = 0x03,
-    JOB_CONN   = 0x04,
-    JOB_LISTEN = 0x08,
+    JOB_LISTEN = 0x04,
+    JOB_CONN   = 0x08,
 };
 
 enum smtp_state {
@@ -58,29 +58,28 @@ enum smtp_state {
     STATE_ETRN,
 };
 
-typedef struct job_t   job_t;
 typedef struct jpriv_t jpriv_t;
 
-struct job_t {
+typedef struct job_t {
     unsigned state : 6;
     unsigned done  : 1;
     unsigned error : 1;
 
     int fd;
 
-    void (*process)(job_t *);
-    void (*stop)(job_t *);
+    void (*process)(struct job_t *);
+    void (*stop)(struct job_t *);
 
     jpriv_t *jdata;
-};
+} job_t;
 
-static inline job_t *job_init(job_t *job) {
-    p_clear(job, 1);
+static inline job_t *job_new(void) {
+    job_t *job = p_new(job_t, 1);
     job->fd = -1;
     return job;
 }
-DO_NEW(job_t, job);
-void job_release(job_t **job);
+void job_delete(job_t **job);
+
 void job_update_state(job_t *job, int state);
 job_t *job_accept(job_t *listener, int state);
 

@@ -60,22 +60,16 @@
 static int epollfd = -1;
 static bool sigint = false;
 
-static void job_wipe(job_t *job)
-{
-    if (job->fd >= 0) {
-        close(job->fd);
-        job->fd = -1;
-    }
-}
-DO_DELETE(job_t, job);
-
-void job_release(job_t **job)
+void job_delete(job_t **job)
 {
     if (*job) {
         if ((*job)->stop) {
             (*job)->stop(*job);
         }
-        job_delete(job);
+        if ((*job)->fd >= 0) {
+            close((*job)->fd);
+        }
+        p_delete(job);
     }
 }
 
@@ -83,18 +77,18 @@ static job_t *job_register_fd(job_t *job)
 {
     struct epoll_event event = { .data.ptr = job, .events = EPOLLRDHUP };
 
-    if (job->state & JOB_READ || job->state & JOB_LISTEN) {
+    if (job->state & (JOB_READ | JOB_LISTEN)) {
         event.events |= EPOLLIN;
     }
 
-    if (job->state & JOB_WRITE || job->state & JOB_CONN) {
-        event.events |= EPOLLIN;
+    if (job->state & (JOB_WRITE | JOB_CONN)) {
+        event.events |= EPOLLOUT;
     }
 
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, job->fd, &event) < 0) {
         syslog(LOG_ERR, "epoll_ctl error: %m");
         job->error = true;
-        job_release(&job);
+        job_delete(&job);
     }
 
     return job;
@@ -108,16 +102,18 @@ void job_update_state(job_t *job, int state)
         return;
 
     job->state = state;
-
-    if (job->state & JOB_READ || job->state & JOB_LISTEN) {
+    if (job->state & (JOB_READ | JOB_LISTEN)) {
         event.events |= EPOLLIN;
     }
 
-    if (job->state & JOB_WRITE || job->state & JOB_CONN) {
-        event.events |= EPOLLIN;
+    if (job->state & (JOB_WRITE | JOB_CONN)) {
+        event.events |= EPOLLOUT;
     }
 
-    epoll_ctl(epollfd, EPOLL_CTL_MOD, job->fd, &event);
+    if (epoll_ctl(epollfd, EPOLL_CTL_MOD, job->fd, &event) < 0) {
+        syslog(LOG_ERR, "epoll_ctl error: %m");
+        job->error = true;
+    }
 }
 
 job_t *job_accept(job_t *listener, int state)
@@ -143,7 +139,7 @@ job_t *job_accept(job_t *listener, int state)
     return job_register_fd(res);
 }
 
-static void job_handler(int sig)
+static void job_sighandler(int sig)
 {
     static time_t lastintr = 0;
     time_t now = time(NULL);
@@ -173,8 +169,8 @@ static void job_handler(int sig)
 void job_initialize(void)
 {
     signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT, &job_handler);
-    signal(SIGTERM, &job_handler);
+    signal(SIGINT,  &job_sighandler);
+    signal(SIGTERM, &job_sighandler);
 
     epollfd = epoll_create(128);
     if (epollfd < 0) {
@@ -203,7 +199,7 @@ void job_loop(void)
             job->process(job);
 
             if (job->error || job->done) {
-                job_release(&job);
+                job_delete(&job);
             }
         }
     }

@@ -42,7 +42,7 @@
 
 bool cleanexit = false;
 
-void shutdown(void)
+static void shutdown(void)
 {
     syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
     job_shutdown();

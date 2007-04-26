@@ -47,13 +47,13 @@ struct jpriv_t {
     buffer_t obuf;
 };
 
-jpriv_t *postfix_jpriv_init(jpriv_t *jp)
+static jpriv_t *postfix_jpriv_init(jpriv_t *jp)
 {
     buffer_init(&jp->ibuf);
     buffer_init(&jp->obuf);
     return jp;
 }
-void postfix_jpriv_wipe(jpriv_t *jp)
+static void postfix_jpriv_wipe(jpriv_t *jp)
 {
     buffer_wipe(&jp->ibuf);
     buffer_wipe(&jp->obuf);
@@ -61,30 +61,23 @@ void postfix_jpriv_wipe(jpriv_t *jp)
 DO_NEW(jpriv_t, postfix_jpriv);
 DO_DELETE(jpriv_t, postfix_jpriv);
 
-
-void postfix_start(job_t *listener)
-{
-    job_t *job;
-
-    job = job_accept(listener, JOB_READ);
-    if (!job)
-        return;
-
-    job->jdata = postfix_jpriv_new();
-}
-
-void postfix_stop(job_t *job)
+static void postfix_stop(job_t *job)
 {
     postfix_jpriv_delete(&job->jdata);
 }
 
-void postfix_process(job_t *job)
+static void postfix_process(job_t *job)
 {
     int nb;
 
     switch (job->state) {
       case JOB_LISTEN:
-        return postfix_start(job);
+        if ((job = job_accept(job, JOB_READ))) {
+            job->jdata   = postfix_jpriv_new();
+            job->process = &postfix_process;
+            job->stop    = &postfix_stop;
+        }
+        return;
 
       case JOB_WRITE:
         nb = write(job->fd, job->jdata->obuf.data, job->jdata->obuf.len);
