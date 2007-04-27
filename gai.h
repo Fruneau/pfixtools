@@ -33,59 +33,24 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#ifndef POSTLICYD_JOB_H
-#define POSTLICYD_JOB_H
+#ifndef POSTLICYD_GAI_H
+#define POSTLICYD_GAI_H
 
-#include "mem.h"
+#include <netdb.h>
 
-enum job_mode {
-    JOB_IDLE   = 0x00,
-    JOB_READ   = 0x01,
-    JOB_WRITE  = 0x02,
-    JOB_RDWR   = JOB_READ | JOB_WRITE,
-    JOB_LISTEN = 0x04,
-    JOB_CONN   = 0x08,
-};
+#include "job.h"
 
-enum smtp_state {
-    STATE_CONNECT,
-    STATE_HELO, /* or EHLO */
-    STATE_MAIL,
-    STATE_RCPT,
-    STATE_DATE,
-    STATE_EOM,
-    STATE_VRFY,
-    STATE_ETRN,
-};
+typedef struct gai_req {
+    struct gaicb cb;
+    struct gaicb *cbp; /* points to cb */
+    job_t *caller;
+} gai_req;
 
-typedef struct jpriv_t jpriv_t;
+gai_req *gai_query(job_t *, const char *lookup);
+void gai_abort(gai_req **);
 
-typedef struct job_t {
-    unsigned mode  :  6; /* 4 are enough, 2 used as padding */
-    unsigned done  :  1;
-    unsigned error :  1;
-    unsigned state : 24;
-
-    int fd;
-
-    void (*process)(struct job_t *);
-    void (*stop)(struct job_t *);
-
-    jpriv_t *jdata;
-} job_t;
-
-static inline job_t *job_new(void) {
-    job_t *job = p_new(job_t, 1);
-    job->fd = -1;
-    return job;
-}
-void job_delete(job_t **job);
-
-void job_update_mode(job_t *job, int mode);
-job_t *job_accept(job_t *listener, int mode);
-
-void job_initialize(void);
-void job_loop(void);
-void job_shutdown(void);
+void gai_initialize(void);
+void gai_process(void);
+void gai_shutdown(void);
 
 #endif

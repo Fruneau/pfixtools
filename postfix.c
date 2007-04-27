@@ -70,7 +70,7 @@ static void postfix_process(job_t *job)
 {
     int nb;
 
-    switch (job->state) {
+    switch (job->mode) {
       case JOB_LISTEN:
         if ((job = job_accept(job, JOB_READ))) {
             job->jdata   = postfix_jpriv_new();
@@ -92,7 +92,7 @@ static void postfix_process(job_t *job)
         if (job->jdata->obuf.len)
             return;
 
-        job_update_state(job, JOB_READ);
+        job_update_mode(job, JOB_READ);
 
         /* fall through */
 
@@ -114,7 +114,7 @@ static void postfix_process(job_t *job)
             return;
 
         /* TODO: do the parse */
-        job_update_state(job, JOB_IDLE);
+        job_update_mode(job, JOB_IDLE);
         return;
 
       default:

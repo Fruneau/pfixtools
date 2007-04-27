@@ -30,12 +30,13 @@
 ##############################################################################
 
 include mk/cflags.mk
+CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=1
 
 PROGRAMS = postlicyd
 
 postlicyd_SOURCES = \
-		str.h buffer.h job.h postfix.h query.h \
-		str.c buffer.c job.c postfix.c         \
+		str.h buffer.h job.h postfix.h gai.h query.h \
+		str.c buffer.c job.c postfix.c gai.c         \
 		postlicyd.c
 
 postlicyd_LIBADD = -lanl

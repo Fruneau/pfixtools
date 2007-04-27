@@ -81,7 +81,4 @@ static inline void query_wipe(query_t *rq) {
 DO_NEW(query_t, query);
 DO_DELETE(query_t, query);
 
-
-job_t *job_accept(job_t *listener, int state);
-
 #endif

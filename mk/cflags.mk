@@ -35,7 +35,7 @@ endif
 
 LDFLAGS += -Wl,--warn-common
 
-CFLAGS := -g
+CFLAGS += -g
 
 # Use pipes and not temp files.
 CFLAGS += -pipe

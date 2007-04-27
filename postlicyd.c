@@ -39,30 +39,38 @@
 #include <syslog.h>
 
 #include "job.h"
+#include "gai.h"
 
 bool cleanexit = false;
 
-static void shutdown(void)
+static void main_initialize(void)
+{
+    openlog("postlicyd", LOG_PID, LOG_MAIL);
+    gai_initialize();
+    job_initialize();
+    syslog(LOG_INFO, "Starting...");
+}
+
+static void main_shutdown(void)
 {
     syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
     job_shutdown();
+    gai_shutdown();
     closelog();
 }
 
 int main(void)
 {
-    if (atexit(shutdown)) {
+    if (atexit(main_shutdown)) {
         fputs("Cannot hook my atexit function, quitting !\n", stderr);
         return EX_CONFIG;
     }
 
-    openlog("postlicyd", LOG_PID, LOG_MAIL);
-    job_initialize();
-    syslog(LOG_INFO, "Starting...");
+    main_initialize();
 
     job_loop();
 
     cleanexit = true;
-    shutdown();
+    main_shutdown();
     return 0;
 }

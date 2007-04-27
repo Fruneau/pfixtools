@@ -54,8 +54,8 @@
 #  endif
 #endif
 
-
 #include "job.h"
+#include "gai.h"
 
 static int epollfd = -1;
 static bool sigint = false;
@@ -77,11 +77,11 @@ static job_t *job_register_fd(job_t *job)
 {
     struct epoll_event event = { .data.ptr = job, .events = EPOLLRDHUP };
 
-    if (job->state & (JOB_READ | JOB_LISTEN)) {
+    if (job->mode & (JOB_READ | JOB_LISTEN)) {
         event.events |= EPOLLIN;
     }
 
-    if (job->state & (JOB_WRITE | JOB_CONN)) {
+    if (job->mode & (JOB_WRITE | JOB_CONN)) {
         event.events |= EPOLLOUT;
     }
 
@@ -94,19 +94,19 @@ static job_t *job_register_fd(job_t *job)
     return job;
 }
 
-void job_update_state(job_t *job, int state)
+void job_update_mode(job_t *job, int mode)
 {
     struct epoll_event event = { .data.ptr = job, .events = EPOLLRDHUP };
 
-    if (job->state == state)
+    if (job->mode == mode)
         return;
 
-    job->state = state;
-    if (job->state & (JOB_READ | JOB_LISTEN)) {
+    job->mode = mode;
+    if (job->mode & (JOB_READ | JOB_LISTEN)) {
         event.events |= EPOLLIN;
     }
 
-    if (job->state & (JOB_WRITE | JOB_CONN)) {
+    if (job->mode & (JOB_WRITE | JOB_CONN)) {
         event.events |= EPOLLOUT;
     }
 
@@ -116,7 +116,7 @@ void job_update_state(job_t *job, int state)
     }
 }
 
-job_t *job_accept(job_t *listener, int state)
+job_t *job_accept(job_t *listener, int mode)
 {
     int sock;
     job_t *res;
@@ -133,7 +133,7 @@ job_t *job_accept(job_t *listener, int state)
 
     res          = job_new();
     res->fd      = sock;
-    res->state   = state;
+    res->mode    = mode;
     res->process = listener->process;
     res->stop    = listener->stop;
     return job_register_fd(res);
@@ -202,6 +202,8 @@ void job_loop(void)
                 job_delete(&job);
             }
         }
+
+        gai_process();
     }
 }
 
