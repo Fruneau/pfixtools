@@ -34,10 +34,12 @@ CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=1
 
 PROGRAMS = postlicyd
 
+GENERATED = tokens.h tokens.c
+
 postlicyd_SOURCES = \
-		str.h buffer.h job.h postfix.h gai.h query.h \
-		str.c buffer.c job.c postfix.c gai.c         \
-		postlicyd.c
+		str.h buffer.h job.h postfix.h gai.h \
+		str.c buffer.c job.c postfix.c gai.c \
+		postlicyd.c $(GENERATED)
 
 postlicyd_LIBADD = -lanl
 
@@ -50,6 +52,7 @@ clean:
 	$(RM) .*.o
 
 distclean: clean
+	$(RM) $(GENERATED)
 
 tags: .tags
 .tags: $(shell git ls-files | egrep '\.[hc]$$')
@@ -60,6 +63,12 @@ headers:
 	@which headache > /dev/null || \
 		( echo "package headache not installed" ; exit 1 )
 	@git ls-files | egrep '(\.h|\.c|Makefile|*\.mk)$$' | xargs -t headache $(HEADACHEOPTS)
+
+%.c: %.sh
+	./$< $@ || ($(RM) $@; exit 1)
+
+%.h: %.sh
+	./$< $@ || ($(RM) $@; exit 1)
 
 .%.o: %.c Makefile
 	$(CC) $(CFLAGS) -MMD -MT ".$*.d $@" -MF .$*.d -g -c -o $@ $<

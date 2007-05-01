@@ -36,4 +36,50 @@
 #ifndef POSTLICYD_POSTFIX_H
 #define POSTLICYD_POSTFIX_H
 
+#include "buffer.h"
+
+/* \see http://www.postfix.org/SMTPD_POLICY_README.html */
+typedef struct query_t {
+    unsigned state : 4;
+    unsigned esmtp : 1;
+
+    const char *helo_name;
+    const char *queue_id;
+    const char *sender;
+    const char *recipient;
+    const char *recipient_count;
+    const char *client_address;
+    const char *client_name;
+    const char *rclient_name;
+    const char *instance;
+
+    /* postfix 2.2+ */
+    const char *sasl_method;
+    const char *sasl_username;
+    const char *sasl_sender;
+    const char *size;
+    const char *ccert_subject;
+    const char *ccert_issuer;
+    const char *ccsert_fingerprint;
+
+    /* postfix 2.3+ */
+    const char *encryption_protocol;
+    const char *encryption_cipher;
+    const char *encryption_keysize;
+    const char *etrn_domain;
+
+    buffer_t data;
+} query_t;
+
+static inline query_t *query_init(query_t *rq) {
+    p_clear(rq, 1);
+    buffer_init(&rq->data);
+    return rq;
+}
+static inline void query_wipe(query_t *rq) {
+    buffer_wipe(&rq->data);
+}
+DO_NEW(query_t, query);
+DO_DELETE(query_t, query);
+
 #endif

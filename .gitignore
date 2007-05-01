@@ -1,3 +1,5 @@
+tokens.[hc]
+
 postlicyd
 
 *.o
