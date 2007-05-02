@@ -44,6 +44,8 @@
 #include "buffer.h"
 #include "tokens.h"
 
+#define ishspace(c)  ((c) == ' ' || (c) == '\t')
+
 struct jpriv_t {
     buffer_t ibuf;
     buffer_t obuf;
@@ -87,18 +89,18 @@ static int postfix_parsejob(query_t *query)
         char *k, *v;
         int klen, vlen, vtk;
 
-        while (*p == ' ' || *p == '\t')
+        while (ishspace(*p))
             p++;
         p = strchr(k = p, '=');
-        PARSE_CHECK(p, "could not find '=' in policy line");
-        for (klen = p - k; k[klen] == ' ' || k[klen] == '\t'; klen--);
+        PARSE_CHECK(p, "could not find '=' in line");
+        for (klen = p - k; klen && ishspace(k[klen]); klen--);
         p += 1; /* skip = */
 
-        while (*p == ' ' || *p == '\t')
+        while (ishspace(*p))
             p++;
         p = strstr(v = p, "\r\n");
-        PARSE_CHECK(p, "could not find final \\r\\n in policy line");
-        for (vlen = p - v; v[vlen] == ' ' || v[vlen] == '\t'; vlen--);
+        PARSE_CHECK(p, "could not find final \\r\\n in line");
+        for (vlen = p - v; vlen && ishspace(v[vlen]); vlen--);
         p += 2; /* skip \r\n */
 
         vtk = tokenize(v, vlen);
@@ -159,10 +161,10 @@ static int postfix_parsejob(query_t *query)
           default:
             return -1;
         }
-        /* do sth with (k,v) */
     }
 
-    return -1;
+    return query->state == SMTP_UNKNOWN ? -1 : 0;
+
 #undef PARSE_CHECK
 }
 
