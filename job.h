@@ -47,19 +47,7 @@ enum job_mode {
     JOB_CONN   = 0x08,
 };
 
-enum smtp_state {
-    STATE_CONNECT,
-    STATE_HELO, /* or EHLO */
-    STATE_MAIL,
-    STATE_RCPT,
-    STATE_DATE,
-    STATE_EOM,
-    STATE_VRFY,
-    STATE_ETRN,
-};
-
 typedef struct jpriv_t jpriv_t;
-
 typedef struct job_t {
     unsigned mode  :  6; /* 4 are enough, 2 used as padding */
     unsigned done  :  1;

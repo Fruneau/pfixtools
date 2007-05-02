@@ -123,8 +123,8 @@ exit 0
 ############ Put tokens here ############
 # postfix 2.1+
 ## request
+## protocol_name
 ## protocol_state
-## protocol_esmtp
 ## helo_name
 ## queue_id
 ## sender
@@ -149,3 +149,21 @@ exit 0
 ## encryption_cipher
 ## encryption_keysize
 ## etrn_domain
+#
+# request value
+## smtpd_access_policy
+#
+# protocol_name values
+## SMTP
+## ESMTP
+#
+# protocol_state values
+## CONNECT
+## EHLO
+## HELO
+## MAIL
+## RCPT
+## DATA
+## END-OF-MESSAGE
+## VRFY
+## ETRN

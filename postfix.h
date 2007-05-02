@@ -36,7 +36,22 @@
 #ifndef POSTLICYD_POSTFIX_H
 #define POSTLICYD_POSTFIX_H
 
+#include <stddef.h>
+
 #include "buffer.h"
+
+enum smtp_state {
+    SMTP_UNKNOWN,
+    SMTP_CONNECT,
+    SMTP_EHLO,
+    SMTP_HELO = SMTP_EHLO,
+    SMTP_MAIL,
+    SMTP_RCPT,
+    SMTP_DATA,
+    SMTP_END_OF_MESSAGE,
+    SMTP_VRFY,
+    SMTP_ETRN,
+};
 
 /* \see http://www.postfix.org/SMTPD_POLICY_README.html */
 typedef struct query_t {
@@ -72,8 +87,13 @@ typedef struct query_t {
 } query_t;
 
 static inline query_t *query_init(query_t *rq) {
-    p_clear(rq, 1);
+    memset(rq, 0, offsetof(query_t, data));
     buffer_init(&rq->data);
+    return rq;
+}
+static inline query_t *query_reset(query_t *rq) {
+    memset(rq, 0, offsetof(query_t, data));
+    buffer_reset(&rq->data);
     return rq;
 }
 static inline void query_wipe(query_t *rq) {

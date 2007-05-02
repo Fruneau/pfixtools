@@ -47,16 +47,19 @@
 struct jpriv_t {
     buffer_t ibuf;
     buffer_t obuf;
+    query_t query;
 };
 
 static jpriv_t *postfix_jpriv_init(jpriv_t *jp)
 {
     buffer_init(&jp->ibuf);
     buffer_init(&jp->obuf);
+    query_init(&jp->query);
     return jp;
 }
 static void postfix_jpriv_wipe(jpriv_t *jp)
 {
+    query_wipe(&jp->query);
     buffer_wipe(&jp->ibuf);
     buffer_wipe(&jp->obuf);
 }
@@ -68,43 +71,105 @@ static void postfix_stop(job_t *job)
     postfix_jpriv_delete(&job->jdata);
 }
 
-static int postfix_parsejob(job_t *job)
+static int postfix_parsejob(query_t *query)
 {
-    const char *p = skipspaces(job->jdata->ibuf.data);
+#define PARSE_CHECK(expr, error, ...)                                        \
+    do {                                                                     \
+        if (!(expr)) {                                                       \
+            syslog(LOG_ERR, error, ##__VA_ARGS__);                           \
+            return -1;                                                       \
+        }                                                                    \
+    } while (0)
 
-    for (;;) {
-        const char *k, *v;
-        int klen, vlen;
+    char *p = vskipspaces(query->data.data);
+
+    while (*p) {
+        char *k, *v;
+        int klen, vlen, vtk;
 
         while (*p == ' ' || *p == '\t')
             p++;
-        p = strchrnul(k = p, '=');
-        if (!*p)
-            return -1;
+        p = strchr(k = p, '=');
+        PARSE_CHECK(p, "could not find '=' in policy line");
         for (klen = p - k; k[klen] == ' ' || k[klen] == '\t'; klen--);
         p += 1; /* skip = */
 
         while (*p == ' ' || *p == '\t')
             p++;
         p = strstr(v = p, "\r\n");
-        if (!p)
-            return -1;
+        PARSE_CHECK(p, "could not find final \\r\\n in policy line");
         for (vlen = p - v; v[vlen] == ' ' || v[vlen] == '\t'; vlen--);
         p += 2; /* skip \r\n */
 
-        /* do sth with (k,v) */
+        vtk = tokenize(v, vlen);
+        switch (tokenize(k, klen)) {
+#define CASE(up, low)  case PTK_##up: query->low = v; v[vlen] = '\0'; break;
+            CASE(HELO_NAME,           helo_name);
+            CASE(QUEUE_ID,            queue_id);
+            CASE(SENDER,              sender);
+            CASE(RECIPIENT,           recipient);
+            CASE(RECIPIENT_COUNT,     recipient_count);
+            CASE(CLIENT_ADDRESS,      client_address);
+            CASE(CLIENT_NAME,         client_name);
+            CASE(RCLIENT_NAME,        rclient_name);
+            CASE(INSTANCE,            instance);
+            CASE(SASL_METHOD,         sasl_method);
+            CASE(SASL_USERNAME,       sasl_username);
+            CASE(SASL_SENDER,         sasl_sender);
+            CASE(SIZE,                size);
+            CASE(CCERT_SUBJECT,       ccert_subject);
+            CASE(CCERT_ISSUER,        ccert_issuer);
+            CASE(CCSERT_FINGERPRINT,  ccsert_fingerprint);
+            CASE(ENCRYPTION_PROTOCOL, encryption_protocol);
+            CASE(ENCRYPTION_CIPHER,   encryption_cipher);
+            CASE(ENCRYPTION_KEYSIZE,  encryption_keysize);
+            CASE(ETRN_DOMAIN,         etrn_domain);
+#undef CASE
 
-        assert (p[0] && p[1]);
-        if (p[0] == '\r' && p[1] == '\n')
+          case PTK_REQUEST:
+            PARSE_CHECK(vtk == PTK_SMTPD_ACCESS_POLICY,
+                        "unexpected `request' value: %.*s", vlen, v);
             break;
+
+          case PTK_PROTOCOL_NAME:
+            PARSE_CHECK(vtk == PTK_SMTP || vtk == PTK_ESMTP,
+                        "unexpected `protocol_name' value: %.*s", vlen, v);
+            query->esmtp = vtk == PTK_ESMTP;
+            break;
+
+          case PTK_PROTOCOL_STATE:
+            switch (vtk) {
+#define CASE(name)  case PTK_##name: query->state = SMTP_##name; break;
+                CASE(CONNECT);
+                CASE(EHLO);
+                CASE(HELO);
+                CASE(MAIL);
+                CASE(RCPT);
+                CASE(DATA);
+                CASE(END_OF_MESSAGE);
+                CASE(VRFY);
+                CASE(ETRN);
+              default:
+                PARSE_CHECK(false, "unexpected `protocol_state` value: %.*s",
+                            vlen, v);
+#undef CASE
+            }
+            break;
+
+          default:
+            return -1;
+        }
+        /* do sth with (k,v) */
     }
 
     return -1;
+#undef PARSE_CHECK
 }
 
 static void postfix_process(job_t *job)
 {
     int nb;
+    const char *p;
 
     switch (job->mode) {
       case JOB_LISTEN:
@@ -146,16 +211,22 @@ static void postfix_process(job_t *job)
             return;
         }
 
-        if (!strstr(skipspaces(job->jdata->ibuf.data), "\r\n\r\n")) {
+        p = strstr(skipspaces(job->jdata->ibuf.data), "\r\n\r\n");
+        if (!p) {
             if (job->jdata->ibuf.len > SHRT_MAX) {
                 syslog(LOG_ERR, "too much data without CRLFCRLF");
                 job->error = true;
             }
             return;
         }
+        p += 4;
 
-        if (postfix_parsejob(job) < 0) {
-            syslog(LOG_ERR, "could not parse postfix request");
+        query_reset(&job->jdata->query);
+        buffer_add(&job->jdata->query.data, job->jdata->ibuf.data,
+                   p - 2 - job->jdata->ibuf.data);
+        buffer_consume(&job->jdata->query.data, p - job->jdata->ibuf.data);
+
+        if (postfix_parsejob(&job->jdata->query) < 0) {
             job->error = true;
             return;
         }
