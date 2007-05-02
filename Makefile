@@ -30,7 +30,7 @@
 ##############################################################################
 
 include mk/cflags.mk
-CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=1
+CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=2
 
 PROGRAMS = postlicyd
 

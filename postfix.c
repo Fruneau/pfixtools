@@ -34,6 +34,7 @@
  */
 
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -41,6 +42,7 @@
 #include "job.h"
 #include "postfix.h"
 #include "buffer.h"
+#include "tokens.h"
 
 struct jpriv_t {
     buffer_t ibuf;
@@ -64,6 +66,40 @@ DO_DELETE(jpriv_t, postfix_jpriv);
 static void postfix_stop(job_t *job)
 {
     postfix_jpriv_delete(&job->jdata);
+}
+
+static int postfix_parsejob(job_t *job)
+{
+    const char *p = skipspaces(job->jdata->ibuf.data);
+
+    for (;;) {
+        const char *k, *v;
+        int klen, vlen;
+
+        while (*p == ' ' || *p == '\t')
+            p++;
+        p = strchrnul(k = p, '=');
+        if (!*p)
+            return -1;
+        for (klen = p - k; k[klen] == ' ' || k[klen] == '\t'; klen--);
+        p += 1; /* skip = */
+
+        while (*p == ' ' || *p == '\t')
+            p++;
+        p = strstr(v = p, "\r\n");
+        if (!p)
+            return -1;
+        for (vlen = p - v; v[vlen] == ' ' || v[vlen] == '\t'; vlen--);
+        p += 2; /* skip \r\n */
+
+        /* do sth with (k,v) */
+
+        assert (p[0] && p[1]);
+        if (p[0] == '\r' && p[1] == '\n')
+            break;
+    }
+
+    return -1;
 }
 
 static void postfix_process(job_t *job)
@@ -110,11 +146,23 @@ static void postfix_process(job_t *job)
             return;
         }
 
-        if (!strstr(job->jdata->ibuf.data, "\r\n\r\n"))
+        if (!strstr(skipspaces(job->jdata->ibuf.data), "\r\n\r\n")) {
+            if (job->jdata->ibuf.len > SHRT_MAX) {
+                syslog(LOG_ERR, "too much data without CRLFCRLF");
+                job->error = true;
+            }
             return;
+        }
 
-        /* TODO: do the parse */
+        if (postfix_parsejob(job) < 0) {
+            syslog(LOG_ERR, "could not parse postfix request");
+            job->error = true;
+            return;
+        }
+
         job_update_mode(job, JOB_IDLE);
+
+        /* TODO: run the scenario */
         return;
 
       default:
