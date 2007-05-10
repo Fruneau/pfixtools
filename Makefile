@@ -45,7 +45,7 @@ postlicyd_LIBADD = -lanl
 
 # RULES ###################################################################{{{
 
-all: $(PROGRAMS)
+all: $(PROGRAMS) $(GENERATED) | $(GENERATED)
 
 clean:
 	$(RM) $(PROGRAMS)
@@ -64,10 +64,10 @@ headers:
 		( echo "package headache not installed" ; exit 1 )
 	@git ls-files | egrep '(\.h|\.c|Makefile|*\.mk)$$' | xargs -t headache $(HEADACHEOPTS)
 
-%.c: %.sh
+%.h: %.sh
 	./$< $@ || ($(RM) $@; exit 1)
 
-%.h: %.sh
+%.c: %.sh
 	./$< $@ || ($(RM) $@; exit 1)
 
 .%.o: %.c Makefile
