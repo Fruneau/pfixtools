@@ -29,56 +29,58 @@
 #  THE POSSIBILITY OF SUCH DAMAGE.                                           #
 ##############################################################################
 
+DC:=gdc
+
 ifneq ($(filter 4.%,$(shell gcc -dumpversion)),)
   GCC4=1
 endif
 
 # Use pipes and not temp files.
-CFLAGS += -pipe
+DFLAGS += -pipe
 # optimize even more
-CFLAGS += -O2
+DFLAGS += -O2
 # let the type char be unsigned by default
-CFLAGS += -funsigned-char
-CFLAGS += -fstrict-aliasing
+DFLAGS += -funsigned-char
+DFLAGS += -fstrict-aliasing
 # turn on all common warnings
-CFLAGS += -Wall
+DFLAGS += -Wall
 # turn on extra warnings
-CFLAGS += $(if $(GCC4),-Wextra,-W)
+DFLAGS += $(if $(GCC4),-Wextra,-W)
 # treat warnings as errors
-CFLAGS += -Werror
-CFLAGS += -Wchar-subscripts
+DFLAGS += -Werror
+DFLAGS += -Wchar-subscripts
 # warn about undefined preprocessor identifiers
-CFLAGS += -Wundef
+DFLAGS += -Wundef
 # warn about local variable shadowing another local variable
-CFLAGS += -Wshadow
+DFLAGS += -Wshadow
 # warn about casting of pointers to increased alignment requirements
-CFLAGS += -Wcast-align
+DFLAGS += -Wcast-align
 # make string constants const
-CFLAGS += -Wwrite-strings
+DFLAGS += -Wwrite-strings
 # warn about implicit conversions with side effects
 # fgets, calloc and friends take an int, not size_t...
-#CFLAGS += -Wconversion
+#DFLAGS += -Wconversion
 # warn about comparisons between signed and unsigned values
-CFLAGS += -Wsign-compare
+DFLAGS += -Wsign-compare
 # warn about unused declared stuff
-CFLAGS += -Wunused
-CFLAGS += -Wno-unused-parameter
+DFLAGS += -Wunused
+DFLAGS += -Wno-unused-parameter
 # warn about variable use before initialization
-CFLAGS += -Wuninitialized
+DFLAGS += -Wuninitialized
 # warn about variables which are initialized with themselves
-CFLAGS += -Winit-self
+DFLAGS += -Winit-self
 # warn about pointer arithmetic on void* and function pointers
-CFLAGS += -Wpointer-arith
+DFLAGS += -Wpointer-arith
 # warn about multiple declarations
-CFLAGS += -Wredundant-decls
+DFLAGS += -Wredundant-decls
 # warn if the format string is not a string literal
-CFLAGS += -Wformat-nonliteral
+DFLAGS += -Wformat-nonliteral
 # do not warn about zero-length formats.
-CFLAGS += -Wno-format-zero-length
+DFLAGS += -Wno-format-zero-length
 # missing prototypes
-CFLAGS += -Wmissing-prototypes
+DFLAGS += -Wmissing-prototypes
 # warn about functions without format attribute that should have one
-CFLAGS += -Wmissing-format-attribute
+DFLAGS += -Wmissing-format-attribute
 # barf if we change constness
-#CFLAGS += -Wcast-qual
+#DFLAGS += -Wcast-qual
 

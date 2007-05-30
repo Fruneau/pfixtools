@@ -4,5 +4,5 @@ postlicyd
 
 *.o
 .tags
-.*.d
+.*.dep
 .*.swp

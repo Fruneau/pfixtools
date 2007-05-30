@@ -29,7 +29,11 @@
 #  THE POSSIBILITY OF SUCH DAMAGE.                                           #
 ##############################################################################
 
+LDFLAGS += -Wl,--warn-common
+
 include mk/cflags.mk
+include mk/dflags.mk
+
 CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=2
 
 PROGRAMS = postlicyd
@@ -70,17 +74,20 @@ headers:
 %.c: %.sh
 	./$< $@ || ($(RM) $@; exit 1)
 
-.%.o: %.c Makefile
-	$(CC) $(CFLAGS) -MMD -MT ".$*.d $@" -MF .$*.d -g -c -o $@ $<
+.%.o: %.d Makefile
+	$(DC) $(DFLAGS) -g -c -o $@ $<
 
-%.d: %.c Makefile
-	$(CC) $(CFLAGS) -MM -MT ".$*.d $@" -MF .$*.d $<
+.%.o: %.c Makefile
+	$(CC) $(CFLAGS) -MMD -MT ".$*.dep $@" -MF .$*.dep -g -c -o $@ $<
+
+%.dep: %.c Makefile
+	$(CC) $(CFLAGS) -MM -MT ".$*.dep $@" -MF .$*.dep $<
 
 .SECONDEXPANSION:
 
 $(PROGRAMS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
-	$(CC) -o $@ $(CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
+	$(DC) -o $@ $(CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
--include $(foreach p,$(PROGRAMS),$(patsubst %.c,.%.d,$(filter %.c,$($p_SOURCES))))
+-include $(foreach p,$(PROGRAMS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
 
 ###########################################################################}}}
