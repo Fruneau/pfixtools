@@ -32,7 +32,6 @@
 LDFLAGS += -Wl,--warn-common
 
 include mk/cflags.mk
-include mk/dflags.mk
 
 CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=2
 
@@ -74,9 +73,6 @@ headers:
 %.c: %.sh
 	./$< $@ || ($(RM) $@; exit 1)
 
-.%.o: %.d Makefile
-	$(DC) $(DFLAGS) -g -c -o $@ $<
-
 .%.o: %.c Makefile
 	$(CC) $(CFLAGS) -MMD -MT ".$*.dep $@" -MF .$*.dep -g -c -o $@ $<
 
@@ -86,7 +82,7 @@ headers:
 .SECONDEXPANSION:
 
 $(PROGRAMS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
-	$(DC) -o $@ $(CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
+	$(CC) -o $@ $(CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
 -include $(foreach p,$(PROGRAMS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
 
