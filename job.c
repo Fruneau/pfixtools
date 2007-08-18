@@ -55,7 +55,6 @@
 #endif
 
 #include "job.h"
-#include "gai.h"
 
 static int epollfd = -1;
 static bool sigint = false;
@@ -202,8 +201,6 @@ void job_loop(void)
                 job_delete(&job);
             }
         }
-
-        gai_process();
     }
 }
 

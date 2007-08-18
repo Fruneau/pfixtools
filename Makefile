@@ -40,11 +40,11 @@ PROGRAMS = postlicyd
 GENERATED = tokens.h tokens.c
 
 postlicyd_SOURCES = \
-		str.h buffer.h job.h postfix.h gai.h \
-		str.c buffer.c job.c postfix.c gai.c \
+		str.h buffer.h job.h postfix.h \
+		str.c buffer.c job.c postfix.c \
 		postlicyd.c $(GENERATED)
 
-postlicyd_LIBADD = -lanl
+postlicyd_LIBADD = -lpthread
 
 # RULES ###################################################################{{{
 
@@ -52,7 +52,7 @@ all: $(PROGRAMS) $(GENERATED) | $(GENERATED)
 
 clean:
 	$(RM) $(PROGRAMS)
-	$(RM) .*.o
+	$(RM) .*.o .*.dep
 
 distclean: clean
 	$(RM) $(GENERATED)
@@ -76,8 +76,8 @@ headers:
 .%.o: %.c Makefile
 	$(CC) $(CFLAGS) -MMD -MT ".$*.dep $@" -MF .$*.dep -g -c -o $@ $<
 
-%.dep: %.c Makefile
-	$(CC) $(CFLAGS) -MM -MT ".$*.dep $@" -MF .$*.dep $<
+.%.dep: %.c Makefile
+	$(CC) $(CFLAGS) -MM -MT ".$*.o $@" -MF .$*.dep $<
 
 .SECONDEXPANSION:
 
