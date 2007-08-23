@@ -89,8 +89,10 @@ void *job_run(void *_fd)
 
 static void main_loop(void)
 {
+    int sock = -1;
+
     while (!sigint) {
-        int fd = accept(-1, NULL, 0);
+        int fd = accept(sock, NULL, 0);
         pthread_attr_t attr;
         pthread_t dummy;
 
@@ -105,6 +107,9 @@ static void main_loop(void)
         pthread_create(&dummy, &attr, job_run, (void *)(intptr_t)fd);
         pthread_attr_destroy(&attr);
     }
+
+    cleanexit = true;
+    close(sock);
 }
 
 static void main_shutdown(void)
@@ -122,7 +127,6 @@ int main(void)
 
     main_initialize();
     main_loop();
-    cleanexit = true;
     main_shutdown();
     return EXIT_SUCCESS;
 }
