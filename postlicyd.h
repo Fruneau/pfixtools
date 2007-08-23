@@ -38,6 +38,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdbool.h>
 #include <stdio.h>

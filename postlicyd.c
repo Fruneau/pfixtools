@@ -39,8 +39,9 @@
 
 #include "postlicyd.h"
 
-static bool cleanexit = false;
-static bool sigint = false;
+static sig_atomic_t cleanexit = false;
+static sig_atomic_t sigint    = false;
+static volatile int nbthreads = 0;
 
 static void main_sighandler(int sig)
 {
@@ -78,19 +79,31 @@ static void main_initialize(void)
     syslog(LOG_INFO, "Starting...");
 }
 
+void *job_run(void *_fd)
+{
+    int fd = (intptr_t)_fd;
+
+    close(fd);
+    return NULL;
+}
+
 static void main_loop(void)
 {
     while (!sigint) {
         int fd = accept(-1, NULL, 0);
+        pthread_attr_t attr;
+        pthread_t dummy;
 
         if (fd < 0) {
-            if (errno == EINTR || errno == EAGAIN)
-                continue;
-            syslog(LOG_ERR, "accept error: %m");
-            return;
+            if (errno != EINTR || errno != EAGAIN)
+                UNIXERR("accept");
+            continue;
         }
 
-        //pthread_create(NULL, NULL, job_run, (intptr_t)fd);
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        pthread_create(&dummy, &attr, job_run, (void *)(intptr_t)fd);
+        pthread_attr_destroy(&attr);
     }
 }
 
