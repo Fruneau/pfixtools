@@ -33,18 +33,18 @@ LDFLAGS += -Wl,--warn-common
 
 include mk/cflags.mk
 
-CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=2
+CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=2 $(shell pkg-config --cflags lua5.1)
 
 PROGRAMS = postlicyd
 
 GENERATED = tokens.h tokens.c
 
 postlicyd_SOURCES = \
-		str.h buffer.h job.h postfix.h \
-		str.c buffer.c job.c postfix.c \
+		str.h buffer.h daemon.h postfix.h \
+		str.c buffer.c daemon.c postfix.c \
 		postlicyd.c $(GENERATED)
 
-postlicyd_LIBADD = -lpthread
+postlicyd_LIBADD = -lpthread $(shell pkg-config --libs lua5.1)
 
 # RULES ###################################################################{{{
 
@@ -76,8 +76,7 @@ headers:
 .%.o: %.c Makefile
 	$(CC) $(CFLAGS) -MMD -MT ".$*.dep $@" -MF .$*.dep -g -c -o $@ $<
 
-.%.dep: %.c Makefile
-	$(CC) $(CFLAGS) -MM -MT ".$*.o $@" -MF .$*.dep $<
+.%.dep: .%.o
 
 .SECONDEXPANSION:
 

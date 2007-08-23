@@ -33,24 +33,20 @@
  * Copyright © 2006-2007 Pierre Habouzit
  */
 
-#include <errno.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <syslog.h>
-#include <unistd.h>
-
-#include "job.h"
+#include "postlicyd.h"
 #include "postfix.h"
 #include "buffer.h"
 #include "tokens.h"
 
+#if 0
+
 #define ishspace(c)  ((c) == ' ' || (c) == '\t')
 
-struct jpriv_t {
+typedef struct jpriv_t {
     buffer_t ibuf;
     buffer_t obuf;
     query_t query;
-};
+} jpriv_t;
 
 static jpriv_t *postfix_jpriv_init(jpriv_t *jp)
 {
@@ -67,11 +63,6 @@ static void postfix_jpriv_wipe(jpriv_t *jp)
 }
 DO_NEW(jpriv_t, postfix_jpriv);
 DO_DELETE(jpriv_t, postfix_jpriv);
-
-static void postfix_stop(job_t *job)
-{
-    postfix_jpriv_delete(&job->jdata);
-}
 
 static int postfix_parsejob(query_t *query)
 {
@@ -195,8 +186,6 @@ static void postfix_process(job_t *job)
         if (job->jdata->obuf.len)
             return;
 
-        job_update_mode(job, JOB_READ);
-
         /* fall through */
 
       case JOB_READ:
@@ -233,8 +222,6 @@ static void postfix_process(job_t *job)
             return;
         }
 
-        job_update_mode(job, JOB_IDLE);
-
         /* TODO: run the scenario */
         return;
 
@@ -243,3 +230,4 @@ static void postfix_process(job_t *job)
         return;
     }
 }
+#endif

@@ -66,7 +66,7 @@ CFLAGS += -Wno-unused-parameter
 # warn about variable use before initialization
 CFLAGS += -Wuninitialized
 # warn about variables which are initialized with themselves
-CFLAGS += -Winit-self
+CFLAGS += $(if $(GCC4),-Winit-self)
 # warn about pointer arithmetic on void* and function pointers
 CFLAGS += -Wpointer-arith
 # warn about multiple declarations
@@ -75,10 +75,7 @@ CFLAGS += -Wredundant-decls
 CFLAGS += -Wformat-nonliteral
 # do not warn about zero-length formats.
 CFLAGS += -Wno-format-zero-length
-# missing prototypes
-CFLAGS += -Wmissing-prototypes
+# do not warn about strftime format with y2k issues
+CFLAGS += -Wno-format-y2k
 # warn about functions without format attribute that should have one
 CFLAGS += -Wmissing-format-attribute
-# barf if we change constness
-#CFLAGS += -Wcast-qual
-

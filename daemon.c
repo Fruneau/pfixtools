@@ -30,86 +30,60 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2006-2007 Pierre Habouzit
+ * Copyright © 2007 Pierre Habouzit
  */
 
-#include <signal.h>
-#include <time.h>
-#include <getopt.h>
+#include <sys/un.h>
 
 #include "postlicyd.h"
+#include "daemon.h"
 
-static bool cleanexit = false;
-static bool sigint = false;
-
-static void main_sighandler(int sig)
+int tcp_listen(const struct sockaddr *addr, socklen_t len)
 {
-    static time_t lastintr = 0;
-    time_t now = time(NULL);
+    int sock;
 
-    switch (sig) {
-      case SIGINT:
-        if (sigint) {
-            if (now - lastintr >= 1)
-                break;
-        } else {
-            lastintr = now;
-            sigint   = true;
-        }
-        return;
-
-      case SIGTERM:
+    switch (addr->sa_family) {
+      case AF_UNIX:
+        unlink(((struct sockaddr_un *)addr)->sun_path);
+        sock = socket(PF_UNIX, SOCK_STREAM, 0);
         break;
-
+      case AF_INET:
+        sock = socket(PF_INET, SOCK_STREAM, 0);
+        break;
+      case AF_INET6:
+        sock = socket(PF_INET6, SOCK_STREAM, 0);
+        break;
       default:
-        return;
+        errno = EINVAL;
+        return -1;
     }
 
-    syslog(LOG_ERR, "Killed...");
-    exit(-1);
-}
+    if (sock < 0) {
+        UNIXERR("socket");
+        return -1;
+    }
 
-static void main_initialize(void)
-{
-    openlog("postlicyd", LOG_PID, LOG_MAIL);
-    signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT,  &main_sighandler);
-    signal(SIGTERM, &main_sighandler);
-    syslog(LOG_INFO, "Starting...");
-}
-
-static void main_loop(void)
-{
-    while (!sigint) {
-        int fd = accept(-1, NULL, 0);
-
-        if (fd < 0) {
-            if (errno == EINTR || errno == EAGAIN)
-                continue;
-            syslog(LOG_ERR, "accept error: %m");
-            return;
+    if (addr->sa_family != AF_UNIX) {
+        int v = 1;
+        if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)) < 0) {
+            UNIXERR("setsockopt(SO_REUSEADDR)");
+            close(sock);
+            return -1;
         }
-
-        //pthread_create(NULL, NULL, job_run, (intptr_t)fd);
-    }
-}
-
-static void main_shutdown(void)
-{
-    syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
-    closelog();
-}
-
-int main(void)
-{
-    if (atexit(main_shutdown)) {
-        fputs("Cannot hook my atexit function, quitting !\n", stderr);
-        return EXIT_FAILURE;
     }
 
-    main_initialize();
-    main_loop();
-    cleanexit = true;
-    main_shutdown();
-    return EXIT_SUCCESS;
+    if (bind(sock, addr, len) < 0) {
+        UNIXERR("bind");
+        close(sock);
+        return -1;
+    }
+
+    if (listen(sock, 0) < 0) {
+        UNIXERR("bind");
+        close(sock);
+        return -1;
+    }
+
+    return sock;
 }
+

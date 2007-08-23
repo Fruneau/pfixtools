@@ -30,86 +30,12 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2006-2007 Pierre Habouzit
+ * Copyright © 2007 Pierre Habouzit
  */
 
-#include <signal.h>
-#include <time.h>
-#include <getopt.h>
+#ifndef POSTLICYD_DAEMON_H
+#define POSTLICYD_DAEMON_H
 
-#include "postlicyd.h"
+int tcp_listen(const struct sockaddr *addr, socklen_t len);
 
-static bool cleanexit = false;
-static bool sigint = false;
-
-static void main_sighandler(int sig)
-{
-    static time_t lastintr = 0;
-    time_t now = time(NULL);
-
-    switch (sig) {
-      case SIGINT:
-        if (sigint) {
-            if (now - lastintr >= 1)
-                break;
-        } else {
-            lastintr = now;
-            sigint   = true;
-        }
-        return;
-
-      case SIGTERM:
-        break;
-
-      default:
-        return;
-    }
-
-    syslog(LOG_ERR, "Killed...");
-    exit(-1);
-}
-
-static void main_initialize(void)
-{
-    openlog("postlicyd", LOG_PID, LOG_MAIL);
-    signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT,  &main_sighandler);
-    signal(SIGTERM, &main_sighandler);
-    syslog(LOG_INFO, "Starting...");
-}
-
-static void main_loop(void)
-{
-    while (!sigint) {
-        int fd = accept(-1, NULL, 0);
-
-        if (fd < 0) {
-            if (errno == EINTR || errno == EAGAIN)
-                continue;
-            syslog(LOG_ERR, "accept error: %m");
-            return;
-        }
-
-        //pthread_create(NULL, NULL, job_run, (intptr_t)fd);
-    }
-}
-
-static void main_shutdown(void)
-{
-    syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
-    closelog();
-}
-
-int main(void)
-{
-    if (atexit(main_shutdown)) {
-        fputs("Cannot hook my atexit function, quitting !\n", stderr);
-        return EXIT_FAILURE;
-    }
-
-    main_initialize();
-    main_loop();
-    cleanexit = true;
-    main_shutdown();
-    return EXIT_SUCCESS;
-}
+#endif
