@@ -33,57 +33,15 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#include <sys/un.h>
+#ifndef POSTLICYD_RBL_H
+#define POSTLICYD_RBL_H
 
-#include "common.h"
-#include "daemon.h"
+typedef struct rbldb_t rbldb_t;
 
-int tcp_listen(const struct sockaddr *addr, socklen_t len)
-{
-    int sock;
+rbldb_t *rbldb_create(const char *file);
+void rbldb_delete(rbldb_t **);
 
-    switch (addr->sa_family) {
-      case AF_UNIX:
-        unlink(((struct sockaddr_un *)addr)->sun_path);
-        sock = socket(PF_UNIX, SOCK_STREAM, 0);
-        break;
-      case AF_INET:
-        sock = socket(PF_INET, SOCK_STREAM, 0);
-        break;
-      case AF_INET6:
-        sock = socket(PF_INET6, SOCK_STREAM, 0);
-        break;
-      default:
-        errno = EINVAL;
-        return -1;
-    }
+uint32_t rbldb_stats(rbldb_t *rbl);
+bool rbldb_ipv4_lookup(rbldb_t *rbl, uint32_t ip);
 
-    if (sock < 0) {
-        UNIXERR("socket");
-        return -1;
-    }
-
-    if (addr->sa_family != AF_UNIX) {
-        int v = 1;
-        if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)) < 0) {
-            UNIXERR("setsockopt(SO_REUSEADDR)");
-            close(sock);
-            return -1;
-        }
-    }
-
-    if (bind(sock, addr, len) < 0) {
-        UNIXERR("bind");
-        close(sock);
-        return -1;
-    }
-
-    if (listen(sock, 0) < 0) {
-        UNIXERR("bind");
-        close(sock);
-        return -1;
-    }
-
-    return sock;
-}
-
+#endif

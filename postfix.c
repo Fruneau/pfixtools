@@ -33,7 +33,7 @@
  * Copyright © 2006-2007 Pierre Habouzit
  */
 
-#include "postlicyd.h"
+#include "common.h"
 #include "postfix.h"
 #include "buffer.h"
 #include "tokens.h"

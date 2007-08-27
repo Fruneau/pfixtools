@@ -37,7 +37,7 @@
 #include <time.h>
 #include <getopt.h>
 
-#include "postlicyd.h"
+#include "common.h"
 
 static sig_atomic_t cleanexit = false;
 static sig_atomic_t sigint    = false;

@@ -33,57 +33,20 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#include <sys/un.h>
+#define DEBUG(fmt, ...) \
+    fprintf(stderr, "%s:%d:%s: "fmt"\n", \
+            __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 
 #include "common.h"
-#include "daemon.h"
+#include "rbl.c"
 
-int tcp_listen(const struct sockaddr *addr, socklen_t len)
+int main(int argc, char *argv[])
 {
-    int sock;
-
-    switch (addr->sa_family) {
-      case AF_UNIX:
-        unlink(((struct sockaddr_un *)addr)->sun_path);
-        sock = socket(PF_UNIX, SOCK_STREAM, 0);
-        break;
-      case AF_INET:
-        sock = socket(PF_INET, SOCK_STREAM, 0);
-        break;
-      case AF_INET6:
-        sock = socket(PF_INET6, SOCK_STREAM, 0);
-        break;
-      default:
-        errno = EINVAL;
-        return -1;
+    if (argc > 1) {
+        rbldb_t *db = rbldb_create(argv[1]);
+        printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
+               rbldb_stats(db) * 4);
+        rbldb_delete(&db);
     }
-
-    if (sock < 0) {
-        UNIXERR("socket");
-        return -1;
-    }
-
-    if (addr->sa_family != AF_UNIX) {
-        int v = 1;
-        if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)) < 0) {
-            UNIXERR("setsockopt(SO_REUSEADDR)");
-            close(sock);
-            return -1;
-        }
-    }
-
-    if (bind(sock, addr, len) < 0) {
-        UNIXERR("bind");
-        close(sock);
-        return -1;
-    }
-
-    if (listen(sock, 0) < 0) {
-        UNIXERR("bind");
-        close(sock);
-        return -1;
-    }
-
-    return sock;
+    return 0;
 }
-

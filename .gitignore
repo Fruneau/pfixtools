@@ -1,6 +1,8 @@
-tokens.[hc]
+/tokens.[hc]
 
-postlicyd
+/postlicyd
+/tst-rbl
+/srsd
 
 *.o
 .tags

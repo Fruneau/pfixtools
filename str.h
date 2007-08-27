@@ -339,6 +339,14 @@ static inline const char *m_strnextsp(const char *s) {
 }
 
 __attribute__((nonnull(1)))
+static inline char *m_vstrnextsp(char *s) {
+    while (*s && !isspace((unsigned char)*s))
+        s++;
+    return s;
+}
+
+
+__attribute__((nonnull(1)))
 static inline const char *skipspaces(const char *s) {
     while (isspace((unsigned char)*s))
         s++;

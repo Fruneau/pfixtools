@@ -33,18 +33,25 @@ LDFLAGS += -Wl,--warn-common
 
 include mk/cflags.mk
 
-CFLAGS += --std=gnu99 -D_GNU_SOURCE -D_FORTIFY_SOURCE=2 $(shell pkg-config --cflags lua5.1)
+CFLAGS += --std=gnu99 -D_GNU_SOURCE
 
-PROGRAMS = postlicyd
+PROGRAMS = postlicyd srsd
+TESTS    = tst-rbl
 
 GENERATED = tokens.h tokens.c
 
 postlicyd_SOURCES = \
-		str.h buffer.h daemon.h postfix.h \
-		str.c buffer.c daemon.c postfix.c \
+		str.h buffer.h daemon.h rbl.h postfix.h \
+		str.c buffer.c daemon.c rbl.c postfix.c \
 		postlicyd.c $(GENERATED)
+postlicyd_LIBADD = -lpthread
 
-postlicyd_LIBADD = -lpthread $(shell pkg-config --libs lua5.1)
+srsd_SOURCES = \
+	       str.h daemon.h srsd.h \
+	       str.c daemon.c srsd.c
+srsd_LIBADD = -lsrs2
+
+tst-rbl_SOURCES = tst-rbl.c
 
 # RULES ###################################################################{{{
 
@@ -80,9 +87,9 @@ headers:
 
 .SECONDEXPANSION:
 
-$(PROGRAMS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
-	$(CC) -o $@ $(CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
+$(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
+	$(CC) -o $@ $(CFLAGS) $($@_CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
--include $(foreach p,$(PROGRAMS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
+-include $(foreach p,$(PROGRAMS) $(TESTS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
 
 ###########################################################################}}}
