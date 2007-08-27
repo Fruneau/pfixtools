@@ -88,9 +88,8 @@ static char **read_sfile(char *sfile)
         }
     }
 
-    for ( nb = pos = 0; pos < stat_buf.st_size ; pos++)
-    {
-        if ( buf[pos] == '\n' ) {
+    for (nb = pos = 0; pos < stat_buf.st_size ; pos++) {
+        if (buf[pos] == '\n') {
             nb++;
             buf[pos] = 0;
         }
@@ -99,8 +98,7 @@ static char **read_sfile(char *sfile)
     res = p_new(char*, nb + 2);
 
     nb = pos = 0;
-    while (pos < stat_buf.st_size)
-    {
+    while (pos < stat_buf.st_size) {
         len = strlen(&(buf[pos]));
         if (len) {
             res[nb++] = &(buf[pos]);
@@ -112,7 +110,7 @@ static char **read_sfile(char *sfile)
 }
 
 
-static char *encode(char * secret, char * sender, char * alias)
+static char *encode(char *secret, char *sender, char *alias)
 {
     int    err = 0;
     char  *res = NULL;
@@ -129,11 +127,11 @@ static char *encode(char * secret, char * sender, char * alias)
     return res;
 }
 
-static char * decode(char * secret, char * secrets[], char * sender)
+static char *decode(char *secret, char *secrets[], char *sender)
 {
-    int     err = 0;
-    char *  res = NULL;
-    srs_t * srs = srs_new();
+    int    err = 0;
+    char  *res = NULL;
+    srs_t *srs = srs_new();
 
     if (secret) {
         srs_add_secret(srs, secret);
@@ -170,7 +168,7 @@ static void help(void)
     exit (1);
 }
 
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
     char *buf    = NULL;
     char *domain = NULL;
@@ -182,8 +180,7 @@ int main(int argc, char * argv[])
     bool   rev   = false;
     char **secr  = NULL;
 
-    while ((opt = getopt(argc, argv, "d:e:s:f:r")) != -1)
-    {
+    while ((opt = getopt(argc, argv, "d:e:s:f:r")) != -1) {
         switch (opt) {
             case 'd': domain = optarg;  break;
             case 'e': sender = optarg;  break;
@@ -193,7 +190,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if ( !sender || !(secret||sfile) || !(rev||domain) ) {
+    if (!sender || !(secret||sfile) || !(rev||domain)) {
         help ();
     }
 
