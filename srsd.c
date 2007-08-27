@@ -65,8 +65,7 @@ static char **read_sfile(char *sfile)
         exit(1);
     }
 
-    buf = (char *)malloc(stat_buf.st_size+1);
-    buf[stat_buf.st_size] = 0;
+    buf = p_new(char, stat_buf.st_size + 1);
 
     if ((fd = open(sfile, O_RDONLY)) < 0) {
         perror("open");
@@ -127,18 +126,14 @@ static char *encode(char *secret, char *sender, char *alias)
     return res;
 }
 
-static char *decode(char *secret, char *secrets[], char *sender)
+static char *decode(char **secrets, char *sender)
 {
     int    err = 0;
     char  *res = NULL;
     srs_t *srs = srs_new();
 
-    if (secret) {
-        srs_add_secret(srs, secret);
-    }
-
-    for (; secrets && secrets[err] != 0; err++) {
-        srs_add_secret(srs, secrets[err]);
+    while (*secrets) {
+        srs_add_secret(srs, *secrets++);
     }
 
     err = srs_reverse_alloc(srs, &res, sender);
@@ -154,13 +149,12 @@ static char *decode(char *secret, char *secrets[], char *sender)
 static void help(void)
 {
     puts(
-            "Usage: srs-c [ -r | -d domain ] [ -s secret | -f sfile ] -e sender\n"
+            "Usage: srs-c [ -r | -d domain ] -f sfile -e sender\n"
             "Perform an SRS encoding / decoding\n"
             "\n"
             "    -r          perform an SRS decoding\n"
             "    -d domain   use that domain (required for encoding)\n"
             "\n"
-            "    -s secret   secret used in the encoding (sfile required if omitted)\n"
             "    -f sfile    secret file for decoding.  the first line is taken if -s omitted\n"
             "\n"
             "    -e sender   the sender address we want to encode/decode\n"
@@ -173,39 +167,37 @@ int main(int argc, char *argv[])
     char *buf    = NULL;
     char *domain = NULL;
     char *sender = NULL;
-    char *secret = NULL;
     char *sfile  = NULL;
 
     int    opt   = 0;
     bool   rev   = false;
     char **secr  = NULL;
 
-    while ((opt = getopt(argc, argv, "d:e:s:f:r")) != -1) {
+    while ((opt = getopt(argc, argv, "d:e:f:r")) != -1) {
         switch (opt) {
             case 'd': domain = optarg;  break;
             case 'e': sender = optarg;  break;
             case 'f': sfile  = optarg;  break;
             case 'r': rev    = true;    break;
-            case 's': secret = optarg;  break;
         }
     }
 
-    if (!sender || !(secret||sfile) || !(rev||domain)) {
+    if (!sender || !sfile || !(rev||domain)) {
         help ();
     }
 
     if (sfile) {
         secr = read_sfile(sfile);
-        if (!secret && (!secr || !secr[0])) {
+        if (!secr || !secr[0]) {
             fprintf(stderr, "No secret given, and secret file is empty\n");
             exit (1);
         }
     }
 
     if (rev) {
-        buf = decode(secret, secr, sender);
+        buf = decode(secr, sender);
     } else {
-        buf = encode((secret ? secret : secr[0]), sender, domain);
+        buf = encode(secr[0], sender, domain);
     }
 
     puts(buf);
