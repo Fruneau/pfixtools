@@ -54,8 +54,7 @@ tst-rbl_SOURCES = tst-rbl.c
 all: $(PROGRAMS) $(GENERATED) | $(GENERATED)
 
 clean:
-	$(RM) $(PROGRAMS)
-	$(RM) .*.o .*.dep
+	$(RM) $(PROGRAMS) $(TESTS) .*.o .*.dep
 
 distclean: clean
 	$(RM) $(GENERATED)
