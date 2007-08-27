@@ -40,15 +40,11 @@ TESTS    = tst-rbl
 
 GENERATED = tokens.h tokens.c
 
-postlicyd_SOURCES = \
-		str.h buffer.h daemon.h rbl.h postfix.h \
-		str.c buffer.c daemon.c rbl.c postfix.c \
-		postlicyd.c $(GENERATED)
+postlicyd_SOURCES = str.c buffer.c daemon.c rbl.c postfix.c \
+		    postlicyd.c $(GENERATED)
 postlicyd_LIBADD = -lpthread
 
-srsd_SOURCES = \
-	       str.h daemon.h srsd.h \
-	       str.c daemon.c srsd.c
+srsd_SOURCES = str.c daemon.c srsd.c
 srsd_LIBADD = -lsrs2
 
 tst-rbl_SOURCES = tst-rbl.c
