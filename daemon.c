@@ -34,9 +34,28 @@
  */
 
 #include <sys/un.h>
+#include <fcntl.h>
 
 #include "common.h"
 #include "daemon.h"
+
+static int setnonblock(int sock)
+{
+    int res = fcntl(sock, F_GETFL);
+
+    if (res < 0) {
+        UNIXERR("fcntl");
+        return -1;
+    }
+
+    if (fcntl(sock, F_SETFL, res | O_NONBLOCK) < 0) {
+        UNIXERR("fcntl");
+        return -1;
+    }
+
+    return 0;
+}
+
 
 int tcp_listen(const struct sockaddr *addr, socklen_t len)
 {
@@ -78,6 +97,11 @@ int tcp_listen(const struct sockaddr *addr, socklen_t len)
         return -1;
     }
 
+    if (setnonblock(sock)) {
+        close(sock);
+        return -1;
+    }
+
     if (listen(sock, 0) < 0) {
         UNIXERR("bind");
         close(sock);
@@ -87,3 +111,19 @@ int tcp_listen(const struct sockaddr *addr, socklen_t len)
     return sock;
 }
 
+int accept_nonblock(int fd)
+{
+    int sock = accept(fd, NULL, 0);
+
+    if (sock < 0) {
+        UNIXERR("accept");
+        return -1;
+    }
+
+    if (setnonblock(sock)) {
+        close(sock);
+        return -1;
+    }
+
+    return sock;
+}

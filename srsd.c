@@ -262,7 +262,7 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
                 srsd_t *tmp;
                 int sock;
 
-                sock = accept(srsd->fd, NULL, NULL);
+                sock = accept_nonblock(srsd->fd);
                 if (sock < 0) {
                     UNIXERR("accept");
                     continue;
