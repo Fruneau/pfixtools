@@ -1,5 +1,5 @@
 /******************************************************************************/
-/*          postlicyd: a postfix policy daemon with a lot of features         */
+/*          pfixtools: a collection of postfix related tools                  */
 /*          ~~~~~~~~~                                                         */
 /*  ________________________________________________________________________  */
 /*                                                                            */
