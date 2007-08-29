@@ -1,0 +1,9 @@
+# Configuration file for pfixtools
+
+#
+# pfix-srsd
+#
+SRSD_ENABLE="no"
+SRSD_SECRETS="/etc/pfixtools/srsd.secrets"
+SRSD_DOMAIN="example.com"
+SRSD_OPTIONS=""

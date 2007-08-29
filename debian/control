@@ -1,0 +1,16 @@
+Source: pfixtools
+Section: mail
+Priority: optional
+Maintainer: Pierre Habouzit <madcoder@debian.org>
+Build-Depends: debhelper (>= 5), libsrs2-dev, gperf
+Standards-Version: 3.7.2.0
+
+Package: pfixtools
+Architecture: any
+Depends: lsb-base, ${shlibs:Depends}, ${misc:Depends}
+Recommends: postfix
+Enhances: postfix
+Description: a collection of postfix tools
+ pfixtools consists of:
+ .
+ pfix-srsd: a daemon to be used a canonical(5) tcp_table(5) lookup table.
