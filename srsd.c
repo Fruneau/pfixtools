@@ -349,12 +349,12 @@ static srs_t *srs_read_secrets(const char *sfile)
         int n = strlen(buf);
 
         ++lineno;
-        if (buf[n - 1] != '\n') {
+        if (n == sizeof(buf) - 1 && buf[n - 1] != '\n') {
             syslog(LOG_CRIT, "%s:%d: line too long", sfile, lineno);
             goto error;
         }
-
-        srs_add_secret(srs, buf);
+        m_strrtrim(buf);
+        srs_add_secret(srs, skipspaces(buf));
     }
 
     if (!lineno) {
