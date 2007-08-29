@@ -36,7 +36,7 @@
 #ifndef POSTLICYD_DAEMON_H
 #define POSTLICYD_DAEMON_H
 
-int tcp_listen(const struct sockaddr *addr, socklen_t len);
+int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len);
 int accept_nonblock(int fd);
 
 #endif

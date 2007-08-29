@@ -172,7 +172,7 @@ int start_listener(int epollfd, int port, bool decoder)
     int sock;
 
     addr.sin_port = htons(port);
-    sock = tcp_listen((const struct sockaddr *)&addr, sizeof(addr));
+    sock = tcp_listen_nonblock((const struct sockaddr *)&addr, sizeof(addr));
     if (sock < 0) {
         return -1;
     }
