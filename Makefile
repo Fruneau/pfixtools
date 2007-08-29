@@ -40,11 +40,11 @@ TESTS    = tst-rbl
 
 GENERATED = tokens.h tokens.c
 
-postlicyd_SOURCES = str.c buffer.c daemon.c rbl.c postfix.c \
-		    postlicyd.c $(GENERATED)
+postlicyd_SOURCES = common.c str.c buffer.c daemon.c rbl.c postfix.c \
+		    $(GENERATED) postlicyd.c
 postlicyd_LIBADD = -lpthread
 
-srsd_SOURCES = str.c daemon.c srsd.c
+srsd_SOURCES = common.c buffer.c str.c daemon.c srsd.c
 srsd_LIBADD = -lsrs2
 
 tst-rbl_SOURCES = tst-rbl.c
@@ -82,8 +82,8 @@ headers:
 
 .SECONDEXPANSION:
 
-$(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
-	$(CC) -o $@ $(CFLAGS) $($@_CFLAGS) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
+$(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile common.ld
+	$(CC) -o $@ $(CFLAGS) $($@_CFLAGS) $(filter %.ld,$^) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
 -include $(foreach p,$(PROGRAMS) $(TESTS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
 

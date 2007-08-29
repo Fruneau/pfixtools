@@ -33,43 +33,59 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#ifndef POSTLICYD_H
-#define POSTLICYD_H
+#include "common.h"
 
-#include <errno.h>
-#include <limits.h>
-#include <pthread.h>
-#include <signal.h>
-#include <stdbool.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <syslog.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
+sig_atomic_t cleanexit = false;
+sig_atomic_t sigint    = false;
+sig_atomic_t sighup    = false;
 
-#define UNIXERR(fun)                                    \
-        syslog(LOG_ERR, "%s:%d:%s: %s: %m",             \
-               __FILE__, __LINE__, __func__, fun)
+void common_sighandler(int sig)
+{
+    static time_t lastintr = 0;
+    time_t now = time(NULL);
 
-typedef int  (*initcall_t)(void);
-typedef void (*exitcall_t)(void);
+    switch (sig) {
+      case SIGINT:
+        if (sigint) {
+            if (now - lastintr >= 1)
+                break;
+        } else {
+            lastintr = now;
+            sigint   = true;
+        }
+        return;
 
-#define __init __attribute__((__used__,__section__(".mad.init")))
-#define __exit __attribute__((__used__,__section__(".mad.exit")))
+      case SIGTERM:
+        break;
 
-#define module_init(fn)  static initcall_t __init_##fn __init = fn;
-#define module_exit(fn)  static exitcall_t __exit_##fn __exit = fn;
+      case SIGHUP:
+        sighup = true;
+        return;
 
-/* common.c */
-extern sig_atomic_t cleanexit;
-extern sig_atomic_t sigint;
-extern sig_atomic_t sighup;
+      default:
+        return;
+    }
 
-void common_sighandler(int sig);
-void common_initialize(void);
-void common_shutdown(void);
+    syslog(LOG_ERR, "Killed...");
+    exit(-1);
+}
 
-#endif
+void common_initialize(void)
+{
+    extern initcall_t __madinit_start, __madinit_end;
+
+    initcall_t *call_p = &__madinit_start;
+    while (call_p < &__madinit_end) {
+        (*call_p++)();
+    }
+}
+
+void common_shutdown(void)
+{
+    extern exitcall_t __madexit_start, __madexit_end;
+
+    exitcall_t *call_p = &__madexit_end;
+    while (call_p > &__madexit_start) {
+        (*--call_p)();
+    }
+}

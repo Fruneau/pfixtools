@@ -39,44 +39,16 @@
 
 #include "common.h"
 
-static sig_atomic_t cleanexit = false;
-static sig_atomic_t sigint    = false;
-static volatile int nbthreads = 0;
+volatile int nbthreads = 0;
 
-static void main_sighandler(int sig)
-{
-    static time_t lastintr = 0;
-    time_t now = time(NULL);
-
-    switch (sig) {
-      case SIGINT:
-        if (sigint) {
-            if (now - lastintr >= 1)
-                break;
-        } else {
-            lastintr = now;
-            sigint   = true;
-        }
-        return;
-
-      case SIGTERM:
-        break;
-
-      default:
-        return;
-    }
-
-    syslog(LOG_ERR, "Killed...");
-    exit(-1);
-}
-
-static void main_initialize(void)
+static int main_initialize(void)
 {
     openlog("postlicyd", LOG_PID, LOG_MAIL);
     signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT,  &main_sighandler);
-    signal(SIGTERM, &main_sighandler);
+    signal(SIGINT,  &common_sighandler);
+    signal(SIGTERM, &common_sighandler);
     syslog(LOG_INFO, "Starting...");
+    return 0;
 }
 
 void *job_run(void *_fd)
@@ -118,15 +90,17 @@ static void main_shutdown(void)
     closelog();
 }
 
+module_init(main_initialize);
+module_exit(main_shutdown);
+
 int main(void)
 {
-    if (atexit(main_shutdown)) {
+    if (atexit(common_shutdown)) {
         fputs("Cannot hook my atexit function, quitting !\n", stderr);
         return EXIT_FAILURE;
     }
 
-    main_initialize();
+    common_initialize();
     main_loop();
-    main_shutdown();
     return EXIT_SUCCESS;
 }
