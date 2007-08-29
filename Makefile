@@ -35,7 +35,7 @@ include mk/cflags.mk
 
 CFLAGS += --std=gnu99 -D_GNU_SOURCE
 
-PROGRAMS = postlicyd srsd
+PROGRAMS = postlicyd pfix-srsd
 TESTS    = tst-rbl
 
 GENERATED = tokens.h tokens.c
@@ -44,8 +44,8 @@ postlicyd_SOURCES = common.c str.c buffer.c daemon.c rbl.c postfix.c \
 		    $(GENERATED) postlicyd.c
 postlicyd_LIBADD = -lpthread
 
-srsd_SOURCES = common.c buffer.c str.c daemon.c srsd.c
-srsd_LIBADD = -lsrs2
+pfix-srsd_SOURCES = common.c buffer.c str.c daemon.c srsd.c
+pfix-srsd_LIBADD = -lsrs2
 
 tst-rbl_SOURCES = tst-rbl.c
 

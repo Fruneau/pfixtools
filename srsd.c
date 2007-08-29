@@ -45,7 +45,7 @@
 #include "mem.h"
 #include "buffer.h"
 
-#define DAEMON_NAME             "srsd"
+#define DAEMON_NAME             "pfix-srsd"
 #define DEFAULT_ENCODER_PORT    10000
 #define DEFAULT_DECODER_PORT    10001
 #define __tostr(x)  #x

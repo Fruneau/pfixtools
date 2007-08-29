@@ -2,7 +2,7 @@
 
 /postlicyd
 /tst-rbl
-/srsd
+/pfix-srsd
 
 *.o
 .tags
