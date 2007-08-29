@@ -39,4 +39,6 @@
 int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len);
 int accept_nonblock(int fd);
 
+int daemon_detach(void);
+
 #endif

@@ -408,5 +408,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    if (daemon_detach() < 0) {
+        syslog(LOG_CRIT, "unable to fork");
+        return EXIT_FAILURE;
+    }
     return main_loop(srs, argv[optind], port_enc, port_dec);
 }

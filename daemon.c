@@ -127,3 +127,25 @@ int accept_nonblock(int fd)
 
     return sock;
 }
+
+int daemon_detach(void)
+{
+    pid_t pid;
+
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+
+    open("/dev/null", O_RDWR);
+    open("/dev/null", O_RDWR);
+    open("/dev/null", O_RDWR);
+
+    pid = fork();
+    if (pid < 0)
+        return -1;
+    if (pid)
+        exit(0);
+
+    setsid();
+    return 0;
+}
