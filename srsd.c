@@ -112,7 +112,6 @@ int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
         if (err == 0) {
             buffer_addstr(&srsd->obuf, "200 ");
             buffer_addstr(&srsd->obuf, buf);
-            buffer_addstr(&srsd->obuf, "\r\n");
         } else {
             switch (SRS_ERROR_TYPE(err)) {
               case SRS_ERRTYPE_SRS:
@@ -124,8 +123,8 @@ int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
                 break;
             }
             buffer_addstr(&srsd->obuf, srs_strerror(err));
-            buffer_addstr(&srsd->obuf, "\r\n");
         }
+        buffer_addch(&srsd->obuf, '\n');
 
       skip:
         buffer_consume(&srsd->ibuf, nl - srsd->ibuf.data);
