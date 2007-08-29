@@ -29,11 +29,14 @@
 #  THE POSSIBILITY OF SUCH DAMAGE.                                           #
 ##############################################################################
 
+all:
+
 LDFLAGS += -Wl,--warn-common
 
 include mk/cflags.mk
 
 CFLAGS += --std=gnu99 -D_GNU_SOURCE
+prefix ?= /usr/local
 
 PROGRAMS = postlicyd pfix-srsd
 TESTS    = tst-rbl
@@ -49,9 +52,14 @@ pfix-srsd_LIBADD = -lsrs2
 
 tst-rbl_SOURCES = tst-rbl.c
 
+install: all
+	install -d $(DESTDIR)$(prefix)/sbin
+	install $(PROGRAMS) $(DESTDIR)$(prefix)/sbin
+	install -d $(DESTDIR)/etc/pfixtools
+
 # RULES ###################################################################{{{
 
-all: $(PROGRAMS) $(GENERATED) | $(GENERATED)
+all: $(GENERATED) $(PROGRAMS) | $(GENERATED)
 
 clean:
 	$(RM) $(PROGRAMS) $(TESTS) .*.o .*.dep
