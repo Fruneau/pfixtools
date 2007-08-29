@@ -45,6 +45,7 @@
 #include "mem.h"
 #include "buffer.h"
 
+#define DAEMON_NAME             "srsd"
 #define DEFAULT_ENCODER_PORT    10000
 #define DEFAULT_DECODER_PORT    10001
 #define __tostr(x)  #x
@@ -165,7 +166,7 @@ int start_listener(int epollfd, int port, bool decoder)
 
 static int main_initialize(void)
 {
-    openlog("srsd", LOG_PID, LOG_MAIL);
+    openlog(DAEMON_NAME, LOG_PID, LOG_MAIL);
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT,  &common_sighandler);
     signal(SIGTERM, &common_sighandler);
@@ -185,7 +186,7 @@ module_exit(main_shutdown);
 
 void usage(void)
 {
-    fputs("usage: srsd [ -e <port> ] [ -d <port> ] domain secrets\n"
+    fputs("usage: "DAEMON_NAME" [ -e <port> ] [ -d <port> ] domain secrets\n"
           "\n"
           "    -e <port>    port to listen to for encoding requests\n"
           "                 (default: "STR(DEFAULT_ENCODER_PORT)")\n"
