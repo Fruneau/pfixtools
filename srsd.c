@@ -80,28 +80,56 @@ static void srsd_delete(srsd_t **srsd)
     }
 }
 
+void urldecode(char *s, char *end)
+{
+    char *p = s;
+
+    while (*p) {
+        if (*p == '%' && end - p >= 3) {
+            int h = (hexval(p[1]) << 4) | hexval(p[2]);
+
+            if (h >= 0) {
+                *s++ = h;
+                p += 3;
+                continue;
+            }
+        }
+
+        *s++ = *p++;
+    }
+    *s++ = '\0';
+}
+
 int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
 {
     while (srsd->ibuf.len > 4) {
         char buf[BUFSIZ], *p, *q, *nl;
         int err;
 
+        nl = strchr(srsd->ibuf.data + 4, '\n');
+        if (!nl) {
+            if (srsd->ibuf.len > BUFSIZ) {
+                syslog(LOG_ERR, "unreasonnable amount of data without a \\n");
+                return -1;
+            }
+            return 0;
+        }
+
         if (strncmp("get ", srsd->ibuf.data, 4)) {
             syslog(LOG_ERR, "bad request, not starting with \"get \"");
             return -1;
         }
 
-        nl = strchr(srsd->ibuf.data + 4, '\n');
-        if (!nl)
-            return 0;
-
         for (p = srsd->ibuf.data + 4; p < nl && isspace(*p); p++);
         for (q = nl++; q >= p && isspace(*q); *q-- = '\0');
 
         if (p == q) {
+            buffer_addstr(&srsd->obuf, "400 empty request ???\n");
             syslog(LOG_WARNING, "empty request");
             goto skip;
         }
+
+        urldecode(p, q);
 
         if (srsd->decoder) {
             err = srs_reverse(srs, buf, ssizeof(buf), p);
