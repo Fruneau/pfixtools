@@ -213,12 +213,14 @@ module_exit(main_shutdown);
 
 void usage(void)
 {
-    fputs("usage: "DAEMON_NAME" [ -e <port> ] [ -d <port> ] domain secrets\n"
+    fputs("usage: "DAEMON_NAME" [options] domain secrets\n"
           "\n"
+          "Options:\n"
           "    -e <port>    port to listen to for encoding requests\n"
           "                 (default: "STR(DEFAULT_ENCODER_PORT)")\n"
           "    -d <port>    port to listen to for decoding requests\n"
           "                 (default: "STR(DEFAULT_DECODER_PORT)")\n"
+          "    -p <pidfile> file to write our pid to\n"
          , stderr);
 }
 
@@ -375,7 +377,10 @@ int main(int argc, char *argv[])
 {
     int port_enc = DEFAULT_ENCODER_PORT;
     int port_dec = DEFAULT_DECODER_PORT;
+    const char *pidfile = NULL;
 
+    FILE *f = NULL;
+    int res;
     srs_t *srs;
 
     if (atexit(common_shutdown)) {
@@ -384,13 +389,16 @@ int main(int argc, char *argv[])
     }
     common_initialize();
 
-    for (int c = 0; (c = getopt(argc, argv, "he:d:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "he:d:p:")) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
             break;
           case 'd':
             port_dec = atoi(optarg);
+            break;
+          case 'p':
+            pidfile = optarg;
             break;
           default:
             usage();
@@ -408,9 +416,28 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    if (pidfile) {
+        f = fopen(pidfile, "w");
+        if (!f) {
+            syslog(LOG_CRIT, "unable to write pidfile %s", pidfile);
+        }
+        fprintf(f, "%d\n", getpid());
+        fflush(f);
+    }
     if (daemon_detach() < 0) {
         syslog(LOG_CRIT, "unable to fork");
         return EXIT_FAILURE;
     }
-    return main_loop(srs, argv[optind], port_enc, port_dec);
+    if (f) {
+        rewind(f);
+        ftruncate(fileno(f), 0);
+        fprintf(f, "%d\n", getpid());
+        fclose(f);
+        f = NULL;
+    }
+    res = main_loop(srs, argv[optind], port_enc, port_dec);
+    if (pidfile) {
+        unlink(pidfile);
+    }
+    return res;
 }
