@@ -45,6 +45,8 @@ typedef struct buffer_t {
     ssize_t size;
 } buffer_t;
 
+#define BUFFER_INIT {NULL, 0, 0}
+
 DO_INIT(buffer_t, buffer);
 static inline void buffer_wipe(buffer_t *buf) {
     p_delete(&buf->data);
