@@ -55,19 +55,14 @@ void common_sighandler(int sig)
         }
         return;
 
-      case SIGTERM:
-        break;
-
       case SIGHUP:
         sighup = true;
         return;
 
       default:
-        return;
+        syslog(LOG_ERR, "Killed (got signal %d)...", sig);
+        exit(-1);
     }
-
-    syslog(LOG_ERR, "Killed...");
-    exit(-1);
 }
 
 void common_initialize(void)

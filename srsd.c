@@ -201,13 +201,13 @@ static int main_initialize(void)
     signal(SIGINT,  &common_sighandler);
     signal(SIGTERM, &common_sighandler);
     signal(SIGHUP,  &common_sighandler);
+    signal(SIGSEGV, &common_sighandler);
     syslog(LOG_INFO, "Starting...");
     return 0;
 }
 
 static void main_shutdown(void)
 {
-    syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
     closelog();
 }
 
@@ -332,7 +332,6 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
     close(epollfd);
 
   error:
-    cleanexit = true;
     return exitcode;
 }
 
@@ -456,5 +455,6 @@ int main(int argc, char *argv[])
         fclose(f);
         f = NULL;
     }
+    syslog(LOG_INFO, "Stopping...");
     return res;
 }
