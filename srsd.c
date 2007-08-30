@@ -48,6 +48,9 @@
 #define DAEMON_NAME             "pfix-srsd"
 #define DEFAULT_ENCODER_PORT    10000
 #define DEFAULT_DECODER_PORT    10001
+#define RUNAS_USER              "nobody"
+#define RUNAS_GROUP             "nogroup"
+
 #define __tostr(x)  #x
 #define STR(x)      __tostr(x)
 
@@ -221,6 +224,7 @@ void usage(void)
           "    -d <port>    port to listen to for decoding requests\n"
           "                 (default: "STR(DEFAULT_DECODER_PORT)")\n"
           "    -p <pidfile> file to write our pid to\n"
+          "    -u           unsafe mode: don't drop privilegies\n"
          , stderr);
 }
 
@@ -375,6 +379,7 @@ static srs_t *srs_read_secrets(const char *sfile)
 
 int main(int argc, char *argv[])
 {
+    bool unsafe  = false;
     int port_enc = DEFAULT_ENCODER_PORT;
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
@@ -389,7 +394,7 @@ int main(int argc, char *argv[])
     }
     common_initialize();
 
-    for (int c = 0; (c = getopt(argc, argv, "he:d:p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "he:d:p:u")) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
@@ -399,6 +404,9 @@ int main(int argc, char *argv[])
             break;
           case 'p':
             pidfile = optarg;
+            break;
+          case 'u':
+            unsafe = true;
             break;
           default:
             usage();
@@ -424,20 +432,29 @@ int main(int argc, char *argv[])
         fprintf(f, "%d\n", getpid());
         fflush(f);
     }
+
+    if (!unsafe && drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
+        syslog(LOG_CRIT, "unable to drop privileges");
+        return EXIT_FAILURE;
+    }
+
     if (daemon_detach() < 0) {
         syslog(LOG_CRIT, "unable to fork");
         return EXIT_FAILURE;
     }
+
     if (f) {
         rewind(f);
         ftruncate(fileno(f), 0);
         fprintf(f, "%d\n", getpid());
-        fclose(f);
-        f = NULL;
+        fflush(f);
     }
     res = main_loop(srs, argv[optind], port_enc, port_dec);
-    if (pidfile) {
-        unlink(pidfile);
+    if (f) {
+        rewind(f);
+        ftruncate(fileno(f), 0);
+        fclose(f);
+        f = NULL;
     }
     return res;
 }

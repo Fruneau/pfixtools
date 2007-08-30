@@ -152,7 +152,7 @@ int daemon_detach(void)
     return 0;
 }
 
-int drop_privilegies(const char *user, const char *group)
+int drop_privileges(const char *user, const char *group)
 {
     if (!geteuid()) {
         struct passwd *pw;
