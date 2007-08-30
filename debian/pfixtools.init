@@ -13,6 +13,8 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
  . /lib/lsb/init-functions
 test -r /etc/default/pfixtools && . /etc/default/pfixtools
 
+mkdir -p /var/run/pfixtools &>/dev/null
+
 isyes() {
     case "$1" in
         [Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|1) true;;
@@ -27,7 +29,10 @@ pidfile() {
 d_start() {
     log_daemon_msg "Starting pidxtools"
     if isyes "$SRSD_ENABLE" && test -x /usr/sbin/pfix-srsd; then
-        /usr/sbin/pfix-srsd $SRSD_OPTIONS "$pf" "$SRSD_DOMAIN" "$SRSD_SECRETS"
+        start_daemon -p /var/run/pfixtools/srsd.pid \
+            /usr/sbin/pfix-srsd $SRSD_OPTIONS       \
+                -p /var/run/pfixtools/srsd.pid      \
+                "$SRSD_DOMAIN" "$SRSD_SECRETS"
         log_progress_msg "pidx-srsd"
     fi
     log_end_msg 0
@@ -36,7 +41,7 @@ d_start() {
 d_stop() {
     log_daemon_msg "Stopping pidxtools"
     if isyes "$SRSD_ENABLE"; then
-        killproc pfix-srsd
+        killproc -p /var/run/pfixtools/srsd.pid pfix-srsd
         log_progress_msg "pidx-srsd"
     fi
     log_end_msg 0
