@@ -33,8 +33,10 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#include <sys/un.h>
 #include <fcntl.h>
+#include <grp.h>
+#include <pwd.h>
+#include <sys/un.h>
 
 #include "common.h"
 #include "daemon.h"
@@ -147,5 +149,30 @@ int daemon_detach(void)
         exit(0);
 
     setsid();
+    return 0;
+}
+
+int drop_privilegies(const char *user, const char *group)
+{
+    if (!geteuid()) {
+        struct passwd *pw;
+        struct group *gr;
+
+        if (group) {
+            gr = getgrnam(group);
+            if (!gr)
+                return -1;
+            setgid(gr->gr_gid);
+        }
+
+        pw = getpwnam(user);
+        if (!pw)
+            return -1;
+        if (!group) {
+            setgid(pw->pw_gid);
+        }
+        setuid(pw->pw_uid);
+    }
+
     return 0;
 }
