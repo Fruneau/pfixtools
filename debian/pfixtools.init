@@ -22,10 +22,6 @@ isyes() {
     esac
 }
 
-pidfile() {
-    echo "/var/run/pfixtools/$1.pid"
-}
-
 d_start() {
     log_daemon_msg "Starting pidxtools"
     if isyes "$SRSD_ENABLE" && test -x /usr/sbin/pfix-srsd; then
