@@ -39,7 +39,6 @@
 #include <sys/un.h>
 
 #include "common.h"
-#include "daemon.h"
 
 static int setnonblock(int sock)
 {

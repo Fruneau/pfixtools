@@ -47,6 +47,7 @@ static int main_initialize(void)
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT,  &common_sighandler);
     signal(SIGTERM, &common_sighandler);
+    signal(SIGSEGV, &common_sighandler);
     syslog(LOG_INFO, "Starting...");
     return 0;
 }
@@ -80,13 +81,11 @@ static void main_loop(void)
         pthread_attr_destroy(&attr);
     }
 
-    cleanexit = true;
     close(sock);
 }
 
 static void main_shutdown(void)
 {
-    syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
     closelog();
 }
 
@@ -102,5 +101,6 @@ int main(void)
 
     common_initialize();
     main_loop();
+    syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
     return EXIT_SUCCESS;
 }

@@ -72,4 +72,11 @@ void common_sighandler(int sig);
 void common_initialize(void);
 void common_shutdown(void);
 
+/* daemon.c */
+int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len);
+int accept_nonblock(int fd);
+
+int daemon_detach(void);
+int drop_privileges(const char *user, const char *group);
+
 #endif

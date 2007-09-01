@@ -41,7 +41,6 @@
 #include <srs2.h>
 
 #include "common.h"
-#include "daemon.h"
 #include "mem.h"
 #include "buffer.h"
 
