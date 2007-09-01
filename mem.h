@@ -33,8 +33,8 @@
  * Copyright © 2006 Pierre Habouzit
  */
 
-#ifndef POSTLICYD_MEM_H
-#define POSTLICYD_MEM_H
+#ifndef PFIXTOOLS_MEM_H
+#define PFIXTOOLS_MEM_H
 
 #include <assert.h>
 #include <ctype.h>
@@ -131,4 +131,4 @@ static inline void *xmemdupstr(const void *src, ssize_t len) {
         }                                                   \
     }
 
-#endif /* POSTLICYD_MEM_H */
+#endif /* PFIXTOOLS_MEM_H */

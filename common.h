@@ -33,8 +33,8 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#ifndef POSTLICYD_H
-#define POSTLICYD_H
+#ifndef PFIXTOOLS_H
+#define PFIXTOOLS_H
 
 #include <errno.h>
 #include <limits.h>
@@ -64,7 +64,6 @@ typedef void (*exitcall_t)(void);
 #define module_exit(fn)  static exitcall_t __exit_##fn __exit = fn;
 
 /* common.c */
-extern sig_atomic_t cleanexit;
 extern sig_atomic_t sigint;
 extern sig_atomic_t sighup;
 

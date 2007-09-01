@@ -33,8 +33,8 @@
  * Copyright © 2006-2007 Pierre Habouzit
  */
 
-#ifndef POSTLICYD_BUFFER_H
-#define POSTLICYD_BUFFER_H
+#ifndef PFIXTOOLS_BUFFER_H
+#define PFIXTOOLS_BUFFER_H
 
 #include "mem.h"
 #include "str.h"
@@ -106,4 +106,4 @@ void buffer_consume(buffer_t *buf, ssize_t len);
 
 ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count);
 
-#endif /* POSTLICYD_BUFFER_H */
+#endif /* PFIXTOOLS_BUFFER_H */

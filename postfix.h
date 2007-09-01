@@ -33,8 +33,8 @@
  * Copyright © 2006-2007 Pierre Habouzit
  */
 
-#ifndef POSTLICYD_POSTFIX_H
-#define POSTLICYD_POSTFIX_H
+#ifndef PFIXTOOLS_POSTFIX_H
+#define PFIXTOOLS_POSTFIX_H
 
 #include <stddef.h>
 

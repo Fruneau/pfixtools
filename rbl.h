@@ -33,8 +33,8 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#ifndef POSTLICYD_RBL_H
-#define POSTLICYD_RBL_H
+#ifndef PFIXTOOLS_RBL_H
+#define PFIXTOOLS_RBL_H
 
 typedef struct rbldb_t rbldb_t;
 

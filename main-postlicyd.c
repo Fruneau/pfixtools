@@ -39,7 +39,7 @@
 
 #include "common.h"
 
-volatile int nbthreads = 0;
+/* administrivia {{{ */
 
 static int main_initialize(void)
 {
@@ -51,6 +51,16 @@ static int main_initialize(void)
     syslog(LOG_INFO, "Starting...");
     return 0;
 }
+
+static void main_shutdown(void)
+{
+    closelog();
+}
+
+module_init(main_initialize);
+module_exit(main_shutdown);
+
+/* }}} */
 
 void *job_run(void *_fd)
 {
@@ -84,14 +94,6 @@ static void main_loop(void)
     close(sock);
 }
 
-static void main_shutdown(void)
-{
-    closelog();
-}
-
-module_init(main_initialize);
-module_exit(main_shutdown);
-
 int main(void)
 {
     if (atexit(common_shutdown)) {
@@ -101,6 +103,6 @@ int main(void)
 
     common_initialize();
     main_loop();
-    syslog(LOG_INFO, cleanexit ? "Stopping..." : "Unclean exit...");
+    syslog(LOG_INFO, "Stopping...");
     return EXIT_SUCCESS;
 }

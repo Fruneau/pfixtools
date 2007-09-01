@@ -40,7 +40,6 @@
 
 #include "common.h"
 
-sig_atomic_t cleanexit = false;
 sig_atomic_t sigint    = false;
 sig_atomic_t sighup    = false;
 
