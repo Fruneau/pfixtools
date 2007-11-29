@@ -33,14 +33,11 @@
  * Copyright © 2005-2007 Pierre Habouzit
  */
 
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/epoll.h>
-#include <sys/stat.h>
+#include "common.h"
 
 #include <srs2.h>
 
-#include "common.h"
+#include "epoll.h"
 #include "mem.h"
 #include "buffer.h"
 
@@ -163,7 +160,7 @@ int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
     return 0;
 }
 
-int start_listener(int epollfd, int port, bool decoder)
+int start_listener(int port, bool decoder)
 {
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
@@ -232,17 +229,10 @@ void usage(void)
 int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
 {
     int exitcode = EXIT_SUCCESS;
-    int epollfd = epoll_create(128);
 
-    if (epollfd < 0) {
-        UNIXERR("epoll_create");
-        exitcode = EXIT_FAILURE;
-        goto error;
-    }
-
-    if (start_listener(epollfd, port_enc, false) < 0)
+    if (start_listener(port_enc, false) < 0)
         return EXIT_FAILURE;
-    if (start_listener(epollfd, port_dec, true) < 0)
+    if (start_listener(port_dec, true) < 0)
         return EXIT_FAILURE;
 
     while (!sigint) {
@@ -328,9 +318,6 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
         }
     }
 
-    close(epollfd);
-
-  error:
     return exitcode;
 }
 
@@ -386,13 +373,9 @@ int main(int argc, char *argv[])
     int res;
     srs_t *srs;
 
-    if (atexit(common_shutdown)) {
-        fputs("Cannot hook my atexit function, quitting !\n", stderr);
-        return EXIT_FAILURE;
-    }
     common_initialize();
 
-    for (int c = 0; (c = getopt(argc, argv, "he:d:p:u")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "hu" "e:d:p:")) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);

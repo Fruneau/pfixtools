@@ -30,113 +30,23 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2006-2007 Pierre Habouzit
+ * Copyright © 2007 Pierre Habouzit
  */
 
-#include <getopt.h>
-
-#include "common.h"
 #include "epoll.h"
 
-/* administrivia {{{ */
+int epollfd = -1;
 
-static int main_initialize(void)
+static int epoll_initialize(void)
 {
-    openlog("postlicyd", LOG_PID, LOG_MAIL);
-    signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT,  &common_sighandler);
-    signal(SIGTERM, &common_sighandler);
-    signal(SIGSEGV, &common_sighandler);
-    syslog(LOG_INFO, "Starting...");
-    return 0;
+    epollfd = epoll_create(128);
+    return epollfd < 0 ? -1 : 0;
 }
 
-static void main_shutdown(void)
+static void epoll_shutdown(void)
 {
-    closelog();
+    close(epollfd);
 }
 
-module_init(main_initialize);
-module_exit(main_shutdown);
-
-/* }}} */
-
-void *job_run(void *_fd)
-{
-    int fd = (intptr_t)_fd;
-
-    close(fd);
-    pthread_detach(pthread_self());
-    return NULL;
-}
-
-static int main_loop(void)
-{
-    int exitcode = EXIT_SUCCESS;
-    int sock = -1;
-
-    while (!sigint) {
-        int fd = accept(sock, NULL, 0);
-        pthread_t dummy;
-
-        if (fd < 0) {
-            if (errno != EINTR || errno != EAGAIN)
-                UNIXERR("accept");
-            continue;
-        }
-
-        pthread_create(&dummy, NULL, job_run, (void *)(intptr_t)fd);
-    }
-
-    close(sock);
-    return exitcode;
-}
-
-int main(int argc, char *argv[])
-{
-    const char *pidfile = NULL;
-    FILE *f = NULL;
-    int res;
-
-    common_initialize();
-    for (int c = 0; (c = getopt(argc, argv, "h" "p:")) >= 0; ) {
-        switch (c) {
-          case 'p':
-            pidfile = optarg;
-            break;
-          default:
-            //usage();
-            return EXIT_FAILURE;
-        }
-    }
-
-    if (pidfile) {
-        f = fopen(pidfile, "w");
-        if (!f) {
-            syslog(LOG_CRIT, "unable to write pidfile %s", pidfile);
-        }
-        fprintf(f, "%d\n", getpid());
-        fflush(f);
-    }
-
-    if (daemon_detach() < 0) {
-        syslog(LOG_CRIT, "unable to fork");
-        return EXIT_FAILURE;
-    }
-
-    if (f) {
-        rewind(f);
-        ftruncate(fileno(f), 0);
-        fprintf(f, "%d\n", getpid());
-        fflush(f);
-    }
-    res = main_loop();
-    if (f) {
-        rewind(f);
-        ftruncate(fileno(f), 0);
-        fclose(f);
-        f = NULL;
-    }
-    syslog(LOG_INFO, "Stopping...");
-    return res;
-}
+module_init(epoll_initialize);
+module_exit(epoll_shutdown);
