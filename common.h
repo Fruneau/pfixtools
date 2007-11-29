@@ -33,14 +33,13 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#ifndef PFIXTOOLS_H
-#define PFIXTOOLS_H
+#ifndef PFIXTOOLS_COMMON_H
+#define PFIXTOOLS_COMMON_H
 
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdbool.h>
@@ -53,6 +52,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "mem.h"
 
 #define UNIXERR(fun)                                    \
         syslog(LOG_ERR, "%s:%d:%s: %s: %m",             \

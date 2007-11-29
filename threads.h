@@ -33,12 +33,13 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#ifndef PFIXTOOLS_EPOLL_H
-#define PFIXTOOLS_EPOLL_H
+#ifndef PFIXTOOLS_THREADS_H
+#define PFIXTOOLS_THREADS_H
 
-#include <sys/epoll.h>
 #include "common.h"
+#include <pthread.h>
 
-extern int epollfd;
+int thread_launch(void *(*f)(int fd, void *), int fd, void *);
+void threads_join(void);
 
 #endif

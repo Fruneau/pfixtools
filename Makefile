@@ -43,7 +43,7 @@ TESTS    = tst-rbl
 
 GENERATED = tokens.h tokens.c
 
-postlicyd_SOURCES = common.c epoll.c str.c buffer.c rbl.c \
+postlicyd_SOURCES = common.c threads.c str.c buffer.c rbl.c \
 		    $(GENERATED) postfix.c main-postlicyd.c
 postlicyd_LIBADD = -lpthread
 

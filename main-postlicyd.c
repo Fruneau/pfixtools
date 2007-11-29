@@ -35,8 +35,8 @@
 
 #include <getopt.h>
 
-#include "common.h"
 #include "epoll.h"
+#include "threads.h"
 
 /* administrivia {{{ */
 
@@ -61,12 +61,9 @@ module_exit(main_shutdown);
 
 /* }}} */
 
-void *job_run(void *_fd)
+void *job_run(int fd, void *data)
 {
-    int fd = (intptr_t)_fd;
-
     close(fd);
-    pthread_detach(pthread_self());
     return NULL;
 }
 
@@ -77,15 +74,14 @@ static int main_loop(void)
 
     while (!sigint) {
         int fd = accept(sock, NULL, 0);
-        pthread_t dummy;
-
         if (fd < 0) {
             if (errno != EINTR || errno != EAGAIN)
                 UNIXERR("accept");
             continue;
         }
 
-        pthread_create(&dummy, NULL, job_run, (void *)(intptr_t)fd);
+        thread_launch(job_run, fd, NULL);
+        threads_join();
     }
 
     close(sock);

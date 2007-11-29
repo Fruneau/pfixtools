@@ -33,12 +33,70 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#ifndef PFIXTOOLS_EPOLL_H
-#define PFIXTOOLS_EPOLL_H
+#include "threads.h"
 
-#include <sys/epoll.h>
-#include "common.h"
+static struct {
+    pthread_spinlock_t spin;
+    pthread_t *deads;
+    int count, size;
+} morgue;
 
-extern int epollfd;
+struct thread_foo {
+    void *(*fun)(int fd, void *);
+    int fd;
+    void *data;
+};
 
-#endif
+void thread_register_dead(void *tid)
+{
+    pthread_spin_lock(&morgue.spin);
+    if (morgue.count >= morgue.size) {
+        p_allocgrow(&morgue.deads, morgue.count + 1, &morgue.size);
+    }
+    morgue.deads[morgue.count++] = (pthread_t)tid;
+    pthread_spin_unlock(&morgue.spin);
+}
+
+static void *thread_wrapper(void *arg)
+{
+    struct thread_foo *foo = arg;
+    void *res;
+    pthread_cleanup_push(thread_register_dead, (void *)pthread_self());
+    res = (*foo->fun)(foo->fd, foo->data);
+    pthread_cleanup_pop(1);
+    return res;
+}
+
+int thread_launch(void *(*f)(int, void *), int fd, void *data)
+{
+    struct thread_foo foo = { f, fd, data };
+    pthread_t t;
+    return pthread_create(&t, NULL, &thread_wrapper, &foo);
+}
+
+void threads_join(void)
+{
+    if (!morgue.count)
+        return;
+
+    pthread_spin_lock(&morgue.spin);
+    while (morgue.count-- > 0) {
+        pthread_join(morgue.deads[morgue.count], NULL);
+    }
+    pthread_spin_unlock(&morgue.spin);
+}
+
+
+static int threads_initialize(void)
+{
+    pthread_spin_init(&morgue.spin, PTHREAD_PROCESS_PRIVATE);
+    return 0;
+}
+
+static void threads_shutdown(void)
+{
+    pthread_spin_destroy(&morgue.spin);
+}
+
+module_init(threads_initialize);
+module_exit(threads_shutdown);
