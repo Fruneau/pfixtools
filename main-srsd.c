@@ -228,8 +228,6 @@ void usage(void)
 
 int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
 {
-    int exitcode = EXIT_SUCCESS;
-
     if (start_listener(port_enc, false) < 0)
         return EXIT_FAILURE;
     if (start_listener(port_dec, true) < 0)
@@ -243,8 +241,7 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
         if (n < 0) {
             if (errno != EAGAIN && errno != EINTR) {
                 UNIXERR("epoll_wait");
-                exitcode = EXIT_FAILURE;
-                break;
+                return EXIT_FAILURE;
             }
             continue;
         }
@@ -318,7 +315,7 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
         }
     }
 
-    return exitcode;
+    return EXIT_SUCCESS;
 }
 
 static srs_t *srs_read_secrets(const char *sfile)
