@@ -71,7 +71,7 @@ tags: .tags
 .tags: $(shell git ls-files | egrep '\.[hc]$$')
 	ctags -o $@ $^
 
-headers: HEADACHEOPTS=-c mk/headache.cfg -h COPYING
+headers: HEADACHEOPTS=-c mk/headache.cfg -h mk/COPYING
 headers:
 	@which headache > /dev/null || \
 		( echo "package headache not installed" ; exit 1 )
