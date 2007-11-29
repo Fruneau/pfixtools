@@ -70,7 +70,8 @@ do_tokens() {
 }
 
 do_c() {
-    cat <<EOF | gperf -m16 -l -t -C -F",0" -Ntokenize_aux
+    cat <<EOF | gperf -m16 -l -t -C -F",0" -Ntokenize_aux | \
+        sed -e '/__gnu_inline__/d;s/\<\(__\|\)inline\>//g'
 %{
 `do_hdr`
 
