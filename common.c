@@ -206,7 +206,15 @@ int drop_privileges(const char *user, const char *group)
 
 extern initcall_t __madinit[], __madexit[];
 
-void common_initialize(void)
+static void common_shutdown(void)
+{
+    for (int i = -1; __madexit[i]; i--) {
+        (*__madexit[i])();
+    }
+}
+
+static void __attribute__((__constructor__,__used__))
+common_initialize(void)
 {
     if (atexit(common_shutdown)) {
         fputs("Cannot hook my atexit function, quitting !\n", stderr);
@@ -220,9 +228,3 @@ void common_initialize(void)
     }
 }
 
-void common_shutdown(void)
-{
-    for (int i = -1; __madexit[i]; i--) {
-        (*__madexit[i])();
-    }
-}

@@ -98,7 +98,6 @@ int main(int argc, char *argv[])
     FILE *f = NULL;
     int res;
 
-    common_initialize();
     for (int c = 0; (c = getopt(argc, argv, "h" "p:")) >= 0; ) {
         switch (c) {
           case 'p':

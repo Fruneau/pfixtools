@@ -72,8 +72,6 @@ extern sig_atomic_t sigint;
 extern sig_atomic_t sighup;
 
 void common_sighandler(int sig);
-void common_initialize(void);
-void common_shutdown(void);
 
 /* daemon.c */
 int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len);

@@ -373,8 +373,6 @@ int main(int argc, char *argv[])
     int res;
     srs_t *srs;
 
-    common_initialize();
-
     for (int c = 0; (c = getopt(argc, argv, "hu" "e:d:p:")) >= 0; ) {
         switch (c) {
           case 'e':
