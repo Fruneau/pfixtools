@@ -37,17 +37,21 @@
 #define PFIXTOOLS_H
 
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <netinet/in.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #define UNIXERR(fun)                                    \
@@ -60,8 +64,8 @@ typedef void (*exitcall_t)(void);
 #define __init __attribute__((__used__,__section__(".mad.init")))
 #define __exit __attribute__((__used__,__section__(".mad.exit")))
 
-#define module_init(fn)  static initcall_t __init_##fn __init = fn;
-#define module_exit(fn)  static exitcall_t __exit_##fn __exit = fn;
+#define module_init(fn)  static __init initcall_t __init_##fn = fn;
+#define module_exit(fn)  static __exit exitcall_t __exit_##fn = fn;
 
 /* common.c */
 extern sig_atomic_t sigint;

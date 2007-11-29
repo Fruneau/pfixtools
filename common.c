@@ -204,22 +204,25 @@ int drop_privileges(const char *user, const char *group)
     return 0;
 }
 
+extern initcall_t __madinit[], __madexit[];
+
 void common_initialize(void)
 {
-    extern initcall_t __madinit_start, __madinit_end;
+    if (atexit(common_shutdown)) {
+        fputs("Cannot hook my atexit function, quitting !\n", stderr);
+        abort();
+    }
 
-    initcall_t *call_p = &__madinit_start;
-    while (call_p < &__madinit_end) {
-        (*call_p++)();
+    for (int i = 0; __madinit[i]; i++) {
+        if ((*__madinit[i])()) {
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
 void common_shutdown(void)
 {
-    extern exitcall_t __madexit_start, __madexit_end;
-
-    exitcall_t *call_p = &__madexit_end;
-    while (call_p > &__madexit_start) {
-        (*--call_p)();
+    for (int i = -1; __madexit[i]; i--) {
+        (*__madexit[i])();
     }
 }

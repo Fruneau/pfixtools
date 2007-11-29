@@ -1,11 +1,10 @@
 SECTIONS {
-    .data : {
-        __madinit_start = . ;
+    .rodata : {
+        . = ALIGN(8);
+        __madinit = . ;
         *( .mad.init )
-        __madinit_end = . ;
-
-        __madexit_start = . ;
+        QUAD(0)
         *( .mad.exit )
-        __madexit_end = . ;
+        __madexit = . ;
     }
 }
