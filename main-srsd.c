@@ -366,7 +366,6 @@ int main(int argc, char *argv[])
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
 
-    FILE *f = NULL;
     int res;
     srs_t *srs;
 
@@ -400,13 +399,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (pidfile) {
-        f = fopen(pidfile, "w");
-        if (!f) {
-            syslog(LOG_CRIT, "unable to write pidfile %s", pidfile);
-        }
-        fprintf(f, "%d\n", getpid());
-        fflush(f);
+    if (pidfile_open(pidfile) < 0) {
+        syslog(LOG_CRIT, "unable to write pidfile %s", pidfile);
+        return EXIT_FAILURE;
     }
 
     if (!unsafe && drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
@@ -419,19 +414,8 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (f) {
-        rewind(f);
-        ftruncate(fileno(f), 0);
-        fprintf(f, "%d\n", getpid());
-        fflush(f);
-    }
+    pidfile_refresh();
     res = main_loop(srs, argv[optind], port_enc, port_dec);
-    if (f) {
-        rewind(f);
-        ftruncate(fileno(f), 0);
-        fclose(f);
-        f = NULL;
-    }
     syslog(LOG_INFO, "Stopping...");
     return res;
 }

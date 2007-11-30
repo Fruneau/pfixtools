@@ -40,8 +40,10 @@
 
 #include "common.h"
 
-sig_atomic_t sigint    = false;
-sig_atomic_t sighup    = false;
+sig_atomic_t sigint  = false;
+sig_atomic_t sighup  = false;
+
+static FILE *pidfile = NULL;
 
 void common_sighandler(int sig)
 {
@@ -204,10 +206,45 @@ int drop_privileges(const char *user, const char *group)
     return 0;
 }
 
+int pidfile_open(const char *name)
+{
+    if (name) {
+        pidfile = fopen(name, "w");
+        if (!pidfile)
+            return -1;
+        fprintf(pidfile, "%d\n", getpid());
+        return fflush(pidfile);
+    }
+    return 0;
+}
+
+int pidfile_refresh(void)
+{
+    if (pidfile) {
+        rewind(pidfile);
+        ftruncate(fileno(pidfile), 0);
+        fprintf(pidfile, "%d\n", getpid());
+        return fflush(pidfile);
+    }
+    return 0;
+}
+
+static void pidfile_close(void)
+{
+    if (pidfile) {
+        rewind(pidfile);
+        ftruncate(fileno(pidfile), 0);
+        fclose(pidfile);
+        pidfile = NULL;
+    }
+}
+
 extern initcall_t __madinit[], __madexit[];
 
 static void common_shutdown(void)
 {
+    pidfile_close();
+
     for (int i = -1; __madexit[i]; i--) {
         (*__madexit[i])();
     }

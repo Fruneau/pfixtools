@@ -68,17 +68,18 @@ typedef void (*exitcall_t)(void);
 #define module_init(fn)  static __init initcall_t __init_##fn = fn;
 #define module_exit(fn)  static __exit exitcall_t __exit_##fn = fn;
 
-/* common.c */
 extern sig_atomic_t sigint;
 extern sig_atomic_t sighup;
 
 void common_sighandler(int sig);
 
-/* daemon.c */
 int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len);
 int accept_nonblock(int fd);
 
 int daemon_detach(void);
 int drop_privileges(const char *user, const char *group);
+
+int pidfile_open(const char *name);
+int pidfile_refresh(void);
 
 #endif

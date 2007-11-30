@@ -102,7 +102,6 @@ static int main_loop(void)
 int main(int argc, char *argv[])
 {
     const char *pidfile = NULL;
-    FILE *f = NULL;
     int res;
 
     for (int c = 0; (c = getopt(argc, argv, "h" "p:")) >= 0; ) {
@@ -121,13 +120,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (pidfile) {
-        f = fopen(pidfile, "w");
-        if (!f) {
-            syslog(LOG_CRIT, "unable to write pidfile %s", pidfile);
-        }
-        fprintf(f, "%d\n", getpid());
-        fflush(f);
+    if (pidfile_open(pidfile) < 0) {
+        syslog(LOG_CRIT, "unable to write pidfile %s", pidfile);
+        return EXIT_FAILURE;
     }
 
     if (daemon_detach() < 0) {
@@ -135,19 +130,8 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (f) {
-        rewind(f);
-        ftruncate(fileno(f), 0);
-        fprintf(f, "%d\n", getpid());
-        fflush(f);
-    }
+    pidfile_refresh();
     res = main_loop();
-    if (f) {
-        rewind(f);
-        ftruncate(fileno(f), 0);
-        fclose(f);
-        f = NULL;
-    }
     syslog(LOG_INFO, "Stopping...");
     return res;
 }
