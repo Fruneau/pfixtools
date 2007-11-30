@@ -35,16 +35,17 @@
 
 #include <tcbdb.h>
 
+#include "common.h"
 #include "greylist.h"
 #include "str.h"
 
 static struct {
-    int do_awl;
-    int awl_count;
+    bool do_awl;
     bool lookup_by_host;
 
+    int awl_limit;
     int delay;
-    int retry_window;
+    int window;
 
     TCBDB *awl_db, *obj_db;
 } cfg;
@@ -58,6 +59,50 @@ struct obj_entry {
     time_t first;
     time_t last;
 };
+
+int greylist_initialize(const char *directory, const char *prefix)
+{
+    char path[PATH_MAX];
+
+    if (cfg.do_awl) {
+        snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
+        cfg.awl_db = tcbdbnew();
+        if (!tcbdbopen(cfg.awl_db, path, BDBOWRITER | BDBOCREAT)) {
+            tcbdbdel(cfg.awl_db);
+            cfg.awl_db = NULL;
+        }
+        return -1;
+    }
+
+    snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
+    cfg.obj_db = tcbdbnew();
+    if (!tcbdbopen(cfg.obj_db, path, BDBOWRITER | BDBOCREAT)) {
+        tcbdbdel(cfg.obj_db);
+        cfg.obj_db = NULL;
+        if (cfg.awl_db) {
+            tcbdbdel(cfg.awl_db);
+            cfg.awl_db = NULL;
+        }
+        return -1;
+    }
+
+    return 0;
+}
+
+static void greylist_shutdown(void)
+{
+    if (cfg.awl_db) {
+        tcbdbsync(cfg.awl_db);
+        tcbdbdel(cfg.awl_db);
+        cfg.awl_db = NULL;
+    }
+    if (cfg.obj_db) {
+        tcbdbsync(cfg.obj_db);
+        tcbdbdel(cfg.obj_db);
+        cfg.obj_db = NULL;
+    }
+}
+module_exit(greylist_shutdown);
 
 const char *sender_normalize(const char *sender, char *buf, int len)
 {
@@ -145,7 +190,7 @@ bool try_greylist(const char *sender, const char *c_addr,
         if (res && len == sizeof(aent)) {
             memcpy(&aent, res, len);
         }
-        if (aent.count > cfg.awl_count) {
+        if (aent.count > cfg.awl_limit) {
             if (now < aent.last + 3600)
                 goto incr_aent;
             return true;
@@ -162,9 +207,7 @@ bool try_greylist(const char *sender, const char *c_addr,
         memcpy(&oent, res, len);
     }
 
-    if (oent.last - oent.first < cfg.delay
-    &&  now - oent.first > cfg.retry_window)
-    {
+    if (oent.last - oent.first < cfg.delay && now - oent.first > cfg.window) {
         oent.first = now;
     }
     oent.last = now;

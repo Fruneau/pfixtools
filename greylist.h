@@ -33,5 +33,7 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
+int greylist_initialize(const char *directory, const char *prefix);
+
 bool try_greylist(const char *sender, const char *c_addr,
                   const char *c_name, const char *rcpt);
