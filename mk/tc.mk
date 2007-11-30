@@ -29,73 +29,9 @@
 #  THE POSSIBILITY OF SUCH DAMAGE.                                           #
 ##############################################################################
 
-all:
-
-LDFLAGS += -Wl,--warn-common
-
-include mk/cflags.mk
-include mk/tc.mk
-
-CFLAGS += --std=gnu99 -D_GNU_SOURCE
-prefix ?= /usr/local
-
-PROGRAMS = postlicyd pfix-srsd
-TESTS    = tst-rbl
-
-GENERATED = tokens.h tokens.c
-
-postlicyd_SOURCES = common.c threads.c str.c buffer.c \
-		    greylist.c rbl.c \
-		    $(GENERATED) postfix.c main-postlicyd.c
-postlicyd_LIBADD = -lpthread $(TC_LIBS)
-postlicyd_CFLAGS = $(TC_CFLAGS)
-
-pfix-srsd_SOURCES = common.c epoll.c buffer.c str.c main-srsd.c
-pfix-srsd_LIBADD = -lsrs2
-
-tst-rbl_SOURCES = tst-rbl.c
-
-install: all
-	install -d $(DESTDIR)$(prefix)/sbin
-	install $(PROGRAMS) $(DESTDIR)$(prefix)/sbin
-	install -d $(DESTDIR)/etc/pfixtools
-
-# RULES ###################################################################{{{
-
-all: $(GENERATED) $(PROGRAMS) | $(GENERATED)
-
-clean:
-	$(RM) $(PROGRAMS) $(TESTS) .*.o .*.dep
-
-distclean: clean
-	$(RM) $(GENERATED)
-
-tags: .tags
-.tags: $(shell git ls-files | egrep '\.[hc]$$')
-	ctags -o $@ $^
-
-headers: HEADACHEOPTS=-c mk/headache.cfg -h mk/COPYING
-headers:
-	@which headache > /dev/null || \
-		( echo "package headache not installed" ; exit 1 )
-	@git ls-files | egrep '(\.h|\.c|Makefile|*\.mk)$$' | xargs -t headache $(HEADACHEOPTS)
-
-%.h: %.sh
-	./$< $@ || ($(RM) $@; exit 1)
-
-%.c: %.sh
-	./$< $@ || ($(RM) $@; exit 1)
-
-.%.o: %.c Makefile
-	$(CC) $(CFLAGS) -MMD -MT ".$*.dep $@" -MF .$*.dep -g -c -o $@ $<
-
-.%.dep: .%.o
-
-.SECONDEXPANSION:
-
-$(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile common.ld
-	$(CC) -o $@ $(CFLAGS) $($@_CFLAGS) $(filter %.ld,$^) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
-
--include $(foreach p,$(PROGRAMS) $(TESTS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
-
-###########################################################################}}}
+ifeq ('','$(shell pkg-config tokyocabinet || echo failed)')
+    TC_CFLAGS:=$(shell pkg-config --cflags tokyocabinet)
+    TC_LIBS:=$(shell pkg-config --libs tokyocabinet)
+else
+    $(error tokyocabinet library not found)
+endif
