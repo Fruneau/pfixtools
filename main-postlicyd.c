@@ -38,6 +38,8 @@
 #include "epoll.h"
 #include "threads.h"
 
+#define DAEMON_NAME             "postlicyd"
+
 /* administrivia {{{ */
 
 static int main_initialize(void)
@@ -58,6 +60,15 @@ static void main_shutdown(void)
 
 module_init(main_initialize);
 module_exit(main_shutdown);
+
+void usage(void)
+{
+    fputs("usage: "DAEMON_NAME" [options] config\n"
+          "\n"
+          "Options:\n"
+          "    -p <pidfile> file to write our pid to\n"
+         , stderr);
+}
 
 /* }}} */
 
@@ -100,9 +111,14 @@ int main(int argc, char *argv[])
             pidfile = optarg;
             break;
           default:
-            //usage();
+            usage();
             return EXIT_FAILURE;
         }
+    }
+
+    if (argc - optind != 1) {
+        usage();
+        return EXIT_FAILURE;
     }
 
     if (pidfile) {
