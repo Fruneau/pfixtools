@@ -88,7 +88,7 @@ static int setnonblock(int sock)
     return 0;
 }
 
-int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len)
+int tcp_bind(const struct sockaddr *addr, socklen_t len)
 {
     int sock;
 
@@ -128,17 +128,32 @@ int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len)
         return -1;
     }
 
-    if (setnonblock(sock)) {
-        close(sock);
-        return -1;
-    }
+    return sock;
+}
 
+int tcp_listen(const struct sockaddr *addr, socklen_t len)
+{
+    int sock = tcp_bind(addr, len);
     if (listen(sock, 0) < 0) {
         UNIXERR("bind");
         close(sock);
         return -1;
     }
+    return sock;
+}
 
+int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len)
+{
+    int sock = tcp_bind(addr, len);
+    if (setnonblock(sock)) {
+        close(sock);
+        return -1;
+    }
+    if (listen(sock, 0) < 0) {
+        UNIXERR("bind");
+        close(sock);
+        return -1;
+    }
     return sock;
 }
 

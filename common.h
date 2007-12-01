@@ -74,6 +74,8 @@ extern sig_atomic_t sighup;
 
 void common_sighandler(int sig);
 
+int tcp_bind(const struct sockaddr *addr, socklen_t len);
+int tcp_listen(const struct sockaddr *addr, socklen_t len);
 int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len);
 int accept_nonblock(int fd);
 int xwrite(int fd, const char *s, size_t l);
