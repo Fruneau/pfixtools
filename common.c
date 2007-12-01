@@ -159,6 +159,20 @@ int accept_nonblock(int fd)
     return sock;
 }
 
+int xwrite(int fd, const char *s, size_t l)
+{
+    while (l > 0) {
+        int nb = write(fd, s, l);
+        if (nb < 0) {
+            if (errno == EINTR || errno == EAGAIN)
+                continue;
+            return -1;
+        }
+        l -= nb;
+    }
+    return 0;
+}
+
 int daemon_detach(void)
 {
     pid_t pid;

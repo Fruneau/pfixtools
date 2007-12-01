@@ -44,9 +44,8 @@ TESTS    = tst-rbl
 
 GENERATED = tokens.h tokens.c
 
-postlicyd_SOURCES = common.c threads.c str.c buffer.c \
-		    policy.c greylist.c rbl.c \
-		    $(GENERATED) main-postlicyd.c
+postlicyd_SOURCES = common.c threads.c str.c buffer.c $(GENERATED) \
+		    greylist.c rbl.c main-postlicyd.c
 postlicyd_LIBADD = -lpthread $(TC_LIBS)
 postlicyd_CFLAGS = $(TC_CFLAGS)
 
