@@ -232,6 +232,7 @@ static int main_initialize(void)
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT,  &common_sighandler);
     signal(SIGTERM, &common_sighandler);
+    signal(SIGHUP,  &common_sighandler);
     signal(SIGSEGV, &common_sighandler);
     syslog(LOG_INFO, "Starting...");
     return 0;

@@ -47,18 +47,9 @@ static FILE *pidfile = NULL;
 
 void common_sighandler(int sig)
 {
-    static time_t lastintr = 0;
-    time_t now = time(NULL);
-
     switch (sig) {
       case SIGINT:
-        if (sigint) {
-            if (now - lastintr >= 1)
-                break;
-        } else {
-            lastintr = now;
-            sigint   = true;
-        }
+        sigint = true;
         return;
 
       case SIGHUP:
