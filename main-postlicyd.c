@@ -41,6 +41,9 @@
 #include "tokens.h"
 
 #define DAEMON_NAME             "postlicyd"
+#define DEFAULT_PORT            10000
+#define RUNAS_USER              "nobody"
+#define RUNAS_GROUP             "nogroup"
 
 enum smtp_state {
     SMTP_UNKNOWN,
@@ -247,6 +250,7 @@ void usage(void)
     fputs("usage: "DAEMON_NAME" [options] config\n"
           "\n"
           "Options:\n"
+          "    -l <port>    port to listen to\n"
           "    -p <pidfile> file to write our pid to\n"
          , stderr);
 }
@@ -255,13 +259,21 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_addr   = { htonl(INADDR_LOOPBACK) },
+    };
     const char *pidfile = NULL;
+    int port = DEFAULT_PORT;
     int sock = -1;
 
-    for (int c = 0; (c = getopt(argc, argv, "h" "p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "h" "l:p:")) >= 0; ) {
         switch (c) {
           case 'p':
             pidfile = optarg;
+            break;
+          case 'l':
+            port = atoi(optarg);
             break;
           default:
             usage();
@@ -279,12 +291,22 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    if (drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
+        syslog(LOG_CRIT, "unable to drop privileges");
+        return EXIT_FAILURE;
+    }
+
     if (daemon_detach() < 0) {
         syslog(LOG_CRIT, "unable to fork");
         return EXIT_FAILURE;
     }
 
     pidfile_refresh();
+
+    addr.sin_port = htons(port);
+    sock = tcp_listen((struct sockaddr *)&addr, sizeof(addr));
+    if (sock < 0)
+        return EXIT_FAILURE;
 
     while (!sigint) {
         int fd = accept(sock, NULL, 0);
