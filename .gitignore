@@ -4,7 +4,7 @@
 /tst-rbl
 /pfix-srsd
 
-*.o
+*.[ao]
 .tags
 .*.dep
 .*.swp

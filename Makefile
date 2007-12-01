@@ -40,17 +40,18 @@ CFLAGS += --std=gnu99 -D_GNU_SOURCE
 prefix ?= /usr/local
 
 PROGRAMS = postlicyd pfix-srsd
+LIBS     = lib
 TESTS    = tst-rbl
 
 GENERATED = tokens.h tokens.c
 
-postlicyd_SOURCES = common.c threads.c str.c buffer.c $(GENERATED) \
-		    greylist.c rbl.c main-postlicyd.c
-postlicyd_LIBADD = -lpthread $(TC_LIBS)
-postlicyd_CFLAGS = $(TC_CFLAGS)
+lib_SOURCES = threads.c str.c buffer.c common.c epoll.c $(GENERATED)
 
-pfix-srsd_SOURCES = common.c epoll.c buffer.c str.c main-srsd.c
-pfix-srsd_LIBADD = -lsrs2
+postlicyd_SOURCES = greylist.c rbl.c main-postlicyd.c lib.a
+postlicyd_LIBADD  = -lpthread $(TC_LIBS)
+
+pfix-srsd_SOURCES = main-srsd.c lib.a
+pfix-srsd_LIBADD  = -lsrs2
 
 tst-rbl_SOURCES = tst-rbl.c
 
@@ -64,7 +65,7 @@ install: all
 all: $(GENERATED) $(PROGRAMS) | $(GENERATED)
 
 clean:
-	$(RM) $(PROGRAMS) $(TESTS) .*.o .*.dep
+	$(RM) $(LIBS:=.a) $(PROGRAMS) $(TESTS) .*.o .*.dep
 
 distclean: clean
 	$(RM) $(GENERATED)
@@ -86,14 +87,19 @@ headers:
 	./$< $@ || ($(RM) $@; exit 1)
 
 .%.o: %.c Makefile
+	$(shell test -d $(@D) || mkdir -p $(@D))
 	$(CC) $(CFLAGS) -MMD -MT ".$*.dep $@" -MF .$*.dep -g -c -o $@ $<
 
 .%.dep: .%.o
 
 .SECONDEXPANSION:
 
+$(LIBS:=.a): $$(patsubst %.c,.%.o,$$($$(patsubst %.a,%,$$@)_SOURCES)) Makefile
+	$(RM) $@
+	$(AR) rcs $@ $(filter %.o,$^)
+
 $(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile common.ld
-	$(CC) -o $@ $(CFLAGS) $($@_CFLAGS) $(filter %.ld,$^) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
+	$(CC) -o $@ $(filter %.ld,$^) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
 -include $(foreach p,$(PROGRAMS) $(TESTS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
 
