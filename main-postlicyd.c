@@ -70,7 +70,7 @@ typedef struct query_t {
     const char *recipient_count;
     const char *client_address;
     const char *client_name;
-    const char *rclient_name;
+    const char *reverse_client_name;
     const char *instance;
 
     /* postfix 2.2+ */
@@ -99,8 +99,8 @@ static int postfix_parsejob(query_t *query, char *p)
         }                                                                    \
     } while (0)
 
-    p_clear(&query, 1);
-    while (p[0] != '\r' || p[1] != '\n') {
+    p_clear(query, 1);
+    while (*p != '\n') {
         char *k, *v;
         int klen, vlen, vtk;
 
@@ -113,10 +113,10 @@ static int postfix_parsejob(query_t *query, char *p)
 
         while (isblank(*p))
             p++;
-        p = strstr(v = p, "\r\n");
-        PARSE_CHECK(p, "could not find final \\r\\n in line");
+        p = strchr(v = p, '\n');
+        PARSE_CHECK(p, "could not find final \\n in line");
         for (vlen = p - v; vlen && isblank(v[vlen]); vlen--);
-        p += 2; /* skip \r\n */
+        p += 1; /* skip \n */
 
         vtk = tokenize(v, vlen);
         switch (tokenize(k, klen)) {
@@ -128,7 +128,7 @@ static int postfix_parsejob(query_t *query, char *p)
             CASE(RECIPIENT_COUNT,     recipient_count);
             CASE(CLIENT_ADDRESS,      client_address);
             CASE(CLIENT_NAME,         client_name);
-            CASE(RCLIENT_NAME,        rclient_name);
+            CASE(REVERSE_CLIENT_NAME, reverse_client_name);
             CASE(INSTANCE,            instance);
             CASE(SASL_METHOD,         sasl_method);
             CASE(SASL_USERNAME,       sasl_username);
@@ -189,6 +189,7 @@ static void *policy_run(int fd, void *data)
 
     buffer_init(&buf);
     for (;;) {
+        ssize_t search_offs = MAX(0, buf.len - 1);
         int nb = buffer_read(&buf, fd, -1);
         const char *eoq;
         query_t q;
@@ -205,15 +206,15 @@ static void *policy_run(int fd, void *data)
             break;
         }
 
-        eoq = strstr(buf.data + MAX(0, buf.len - 3), "\r\n\r\n");
+        eoq = strstr(buf.data + search_offs, "\n\n");
         if (!eoq)
             continue;
 
         if (postfix_parsejob(&q, buf.data) < 0)
             break;
 
-        buffer_consume(&buf, eoq + strlen("\r\n\r\n") - buf.data);
-        if (xwrite(fd, "DUNNO\r\n", strlen("DUNNO\r\n"))) {
+        buffer_consume(&buf, eoq + strlen("\n\n") - buf.data);
+        if (xwrite(fd, "DUNNO\n\n", strlen("DUNNO\n\n"))) {
             UNIXERR("write");
             break;
         }

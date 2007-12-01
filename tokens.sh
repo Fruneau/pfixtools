@@ -133,7 +133,7 @@ exit 0
 ## recipient_count
 ## client_address
 ## client_name
-## rclient_name
+## reverse_client_name
 ## instance
 #
 # postfix 2.2+
