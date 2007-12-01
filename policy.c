@@ -34,7 +34,7 @@
  */
 
 #include "common.h"
-#include "postfix.h"
+#include "policy.h"
 #include "buffer.h"
 #include "tokens.h"
 
@@ -231,3 +231,9 @@ static void postfix_process(job_t *job)
     }
 }
 #endif
+
+void *policy_run(int fd, void *data)
+{
+    close(fd);
+    return NULL;
+}

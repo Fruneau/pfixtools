@@ -35,8 +35,8 @@
 
 #include <getopt.h>
 
-#include "epoll.h"
 #include "threads.h"
+#include "policy.h"
 
 #define DAEMON_NAME             "postlicyd"
 
@@ -72,12 +72,6 @@ void usage(void)
 
 /* }}} */
 
-void *job_run(int fd, void *data)
-{
-    close(fd);
-    return NULL;
-}
-
 static int main_loop(void)
 {
     int exitcode = EXIT_SUCCESS;
@@ -91,7 +85,7 @@ static int main_loop(void)
             continue;
         }
 
-        thread_launch(job_run, fd, NULL);
+        thread_launch(policy_run, fd, NULL);
         threads_join();
     }
 

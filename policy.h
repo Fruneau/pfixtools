@@ -33,8 +33,8 @@
  * Copyright © 2006-2007 Pierre Habouzit
  */
 
-#ifndef PFIXTOOLS_POSTFIX_H
-#define PFIXTOOLS_POSTFIX_H
+#ifndef PFIXTOOLS_POLICY_H
+#define PFIXTOOLS_POLICY_H
 
 #include <stddef.h>
 
@@ -101,5 +101,8 @@ static inline void query_wipe(query_t *rq) {
 }
 DO_NEW(query_t, query);
 DO_DELETE(query_t, query);
+
+
+void *policy_run(int fd, void *);
 
 #endif
