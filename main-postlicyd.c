@@ -84,20 +84,9 @@ typedef struct query_t {
     const char *encryption_cipher;
     const char *encryption_keysize;
     const char *etrn_domain;
-
-    buffer_t data;
 } query_t;
 
-static query_t *query_init(query_t *rq) {
-    memset(rq, 0, offsetof(query_t, data));
-    buffer_init(&rq->data);
-    return rq;
-}
-static void query_wipe(query_t *rq) {
-    buffer_wipe(&rq->data);
-}
-
-static int postfix_parsejob(query_t *query)
+static int postfix_parsejob(query_t *query, char *p)
 {
 #define PARSE_CHECK(expr, error, ...)                                        \
     do {                                                                     \
@@ -107,9 +96,7 @@ static int postfix_parsejob(query_t *query)
         }                                                                    \
     } while (0)
 
-    char *p = vskipspaces(query->data.data);
-
-    memset(query, 0, offsetof(query_t, data));
+    p_clear(&query, 1);
     while (p[0] != '\r' || p[1] != '\n') {
         char *k, *v;
         int klen, vlen, vtk;
@@ -195,12 +182,13 @@ static int postfix_parsejob(query_t *query)
 
 static void *policy_run(int fd, void *data)
 {
-    query_t q;
-    query_init(&q);
+    buffer_t buf;
 
+    buffer_init(&buf);
     for (;;) {
-        int nb = buffer_read(&q.data, fd, -1);
+        int nb = buffer_read(&buf, fd, -1);
         const char *eoq;
+        query_t q;
 
         if (nb < 0) {
             if (errno == EAGAIN || errno == EINTR)
@@ -209,49 +197,28 @@ static void *policy_run(int fd, void *data)
             break;
         }
         if (nb == 0) {
-            if (q.data.len)
+            if (buf.len)
                 syslog(LOG_ERR, "unexpected end of data");
             break;
         }
 
-        eoq = strstr(q.data.data + MAX(0, q.data.len - 3), "\r\n\r\n");
+        eoq = strstr(buf.data + MAX(0, buf.len - 3), "\r\n\r\n");
         if (!eoq)
             continue;
 
-        if (postfix_parsejob(&q) < 0)
+        if (postfix_parsejob(&q, buf.data) < 0)
             break;
 
-        buffer_consume(&q.data, eoq + strlen("\r\n\r\n") - q.data.data);
+        buffer_consume(&buf, eoq + strlen("\r\n\r\n") - buf.data);
         if (xwrite(fd, "DUNNO\r\n", strlen("DUNNO\r\n"))) {
             UNIXERR("write");
             break;
         }
     }
+    buffer_wipe(&buf);
 
-    query_wipe(&q);
     close(fd);
     return NULL;
-}
-
-static int main_loop(void)
-{
-    int exitcode = EXIT_SUCCESS;
-    int sock = -1;
-
-    while (!sigint) {
-        int fd = accept(sock, NULL, 0);
-        if (fd < 0) {
-            if (errno != EINTR || errno != EAGAIN)
-                UNIXERR("accept");
-            continue;
-        }
-
-        thread_launch(policy_run, fd, NULL);
-        threads_join();
-    }
-
-    close(sock);
-    return exitcode;
 }
 
 /* administrivia {{{ */
@@ -289,7 +256,7 @@ void usage(void)
 int main(int argc, char *argv[])
 {
     const char *pidfile = NULL;
-    int res;
+    int sock = -1;
 
     for (int c = 0; (c = getopt(argc, argv, "h" "p:")) >= 0; ) {
         switch (c) {
@@ -318,7 +285,19 @@ int main(int argc, char *argv[])
     }
 
     pidfile_refresh();
-    res = main_loop();
+
+    while (!sigint) {
+        int fd = accept(sock, NULL, 0);
+        if (fd < 0) {
+            if (errno != EINTR && errno != EAGAIN)
+                UNIXERR("accept");
+            continue;
+        }
+        thread_launch(policy_run, fd, NULL);
+        threads_join();
+    }
+
+    close(sock);
     syslog(LOG_INFO, "Stopping...");
-    return res;
+    return EXIT_SUCCESS;
 }
