@@ -221,6 +221,7 @@ void usage(void)
           "                 (default: "STR(DEFAULT_DECODER_PORT)")\n"
           "    -p <pidfile> file to write our pid to\n"
           "    -u           unsafe mode: don't drop privilegies\n"
+          "    -f           stay in foreground\n"
          , stderr);
 }
 
@@ -362,6 +363,7 @@ static srs_t *srs_read_secrets(const char *sfile)
 int main(int argc, char *argv[])
 {
     bool unsafe  = false;
+    bool daemonize = true;
     int port_enc = DEFAULT_ENCODER_PORT;
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
@@ -369,10 +371,13 @@ int main(int argc, char *argv[])
     int res;
     srs_t *srs;
 
-    for (int c = 0; (c = getopt(argc, argv, "hu" "e:d:p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "hfu" "e:d:p:")) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
+            break;
+          case 'f':
+            daemonize = false;
             break;
           case 'd':
             port_dec = atoi(optarg);
@@ -409,7 +414,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (daemon_detach() < 0) {
+    if (daemonize && daemon_detach() < 0) {
         syslog(LOG_CRIT, "unable to fork");
         return EXIT_FAILURE;
     }

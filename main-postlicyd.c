@@ -252,6 +252,7 @@ void usage(void)
           "Options:\n"
           "    -l <port>    port to listen to\n"
           "    -p <pidfile> file to write our pid to\n"
+          "    -f           stay in foreground\n"
          , stderr);
 }
 
@@ -264,16 +265,20 @@ int main(int argc, char *argv[])
         .sin_addr   = { htonl(INADDR_LOOPBACK) },
     };
     const char *pidfile = NULL;
+    bool daemonize = true;
     int port = DEFAULT_PORT;
     int sock = -1;
 
-    for (int c = 0; (c = getopt(argc, argv, "h" "l:p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "hf" "l:p:")) >= 0; ) {
         switch (c) {
           case 'p':
             pidfile = optarg;
             break;
           case 'l':
             port = atoi(optarg);
+            break;
+          case 'f':
+            daemonize = false;
             break;
           default:
             usage();
@@ -296,7 +301,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (daemon_detach() < 0) {
+    if (daemonize && daemon_detach() < 0) {
         syslog(LOG_CRIT, "unable to fork");
         return EXIT_FAILURE;
     }
