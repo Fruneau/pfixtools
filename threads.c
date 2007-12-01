@@ -41,8 +41,8 @@ static struct {
     int count, size;
 } morgue;
 
-struct thread_foo {
-    void *(*fun)(int fd, void *);
+struct job_closure {
+    void *(*f)(int, void*);
     int fd;
     void *data;
 };
@@ -59,19 +59,21 @@ void thread_register_dead(void *tid)
 
 static void *thread_wrapper(void *arg)
 {
-    struct thread_foo *foo = arg;
+    struct job_closure *closure = arg;
     void *res;
+
     pthread_cleanup_push(thread_register_dead, (void *)pthread_self());
-    res = (*foo->fun)(foo->fd, foo->data);
+    res = (*closure->f)(closure->fd, closure->data);
     pthread_cleanup_pop(1);
+    p_delete(&closure);
     return res;
 }
 
 int thread_launch(void *(*f)(int, void *), int fd, void *data)
 {
-    struct thread_foo foo = { f, fd, data };
+    struct job_closure closure = { .f = f, .fd = fd, .data = data };
     pthread_t t;
-    return pthread_create(&t, NULL, &thread_wrapper, &foo);
+    return pthread_create(&t, NULL, &thread_wrapper, p_dup(&closure, 1));
 }
 
 void threads_join(void)
