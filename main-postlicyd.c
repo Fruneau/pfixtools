@@ -228,9 +228,14 @@ static void *policy_run(int fd, void *data)
 
 static int main_initialize(void)
 {
+    struct sigaction sa;
+
     openlog("postlicyd", LOG_PID, LOG_MAIL);
     signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT,  &common_sighandler);
+    sigaction(SIGINT, NULL, &sa);
+    sa.sa_handler = &common_sighandler;
+    sa.sa_flags  &= ~SA_RESTART;
+    sigaction(SIGINT, &sa, NULL);
     signal(SIGTERM, &common_sighandler);
     signal(SIGHUP,  &common_sighandler);
     signal(SIGSEGV, &common_sighandler);
