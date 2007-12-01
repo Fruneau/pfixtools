@@ -229,14 +229,9 @@ static void *policy_run(int fd, void *data)
 
 static int main_initialize(void)
 {
-    struct sigaction sa;
-
     openlog("postlicyd", LOG_PID, LOG_MAIL);
     signal(SIGPIPE, SIG_IGN);
-    sigaction(SIGINT, NULL, &sa);
-    sa.sa_handler = &common_sighandler;
-    sa.sa_flags  &= ~SA_RESTART;
-    sigaction(SIGINT, &sa, NULL);
+    signal(SIGINT,  &common_sighandler);
     signal(SIGTERM, &common_sighandler);
     signal(SIGHUP,  &common_sighandler);
     signal(SIGSEGV, &common_sighandler);
@@ -316,18 +311,35 @@ int main(int argc, char *argv[])
     pidfile_refresh();
 
     addr.sin_port = htons(port);
-    sock = tcp_listen((struct sockaddr *)&addr, sizeof(addr));
+    sock = tcp_listen_nonblock((struct sockaddr *)&addr, sizeof(addr));
     if (sock < 0)
         return EXIT_FAILURE;
 
     while (!sigint) {
-        int fd = accept(sock, NULL, 0);
-        if (fd < 0) {
-            if (errno != EINTR && errno != EAGAIN)
-                UNIXERR("accept");
-            continue;
+        fd_set rfd;
+        struct timeval tv = { 1, 0 };
+        int res;
+
+        FD_SET(sock, &rfd);
+        res = select(sock + 1, &rfd, NULL, NULL, &tv);
+
+        if (res < 0) {
+            if (errno != EINTR && errno != EAGAIN) {
+                UNIXERR("select");
+                return EXIT_FAILURE;
+            }
         }
-        thread_launch(policy_run, fd, NULL);
+        if (res > 0) {
+            int fd = accept(sock, NULL, 0);
+            if (fd < 0) {
+                if (errno != EINTR && errno != EAGAIN) {
+                    UNIXERR("accept");
+                    return EXIT_FAILURE;
+                }
+                continue;
+            }
+            thread_launch(policy_run, fd, NULL);
+        }
         threads_join();
     }
 
