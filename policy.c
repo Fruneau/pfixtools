@@ -38,31 +38,74 @@
 #include "buffer.h"
 #include "tokens.h"
 
-#if 0
+enum smtp_state {
+    SMTP_UNKNOWN,
+    SMTP_CONNECT,
+    SMTP_EHLO,
+    SMTP_HELO = SMTP_EHLO,
+    SMTP_MAIL,
+    SMTP_RCPT,
+    SMTP_DATA,
+    SMTP_END_OF_MESSAGE,
+    SMTP_VRFY,
+    SMTP_ETRN,
+};
 
-#define ishspace(c)  ((c) == ' ' || (c) == '\t')
+/* \see http://www.postfix.org/SMTPD_POLICY_README.html */
+typedef struct query_t {
+    unsigned state : 4;
+    unsigned esmtp : 1;
 
-typedef struct jpriv_t {
-    buffer_t ibuf;
-    buffer_t obuf;
-    query_t query;
-} jpriv_t;
+    const char *helo_name;
+    const char *queue_id;
+    const char *sender;
+    const char *recipient;
+    const char *recipient_count;
+    const char *client_address;
+    const char *client_name;
+    const char *rclient_name;
+    const char *instance;
 
-static jpriv_t *postfix_jpriv_init(jpriv_t *jp)
-{
-    buffer_init(&jp->ibuf);
-    buffer_init(&jp->obuf);
-    query_init(&jp->query);
-    return jp;
+    /* postfix 2.2+ */
+    const char *sasl_method;
+    const char *sasl_username;
+    const char *sasl_sender;
+    const char *size;
+    const char *ccert_subject;
+    const char *ccert_issuer;
+    const char *ccsert_fingerprint;
+
+    /* postfix 2.3+ */
+    const char *encryption_protocol;
+    const char *encryption_cipher;
+    const char *encryption_keysize;
+    const char *etrn_domain;
+
+    buffer_t data;
+} query_t;
+
+static query_t *query_init(query_t *rq) {
+    memset(rq, 0, offsetof(query_t, data));
+    buffer_init(&rq->data);
+    return rq;
 }
-static void postfix_jpriv_wipe(jpriv_t *jp)
-{
-    query_wipe(&jp->query);
-    buffer_wipe(&jp->ibuf);
-    buffer_wipe(&jp->obuf);
+static void query_wipe(query_t *rq) {
+    buffer_wipe(&rq->data);
 }
-DO_NEW(jpriv_t, postfix_jpriv);
-DO_DELETE(jpriv_t, postfix_jpriv);
+
+static int xwrite(int fd, const char *s, size_t l)
+{
+    while (l > 0) {
+        int nb = write(fd, s, l);
+        if (nb < 0) {
+            if (errno == EINTR || errno == EAGAIN)
+                continue;
+            return -1;
+        }
+        l -= nb;
+    }
+    return 0;
+}
 
 static int postfix_parsejob(query_t *query)
 {
@@ -76,22 +119,23 @@ static int postfix_parsejob(query_t *query)
 
     char *p = vskipspaces(query->data.data);
 
-    while (*p) {
+    memset(query, 0, offsetof(query_t, data));
+    while (p[0] != '\r' || p[1] != '\n') {
         char *k, *v;
         int klen, vlen, vtk;
 
-        while (ishspace(*p))
+        while (isblank(*p))
             p++;
         p = strchr(k = p, '=');
         PARSE_CHECK(p, "could not find '=' in line");
-        for (klen = p - k; klen && ishspace(k[klen]); klen--);
+        for (klen = p - k; klen && isblank(k[klen]); klen--);
         p += 1; /* skip = */
 
-        while (ishspace(*p))
+        while (isblank(*p))
             p++;
         p = strstr(v = p, "\r\n");
         PARSE_CHECK(p, "could not find final \\r\\n in line");
-        for (vlen = p - v; vlen && ishspace(v[vlen]); vlen--);
+        for (vlen = p - v; vlen && isblank(v[vlen]); vlen--);
         p += 2; /* skip \r\n */
 
         vtk = tokenize(v, vlen);
@@ -150,90 +194,51 @@ static int postfix_parsejob(query_t *query)
             break;
 
           default:
-            return -1;
+            syslog(LOG_WARNING, "unexpected key, skipped: %.*s", klen, k);
+            break;
         }
     }
 
     return query->state == SMTP_UNKNOWN ? -1 : 0;
-
 #undef PARSE_CHECK
 }
 
-static void postfix_process(job_t *job)
-{
-    int nb;
-    const char *p;
-
-    switch (job->mode) {
-      case JOB_LISTEN:
-        if ((job = job_accept(job, JOB_READ))) {
-            job->jdata   = postfix_jpriv_new();
-            job->process = &postfix_process;
-            job->stop    = &postfix_stop;
-        }
-        return;
-
-      case JOB_WRITE:
-        nb = write(job->fd, job->jdata->obuf.data, job->jdata->obuf.len);
-        if (nb < 0) {
-            if ((job->error = errno != EINTR && errno != EAGAIN)) {
-                syslog(LOG_ERR, "unexpected problem on the socket: %m");
-            }
-            return;
-        }
-
-        buffer_consume(&job->jdata->obuf, nb);
-        if (job->jdata->obuf.len)
-            return;
-
-        /* fall through */
-
-      case JOB_READ:
-        nb = buffer_read(&job->jdata->ibuf, job->fd, -1);
-        if (nb < 0) {
-            if ((job->error = errno != EINTR && errno != EAGAIN)) {
-                syslog(LOG_ERR, "unexpected problem on the socket: %m");
-            }
-            return;
-        }
-        if (nb == 0) {
-            syslog(LOG_ERR, "unexpected eof");
-            job->error = true;
-            return;
-        }
-
-        p = strstr(skipspaces(job->jdata->ibuf.data), "\r\n\r\n");
-        if (!p) {
-            if (job->jdata->ibuf.len > SHRT_MAX) {
-                syslog(LOG_ERR, "too much data without CRLFCRLF");
-                job->error = true;
-            }
-            return;
-        }
-        p += 4;
-
-        query_reset(&job->jdata->query);
-        buffer_add(&job->jdata->query.data, job->jdata->ibuf.data,
-                   p - 2 - job->jdata->ibuf.data);
-        buffer_consume(&job->jdata->query.data, p - job->jdata->ibuf.data);
-
-        if (postfix_parsejob(&job->jdata->query) < 0) {
-            job->error = true;
-            return;
-        }
-
-        /* TODO: run the scenario */
-        return;
-
-      default:
-        job->error = true;
-        return;
-    }
-}
-#endif
-
 void *policy_run(int fd, void *data)
 {
+    query_t q;
+    query_init(&q);
+
+    for (;;) {
+        int nb = buffer_read(&q.data, fd, -1);
+        const char *eoq;
+
+        if (nb < 0) {
+            if (errno == EAGAIN || errno == EINTR)
+                continue;
+            UNIXERR("read");
+            break;
+        }
+        if (nb == 0) {
+            if (q.data.len)
+                syslog(LOG_ERR, "unexpected end of data");
+            break;
+        }
+
+        eoq = strstr(q.data.data + MAX(0, q.data.len - 3), "\r\n\r\n");
+        if (!eoq)
+            continue;
+
+        if (postfix_parsejob(&q) < 0)
+            break;
+
+        buffer_consume(&q.data, eoq + strlen("\r\n\r\n") - q.data.data);
+        if (xwrite(fd, "DUNNO\r\n", strlen("DUNNO\r\n"))) {
+            UNIXERR("write");
+            break;
+        }
+    }
+
+    query_wipe(&q);
     close(fd);
     return NULL;
 }
