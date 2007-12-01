@@ -37,6 +37,7 @@
 
 #include "buffer.h"
 #include "common.h"
+#include "epoll.h"
 #include "threads.h"
 #include "tokens.h"
 
@@ -88,6 +89,35 @@ typedef struct query_t {
     const char *encryption_keysize;
     const char *etrn_domain;
 } query_t;
+
+typedef struct plicyd_t {
+    unsigned listener : 1;
+    unsigned watchwr  : 1;
+    int fd;
+    buffer_t ibuf;
+    buffer_t obuf;
+} plicyd_t;
+
+
+static plicyd_t *plicyd_new(void)
+{
+    plicyd_t *plicyd = p_new(plicyd_t, 1);
+    plicyd->fd = -1;
+    return plicyd;
+}
+
+#if 0
+static void plicyd_delete(plicyd_t **plicyd)
+{
+    if (*plicyd) {
+        if ((*plicyd)->fd >= 0)
+            close((*plicyd)->fd);
+        buffer_wipe(&(*plicyd)->ibuf);
+        buffer_wipe(&(*plicyd)->obuf);
+        p_delete(plicyd);
+    }
+}
+#endif
 
 static int postfix_parsejob(query_t *query, char *p)
 {
@@ -225,6 +255,31 @@ static void *policy_run(int fd, void *data)
     return NULL;
 }
 
+int start_listener(int port)
+{
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_addr   = { htonl(INADDR_LOOPBACK) },
+    };
+    struct epoll_event evt = { .events = EPOLLIN };
+    plicyd_t *tmp;
+    int sock;
+
+    addr.sin_port = htons(port);
+    sock = tcp_listen_nonblock((const struct sockaddr *)&addr, sizeof(addr));
+    if (sock < 0) {
+        return -1;
+    }
+
+    evt.data.ptr  = tmp = plicyd_new();
+    tmp->fd       = sock;
+    tmp->listener = true;
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, &evt) < 0) {
+        UNIXERR("epoll_ctl");
+        return -1;
+    }
+    return 0;
+}
 /* administrivia {{{ */
 
 static int main_initialize(void)
@@ -262,14 +317,9 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_addr   = { htonl(INADDR_LOOPBACK) },
-    };
     const char *pidfile = NULL;
     bool daemonize = true;
     int port = DEFAULT_PORT;
-    int sock = -1;
 
     for (int c = 0; (c = getopt(argc, argv, "hf" "l:p:")) >= 0; ) {
         switch (c) {
@@ -310,40 +360,40 @@ int main(int argc, char *argv[])
 
     pidfile_refresh();
 
-    addr.sin_port = htons(port);
-    sock = tcp_listen_nonblock((struct sockaddr *)&addr, sizeof(addr));
-    if (sock < 0)
+    if (start_listener(port) < 0)
         return EXIT_FAILURE;
 
     while (!sigint) {
-        fd_set rfd;
-        struct timeval tv = { 1, 0 };
-        int res;
+        struct epoll_event evts[1024];
+        int n;
 
-        FD_SET(sock, &rfd);
-        res = select(sock + 1, &rfd, NULL, NULL, &tv);
-
-        if (res < 0) {
-            if (errno != EINTR && errno != EAGAIN) {
-                UNIXERR("select");
+        n = epoll_wait(epollfd, evts, countof(evts), -1);
+        if (n < 0) {
+            if (errno != EAGAIN && errno != EINTR) {
+                UNIXERR("epoll_wait");
                 return EXIT_FAILURE;
             }
+            continue;
         }
-        if (res > 0) {
-            int fd = accept(sock, NULL, 0);
-            if (fd < 0) {
-                if (errno != EINTR && errno != EAGAIN) {
-                    UNIXERR("accept");
-                    return EXIT_FAILURE;
+
+        while (--n >= 0) {
+            plicyd_t *d = evts[n].data.ptr;
+
+            if (d->listener) {
+                int fd = accept(d->fd, NULL, 0);
+                if (fd < 0) {
+                    if (errno != EINTR && errno != EAGAIN) {
+                        UNIXERR("accept");
+                        return EXIT_FAILURE;
+                    }
+                    continue;
                 }
-                continue;
+                thread_launch(policy_run, fd, NULL);
             }
-            thread_launch(policy_run, fd, NULL);
         }
         threads_join();
     }
 
-    close(sock);
     syslog(LOG_INFO, "Stopping...");
     return EXIT_SUCCESS;
 }
