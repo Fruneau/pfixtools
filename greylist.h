@@ -36,6 +36,15 @@
 #ifndef PFIXTOOLS_GREYLIST_H
 #define PFIXTOOLS_GREYLIST_H
 
+struct greylist_cfg {
+    unsigned lookup_by_host : 1;
+    int delay;
+    int retry_window;
+    int client_awl;
+};
+
+extern struct greylist_cfg greylist_cfg;
+
 int greylist_initialize(const char *directory, const char *prefix);
 
 bool try_greylist(const char *sender, const char *c_addr,

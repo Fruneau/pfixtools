@@ -39,16 +39,13 @@
 #include "greylist.h"
 #include "str.h"
 
-static struct {
-    bool do_awl;
-    bool lookup_by_host;
-
-    int awl_limit;
-    int delay;
-    int window;
-
-    TCBDB *awl_db, *obj_db;
-} cfg;
+struct greylist_cfg greylist_cfg = {
+   .lookup_by_host = false,
+   .delay          = 300,
+   .retry_window   = 2 * 24 * 2600,
+   .client_awl     = 5,
+};
+static TCBDB *awl_db, *obj_db;
 
 struct awl_entry {
     int32_t count;
@@ -64,24 +61,24 @@ int greylist_initialize(const char *directory, const char *prefix)
 {
     char path[PATH_MAX];
 
-    if (cfg.do_awl) {
+    if (greylist_cfg.client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        cfg.awl_db = tcbdbnew();
-        if (!tcbdbopen(cfg.awl_db, path, BDBOWRITER | BDBOCREAT)) {
-            tcbdbdel(cfg.awl_db);
-            cfg.awl_db = NULL;
+        awl_db = tcbdbnew();
+        if (!tcbdbopen(awl_db, path, BDBOWRITER | BDBOCREAT)) {
+            tcbdbdel(awl_db);
+            awl_db = NULL;
         }
         return -1;
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    cfg.obj_db = tcbdbnew();
-    if (!tcbdbopen(cfg.obj_db, path, BDBOWRITER | BDBOCREAT)) {
-        tcbdbdel(cfg.obj_db);
-        cfg.obj_db = NULL;
-        if (cfg.awl_db) {
-            tcbdbdel(cfg.awl_db);
-            cfg.awl_db = NULL;
+    obj_db = tcbdbnew();
+    if (!tcbdbopen(obj_db, path, BDBOWRITER | BDBOCREAT)) {
+        tcbdbdel(obj_db);
+        obj_db = NULL;
+        if (awl_db) {
+            tcbdbdel(awl_db);
+            awl_db = NULL;
         }
         return -1;
     }
@@ -91,15 +88,15 @@ int greylist_initialize(const char *directory, const char *prefix)
 
 static void greylist_shutdown(void)
 {
-    if (cfg.awl_db) {
-        tcbdbsync(cfg.awl_db);
-        tcbdbdel(cfg.awl_db);
-        cfg.awl_db = NULL;
+    if (awl_db) {
+        tcbdbsync(awl_db);
+        tcbdbdel(awl_db);
+        awl_db = NULL;
     }
-    if (cfg.obj_db) {
-        tcbdbsync(cfg.obj_db);
-        tcbdbdel(cfg.obj_db);
-        cfg.obj_db = NULL;
+    if (obj_db) {
+        tcbdbsync(obj_db);
+        tcbdbdel(obj_db);
+        obj_db = NULL;
     }
 }
 module_exit(greylist_shutdown);
@@ -145,7 +142,7 @@ c_net(const char *c_addr, const char *c_name, char *cnet, int cnetlen)
     char ip2[4], ip3[4];
     const char *dot, *p;
 
-    if (cfg.lookup_by_host)
+    if (greylist_cfg.lookup_by_host)
         return c_addr;
 
     if (!(dot = strchr(c_addr, '.')))
@@ -185,12 +182,12 @@ bool try_greylist(const char *sender, const char *c_addr,
     int len, klen, c_addrlen = strlen(c_addr);
 
 
-    if (cfg.do_awl) {
-        res = tcbdbget3(cfg.awl_db, c_addr, c_addrlen, &len);
+    if (greylist_cfg.client_awl) {
+        res = tcbdbget3(awl_db, c_addr, c_addrlen, &len);
         if (res && len == sizeof(aent)) {
             memcpy(&aent, res, len);
         }
-        if (aent.count > cfg.awl_limit) {
+        if (aent.count > greylist_cfg.client_awl) {
             if (now < aent.last + 3600)
                 goto incr_aent;
             return true;
@@ -202,22 +199,24 @@ bool try_greylist(const char *sender, const char *c_addr,
                     sender_normalize(sender, sbuf, sizeof(sbuf)), rcpt);
     klen = MIN(klen, ssizeof(key) - 1);
 
-    res = tcbdbget3(cfg.obj_db, key, klen, &len);
+    res = tcbdbget3(obj_db, key, klen, &len);
     if (res && len == sizeof(oent)) {
         memcpy(&oent, res, len);
     }
 
-    if (oent.last - oent.first < cfg.delay && now - oent.first > cfg.window) {
+    if (oent.last - oent.first < greylist_cfg.delay
+    &&  now - oent.first > greylist_cfg.retry_window)
+    {
         oent.first = now;
     }
     oent.last = now;
-    tcbdbput(cfg.obj_db, key, klen, &oent, sizeof(oent));
-    if (oent.first + cfg.delay < now) {
-        if (cfg.do_awl) {
+    tcbdbput(obj_db, key, klen, &oent, sizeof(oent));
+    if (oent.first + greylist_cfg.delay < now) {
+        if (greylist_cfg.client_awl) {
           incr_aent:
             aent.count++;
             aent.last = now;
-            tcbdbput(cfg.awl_db, c_addr, c_addrlen, &aent, sizeof(aent));
+            tcbdbput(awl_db, c_addr, c_addrlen, &aent, sizeof(aent));
         }
         return true;
     }
