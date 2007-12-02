@@ -49,21 +49,18 @@ void buffer_resize(buffer_t *buf, ssize_t newsize)
 
 ssize_t buffer_addvf(buffer_t *buf, const char *fmt, va_list ap)
 {
-    ssize_t pos;
-    int len, available;
+    ssize_t len, avail = buf->size - buf->len;
     va_list ap2;
 
     va_copy(ap2, ap);
 
-    pos = buf->len;
-    available = buf->size - pos;
-
-    len = vsnprintf(buf->data + pos, available, fmt, ap);
-    if (len >= available) {
+    len = vsnprintf(buf->data + buf->len, avail, fmt, ap);
+    if (len >= avail) {
         buffer_resize(buf, buf->len + len);
-        len = vsnprintf(buf->data + pos, available, fmt, ap2);
+        avail = buf->size - buf->len;
+        len = vsnprintf(buf->data + buf->len, avail, fmt, ap2);
     }
-    buf->len = pos + len;
+    buf->len += len;
     buf->data[buf->len] = '\0';
     va_end(ap2);
     return len;
