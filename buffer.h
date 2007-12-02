@@ -105,5 +105,6 @@ static inline void buffer_addch(buffer_t *buf, int c) {
 void buffer_consume(buffer_t *buf, ssize_t len);
 
 ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count);
+ssize_t buffer_write(buffer_t *buf, int fd);
 
 #endif /* PFIXTOOLS_BUFFER_H */

@@ -33,6 +33,7 @@
  * Copyright © 2006-2007 Pierre Habouzit
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -78,5 +79,15 @@ ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count)
     }
 
     buffer_extend(buf, res);
+    return res;
+}
+
+ssize_t buffer_write(buffer_t *buf, int fd)
+{
+    ssize_t res = write(fd, buf->data, buf->len);
+    if (res < 0) {
+        return errno == EINTR || errno == EAGAIN ? 0 : -1;
+    }
+    buffer_consume(buf, res);
     return res;
 }
