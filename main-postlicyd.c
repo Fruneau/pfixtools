@@ -88,14 +88,16 @@ typedef struct query_t {
     const char *encryption_cipher;
     const char *encryption_keysize;
     const char *etrn_domain;
+
+    const char *eoq;
 } query_t;
 
 typedef struct plicyd_t {
     unsigned listener : 1;
-    unsigned watchwr  : 1;
     int fd;
     buffer_t ibuf;
     buffer_t obuf;
+    query_t q;
 } plicyd_t;
 
 
@@ -106,7 +108,6 @@ static plicyd_t *plicyd_new(void)
     return plicyd;
 }
 
-#if 0
 static void plicyd_delete(plicyd_t **plicyd)
 {
     if (*plicyd) {
@@ -117,7 +118,6 @@ static void plicyd_delete(plicyd_t **plicyd)
         p_delete(plicyd);
     }
 }
-#endif
 
 static int postfix_parsejob(query_t *query, char *p)
 {
@@ -213,46 +213,50 @@ static int postfix_parsejob(query_t *query, char *p)
 #undef PARSE_CHECK
 }
 
-static void *policy_run(int fd, void *data)
+__attribute__((format(printf,2,0)))
+static void policy_answer(plicyd_t *pcy, const char *fmt, ...)
 {
-    buffer_t buf;
+    va_list args;
+    va_start(args, fmt);
+    buffer_addvf(&pcy->obuf, fmt, args);
+    va_end(args);
+    buffer_addstr(&pcy->obuf, "\n\n");
+    buffer_consume(&pcy->ibuf, pcy->q.eoq - pcy->ibuf.data);
+    epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
+}
 
-    buffer_init(&buf);
-    for (;;) {
-        ssize_t search_offs = MAX(0, buf.len - 1);
-        int nb = buffer_read(&buf, fd, -1);
-        const char *eoq;
-        query_t q;
+static void policy_process(plicyd_t *pcy)
+{
+    policy_answer(pcy, "DUNNO");
+}
 
-        if (nb < 0) {
-            if (errno == EAGAIN || errno == EINTR)
-                continue;
-            UNIXERR("read");
-            break;
-        }
-        if (nb == 0) {
-            if (buf.len)
-                syslog(LOG_ERR, "unexpected end of data");
-            break;
-        }
+static int policy_run(plicyd_t *pcy)
+{
+    ssize_t search_offs = MAX(0, pcy->ibuf.len - 1);
+    int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
+    const char *eoq;
 
-        eoq = strstr(buf.data + search_offs, "\n\n");
-        if (!eoq)
-            continue;
-
-        if (postfix_parsejob(&q, buf.data) < 0)
-            break;
-
-        buffer_consume(&buf, eoq + strlen("\n\n") - buf.data);
-        if (xwrite(fd, "DUNNO\n\n", strlen("DUNNO\n\n"))) {
-            UNIXERR("write");
-            break;
-        }
+    if (nb < 0) {
+        if (errno == EAGAIN || errno == EINTR)
+            return 0;
+        UNIXERR("read");
+        return -1;
     }
-    buffer_wipe(&buf);
+    if (nb == 0) {
+        if (pcy->ibuf.len)
+            syslog(LOG_ERR, "unexpected end of data");
+        return -1;
+    }
 
-    close(fd);
-    return NULL;
+    if (!(eoq = strstr(pcy->ibuf.data + search_offs, "\n\n")))
+        return 0;
+
+    if (postfix_parsejob(&pcy->q, pcy->ibuf.data) < 0)
+        return -1;
+    pcy->q.eoq = eoq + strlen("\n\n");
+    epoll_modify(pcy->fd, 0, pcy);
+    policy_process(pcy);
+    return 0;
 }
 
 int start_listener(int port)
@@ -261,7 +265,6 @@ int start_listener(int port)
         .sin_family = AF_INET,
         .sin_addr   = { htonl(INADDR_LOOPBACK) },
     };
-    struct epoll_event evt = { .events = EPOLLIN };
     plicyd_t *tmp;
     int sock;
 
@@ -271,15 +274,29 @@ int start_listener(int port)
         return -1;
     }
 
-    evt.data.ptr  = tmp = plicyd_new();
+    tmp           = plicyd_new();
     tmp->fd       = sock;
     tmp->listener = true;
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, &evt) < 0) {
-        UNIXERR("epoll_ctl");
-        return -1;
-    }
+    epoll_register(sock, EPOLLIN, tmp);
     return 0;
 }
+
+void start_client(plicyd_t *d)
+{
+    plicyd_t *tmp;
+    int sock;
+
+    sock = accept_nonblock(d->fd);
+    if (sock < 0) {
+        UNIXERR("accept");
+        return;
+    }
+
+    tmp     = plicyd_new();
+    tmp->fd = sock;
+    epoll_register(sock, EPOLLIN, tmp);
+}
+
 /* administrivia {{{ */
 
 static int main_initialize(void)
@@ -367,7 +384,7 @@ int main(int argc, char *argv[])
         struct epoll_event evts[1024];
         int n;
 
-        n = epoll_wait(epollfd, evts, countof(evts), -1);
+        n = epoll_select(evts, countof(evts), -1);
         if (n < 0) {
             if (errno != EAGAIN && errno != EINTR) {
                 UNIXERR("epoll_wait");
@@ -380,18 +397,27 @@ int main(int argc, char *argv[])
             plicyd_t *d = evts[n].data.ptr;
 
             if (d->listener) {
-                int fd = accept(d->fd, NULL, 0);
-                if (fd < 0) {
-                    if (errno != EINTR && errno != EAGAIN) {
-                        UNIXERR("accept");
-                        return EXIT_FAILURE;
-                    }
+                start_client(d);
+                continue;
+            }
+
+            if (evts[n].events & EPOLLIN) {
+                if (policy_run(d) < 0) {
+                    plicyd_delete(&d);
                     continue;
                 }
-                thread_launch(policy_run, fd, NULL);
+            }
+
+            if ((evts[n].events & EPOLLOUT) && d->obuf.len) {
+                if (buffer_write(&d->obuf, d->fd) < 0) {
+                    plicyd_delete(&d);
+                    continue;
+                }
+                if (!d->obuf.len) {
+                    epoll_modify(d->fd, EPOLLIN, d);
+                }
             }
         }
-        threads_join();
     }
 
     syslog(LOG_INFO, "Stopping...");

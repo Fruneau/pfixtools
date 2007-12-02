@@ -36,6 +36,7 @@
 #ifndef PFIXTOOLS_BUFFER_H
 #define PFIXTOOLS_BUFFER_H
 
+#include <stdarg.h>
 #include "mem.h"
 #include "str.h"
 
@@ -100,6 +101,20 @@ static inline void buffer_addbuf(buffer_t *buf, buffer_t *buf2) {
 }
 static inline void buffer_addch(buffer_t *buf, int c) {
     buffer_extendch(buf, 1, c);
+}
+
+__attribute__((format(printf,2,0)))
+ssize_t buffer_addvf(buffer_t *, const char *fmt, va_list);
+
+static inline __attribute__((format(printf,2,3)))
+ssize_t buffer_addf(buffer_t *buf, const char *fmt, ...)
+{
+    ssize_t res;
+    va_list args;
+    va_start(args, fmt);
+    res = buffer_addvf(buf, fmt, args);
+    va_end(args);
+    return res;
 }
 
 void buffer_consume(buffer_t *buf, ssize_t len);

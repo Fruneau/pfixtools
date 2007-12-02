@@ -55,7 +55,6 @@
 typedef struct srsd_t {
     unsigned listener : 1;
     unsigned decoder  : 1;
-    unsigned watchwr  : 1;
     int fd;
     buffer_t ibuf;
     buffer_t obuf;
@@ -101,6 +100,11 @@ void urldecode(char *s, char *end)
 
 int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
 {
+    int res = buffer_read(&srsd->ibuf, srsd->fd, -1);
+
+    if ((res < 0 && errno != EINTR && errno != EAGAIN) || res == 0)
+        return -1;
+
     while (srsd->ibuf.len > 4) {
         char buf[BUFSIZ], *p, *q, *nl;
         int err;
@@ -166,7 +170,6 @@ int start_listener(int port, bool decoder)
         .sin_family = AF_INET,
         .sin_addr   = { htonl(INADDR_LOOPBACK) },
     };
-    struct epoll_event evt = { .events = EPOLLIN };
     srsd_t *tmp;
     int sock;
 
@@ -176,20 +179,16 @@ int start_listener(int port, bool decoder)
         return -1;
     }
 
-    evt.data.ptr  = tmp = srsd_new();
+    tmp           = srsd_new();
     tmp->fd       = sock;
     tmp->decoder  = decoder;
     tmp->listener = true;
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, &evt) < 0) {
-        UNIXERR("epoll_ctl");
-        return -1;
-    }
+    epoll_register(sock, EPOLLIN, tmp);
     return 0;
 }
 
 void start_client(srsd_t *srsd)
 {
-    struct epoll_event evt = { .events = EPOLLIN };
     srsd_t *tmp;
     int sock;
 
@@ -199,14 +198,10 @@ void start_client(srsd_t *srsd)
         return;
     }
 
-    evt.data.ptr = tmp = srsd_new();
+    tmp          = srsd_new();
     tmp->decoder = srsd->decoder;
     tmp->fd      = sock;
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, &evt) < 0) {
-        UNIXERR("epoll_ctl");
-        srsd_delete(&tmp);
-        close(sock);
-    }
+    epoll_register(sock, EPOLLIN, tmp);
 }
 
 /* }}} */
@@ -260,7 +255,7 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
         struct epoll_event evts[1024];
         int n;
 
-        n = epoll_wait(epollfd, evts, countof(evts), -1);
+        n = epoll_select(evts, countof(evts), -1);
         if (n < 0) {
             if (errno != EAGAIN && errno != EINTR) {
                 UNIXERR("epoll_wait");
@@ -278,40 +273,23 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
             }
 
             if (evts[n].events & EPOLLIN) {
-                int res = buffer_read(&srsd->ibuf, srsd->fd, -1);
-
-                if ((res < 0 && errno != EINTR && errno != EAGAIN)
-                ||  res == 0)
-                {
-                    srsd_delete(&srsd);
-                    continue;
-                }
-
                 if (process_srs(srs, domain, srsd) < 0) {
                     srsd_delete(&srsd);
                     continue;
                 }
+                if (srsd->obuf.len) {
+                    epoll_register(srsd->fd, EPOLLIN | EPOLLOUT, srsd);
+                }
             }
 
             if ((evts[n].events & EPOLLOUT) && srsd->obuf.len) {
-                int res = buffer_write(&srsd->obuf, srsd->fd);
-                if (res < 0) {
+                if (buffer_write(&srsd->obuf, srsd->fd) < 0) {
                     srsd_delete(&srsd);
                     continue;
                 }
-            }
-
-            if (srsd->watchwr == !srsd->obuf.len) {
-                struct epoll_event evt = {
-                    .events   = EPOLLIN | (srsd->obuf.len ? EPOLLOUT : 0),
-                    .data.ptr = srsd,
-                };
-                if (epoll_ctl(epollfd, EPOLL_CTL_MOD, srsd->fd, &evt) < 0) {
-                    UNIXERR("epoll_ctl");
-                    srsd_delete(&srsd);
-                    continue;
+                if (!srsd->obuf.len) {
+                    epoll_modify(srsd->fd, EPOLLIN, srsd);
                 }
-                srsd->watchwr = srsd->obuf.len != 0;
             }
         }
     }

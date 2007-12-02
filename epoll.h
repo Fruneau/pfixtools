@@ -39,6 +39,8 @@
 #include <sys/epoll.h>
 #include "common.h"
 
-extern int epollfd;
+void epoll_register(int fd, uint32_t events, void *ptr);
+void epoll_modify(int fd, uint32_t events, void *ptr);
+int epoll_select(struct epoll_event *events, int maxevents, int timeout);
 
 #endif
