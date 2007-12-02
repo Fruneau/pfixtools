@@ -187,6 +187,28 @@ int start_listener(int port, bool decoder)
     return 0;
 }
 
+void start_client(srsd_t *srsd)
+{
+    struct epoll_event evt = { .events = EPOLLIN };
+    srsd_t *tmp;
+    int sock;
+
+    sock = accept_nonblock(srsd->fd);
+    if (sock < 0) {
+        UNIXERR("accept");
+        return;
+    }
+
+    evt.data.ptr = tmp = srsd_new();
+    tmp->decoder = srsd->decoder;
+    tmp->fd      = sock;
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, &evt) < 0) {
+        UNIXERR("epoll_ctl");
+        srsd_delete(&tmp);
+        close(sock);
+    }
+}
+
 /* }}} */
 /* administrivia {{{ */
 
@@ -251,24 +273,7 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
             srsd_t *srsd = evts[n].data.ptr;
 
             if (srsd->listener) {
-                struct epoll_event evt = { .events = EPOLLIN };
-                srsd_t *tmp;
-                int sock;
-
-                sock = accept_nonblock(srsd->fd);
-                if (sock < 0) {
-                    UNIXERR("accept");
-                    continue;
-                }
-
-                evt.data.ptr = tmp = srsd_new();
-                tmp->decoder = srsd->decoder;
-                tmp->fd      = sock;
-                if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, &evt) < 0) {
-                    UNIXERR("epoll_ctl");
-                    srsd_delete(&tmp);
-                    close(sock);
-                }
+                start_client(srsd);
                 continue;
             }
 
@@ -289,15 +294,10 @@ int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
             }
 
             if ((evts[n].events & EPOLLOUT) && srsd->obuf.len) {
-                int res = write(srsd->fd, srsd->obuf.data, srsd->obuf.len);
-
-                if (res < 0 && errno != EINTR && errno != EAGAIN) {
+                int res = buffer_write(&srsd->obuf, srsd->fd);
+                if (res < 0) {
                     srsd_delete(&srsd);
                     continue;
-                }
-
-                if (res > 0) {
-                    buffer_consume(&srsd->obuf, res);
                 }
             }
 
