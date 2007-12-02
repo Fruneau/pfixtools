@@ -45,10 +45,10 @@ TESTS    = tst-rbl
 
 GENERATED = tokens.h tokens.c
 
-lib_SOURCES = threads.c str.c buffer.c common.c epoll.c $(GENERATED)
+lib_SOURCES = str.c buffer.c common.c epoll.c $(GENERATED)
 
 postlicyd_SOURCES = greylist.c rbl.c main-postlicyd.c lib.a
-postlicyd_LIBADD  = -lpthread $(TC_LIBS)
+postlicyd_LIBADD  = $(TC_LIBS)
 
 pfix-srsd_SOURCES = main-srsd.c lib.a
 pfix-srsd_LIBADD  = -lsrs2

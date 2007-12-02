@@ -38,7 +38,6 @@
 #include "buffer.h"
 #include "common.h"
 #include "epoll.h"
-#include "threads.h"
 #include "tokens.h"
 
 #define DAEMON_NAME             "postlicyd"
