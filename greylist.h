@@ -33,7 +33,12 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
+#ifndef PFIXTOOLS_GREYLIST_H
+#define PFIXTOOLS_GREYLIST_H
+
 int greylist_initialize(const char *directory, const char *prefix);
 
 bool try_greylist(const char *sender, const char *c_addr,
                   const char *c_name, const char *rcpt);
+
+#endif
