@@ -259,7 +259,8 @@ static void pidfile_close(void)
     }
 }
 
-extern initcall_t __madinit[], __madexit[];
+extern initcall_t __madinit[];
+extern exitcall_t __madexit[];
 
 static void common_shutdown(void)
 {
