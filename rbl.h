@@ -38,7 +38,7 @@
 
 typedef struct rbldb_t rbldb_t;
 
-rbldb_t *rbldb_create(const char *file);
+rbldb_t *rbldb_create(const char *file, bool lock);
 void rbldb_delete(rbldb_t **);
 
 uint32_t rbldb_stats(rbldb_t *rbl);

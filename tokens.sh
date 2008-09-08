@@ -143,13 +143,16 @@ exit 0
 ## size
 ## ccert_subject
 ## ccert_issuer
-## ccsert_fingerprint
+## ccert_fingerprint
 #
 # postfix 2.3+
 ## encryption_protocol
 ## encryption_cipher
 ## encryption_keysize
 ## etrn_domain
+#
+# postfix 2.5+
+## stress
 #
 # request value
 ## smtpd_access_policy

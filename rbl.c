@@ -60,6 +60,7 @@ enum {
 struct rbldb_t {
     uint32_t len, size;
     uint32_t *ips;
+    bool     locked;
 };
 
 static int get_o(const char *s, const char **out)
@@ -114,7 +115,7 @@ static int parse_ipv4(const char *s, const char **out, uint32_t *ip)
     return 0;
 }
 
-rbldb_t *rbldb_create(const char *file)
+rbldb_t *rbldb_create(const char *file, bool lock)
 {
     rbldb_t *db;
     const char *map, *p, *end;
@@ -169,6 +170,10 @@ rbldb_t *rbldb_create(const char *file)
     }
     munmap((void*)map, st.st_size);
 
+    /* Lookup may perform serveral I/O, so avoid swap.
+     */
+    db->locked = lock && mlock(db->ips, db->len * sizeof(*(db->ips))) == 0;
+
     if (db->len) {
 #       define QSORT_TYPE uint32_t
 #       define QSORT_BASE db->ips
@@ -184,6 +189,9 @@ rbldb_t *rbldb_create(const char *file)
 void rbldb_delete(rbldb_t **db)
 {
     if (*db) {
+        if ((*db)->locked) {
+            (void)munlock((*db)->ips, (*db)->len * sizeof(*(*db)->ips));
+        }
         p_delete(&(*db)->ips);
         p_delete(&(*db));
     }

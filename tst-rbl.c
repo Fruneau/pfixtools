@@ -43,7 +43,7 @@
 int main(int argc, char *argv[])
 {
     if (argc > 1) {
-        rbldb_t *db = rbldb_create(argv[1]);
+        rbldb_t *db = rbldb_create(argv[1], false);
         printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
                rbldb_stats(db) * 4);
         rbldb_delete(&db);

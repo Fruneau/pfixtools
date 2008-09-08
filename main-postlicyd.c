@@ -84,13 +84,16 @@ typedef struct query_t {
     const char *size;
     const char *ccert_subject;
     const char *ccert_issuer;
-    const char *ccsert_fingerprint;
+    const char *ccert_fingerprint;
 
     /* postfix 2.3+ */
     const char *encryption_protocol;
     const char *encryption_cipher;
     const char *encryption_keysize;
     const char *etrn_domain;
+
+    /* postfix 2.5+ */
+    const char *stress;
 
     const char *eoq;
 } query_t;
@@ -159,11 +162,12 @@ static int postfix_parsejob(query_t *query, char *p)
             CASE(SIZE,                size);
             CASE(CCERT_SUBJECT,       ccert_subject);
             CASE(CCERT_ISSUER,        ccert_issuer);
-            CASE(CCSERT_FINGERPRINT,  ccsert_fingerprint);
+            CASE(CCERT_FINGERPRINT,   ccert_fingerprint);
             CASE(ENCRYPTION_PROTOCOL, encryption_protocol);
             CASE(ENCRYPTION_CIPHER,   encryption_cipher);
             CASE(ENCRYPTION_KEYSIZE,  encryption_keysize);
             CASE(ETRN_DOMAIN,         etrn_domain);
+            CASE(STRESS,              stress);
 #undef CASE
 
           case PTK_REQUEST:
@@ -211,6 +215,7 @@ static void policy_answer(server_t *pcy, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+    buffer_addstr(&pcy->obuf, "action=");
     buffer_addvf(&pcy->obuf, fmt, args);
     va_end(args);
     buffer_addstr(&pcy->obuf, "\n\n");
