@@ -214,7 +214,7 @@ __attribute__((format(printf,2,0)))
 static void policy_answer(server_t *pcy, const char *fmt, ...)
 {
     va_list args;
-    query_t* query = pcy->data;
+    const query_t* query = pcy->data;
 
     buffer_addstr(&pcy->obuf, "action=");
     va_start(args, fmt);
@@ -225,9 +225,17 @@ static void policy_answer(server_t *pcy, const char *fmt, ...)
     epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
 }
 
+static bool policy_run_filter(const query_t* query, void* filter, void* conf)
+{
+    return false;
+}
+
 static void policy_process(server_t *pcy)
 {
-    policy_answer(pcy, "DUNNO");
+    const query_t* query = pcy->data;
+    if (!policy_run_filter(query, NULL, NULL)) {
+        policy_answer(pcy, "DUNNO");
+    }
 }
 
 static int policy_run(server_t *pcy, void* config)

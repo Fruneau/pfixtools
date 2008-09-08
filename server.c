@@ -36,6 +36,10 @@
 #include "server.h"
 #include "epoll.h"
 
+static server_t *listeners[1024];
+static int listener_count = 0;
+
+
 static server_t* server_new(void)
 {
     server_t* server = p_new(server_t, 1);
@@ -57,6 +61,15 @@ static void server_delete(server_t **server)
         p_delete(server);
     }
 }
+
+static void server_shutdown(void)
+{
+    for (int i = 0 ; i < listener_count ; ++i) {
+        server_delete(&listeners[i]);
+    }
+}
+
+module_exit(server_shutdown);
 
 int start_server(int port, start_listener_t starter, delete_client_t deleter)
 {
@@ -88,6 +101,7 @@ int start_server(int port, start_listener_t starter, delete_client_t deleter)
     tmp->data       = data;
     tmp->clear_data = deleter;
     epoll_register(sock, EPOLLIN, tmp);
+    listeners[listener_count++] = tmp;
     return 0;
 }
 
