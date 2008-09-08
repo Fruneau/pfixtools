@@ -202,7 +202,7 @@ static int postfix_parsejob(query_t *query, char *p)
 
           default:
             syslog(LOG_WARNING, "unexpected key, skipped: %.*s", klen, k);
-            break;
+            continue;
         }
     }
 
@@ -214,12 +214,14 @@ __attribute__((format(printf,2,0)))
 static void policy_answer(server_t *pcy, const char *fmt, ...)
 {
     va_list args;
-    va_start(args, fmt);
+    query_t* query = pcy->data;
+
     buffer_addstr(&pcy->obuf, "action=");
+    va_start(args, fmt);
     buffer_addvf(&pcy->obuf, fmt, args);
     va_end(args);
     buffer_addstr(&pcy->obuf, "\n\n");
-    buffer_consume(&pcy->ibuf, ((query_t*)(pcy->data))->eoq - pcy->ibuf.data);
+    buffer_consume(&pcy->ibuf, query->eoq - pcy->ibuf.data);
     epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
 }
 
@@ -233,6 +235,7 @@ static int policy_run(server_t *pcy, void* config)
     ssize_t search_offs = MAX(0, pcy->ibuf.len - 1);
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
     const char *eoq;
+    query_t* query = pcy->data;
 
     if (nb < 0) {
         if (errno == EAGAIN || errno == EINTR)
@@ -251,7 +254,7 @@ static int policy_run(server_t *pcy, void* config)
 
     if (postfix_parsejob(pcy->data, pcy->ibuf.data) < 0)
         return -1;
-    ((query_t*)pcy->data)->eoq = eoq + strlen("\n\n");
+    query->eoq = eoq + strlen("\n\n");
     epoll_modify(pcy->fd, 0, pcy);
     policy_process(pcy);
     return 0;
