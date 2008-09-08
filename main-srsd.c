@@ -31,6 +31,7 @@
 
 /*
  * Copyright © 2005-2007 Pierre Habouzit
+ * Copyright © 2008 Florent Bruneau
  */
 
 #include "common.h"
@@ -40,6 +41,7 @@
 #include "epoll.h"
 #include "mem.h"
 #include "buffer.h"
+#include "server.h"
 
 #define DAEMON_NAME             "pfix-srsd"
 #define DEFAULT_ENCODER_PORT    10001
@@ -50,32 +52,27 @@
 #define __tostr(x)  #x
 #define STR(x)      __tostr(x)
 
-/* srs encoder/decoder/listener worker {{{ */
+typedef struct srs_config_t {
+    srs_t* srs;
+    const char* domain;
+} srs_config_t;
 
-typedef struct srsd_t {
-    unsigned listener : 1;
-    unsigned decoder  : 1;
-    int fd;
-    buffer_t ibuf;
-    buffer_t obuf;
-} srsd_t;
+static const char* decoder_ptr = "decoder";
+static const char* encoder_ptr = "encoder";
 
-static srsd_t *srsd_new(void)
+static void *srsd_new_decoder(void)
 {
-    srsd_t *srsd = p_new(srsd_t, 1);
-    srsd->fd = -1;
-    return srsd;
+    return (void*)decoder_ptr;
 }
 
-static void srsd_delete(srsd_t **srsd)
+static void *srsd_new_encoder(void)
 {
-    if (*srsd) {
-        if ((*srsd)->fd >= 0)
-            close((*srsd)->fd);
-        buffer_wipe(&(*srsd)->ibuf);
-        buffer_wipe(&(*srsd)->obuf);
-        p_delete(srsd);
-    }
+    return (void*)encoder_ptr;
+}
+
+static void *srsd_stater(server_t *server)
+{
+    return server->data;
 }
 
 void urldecode(char *s, char *end)
@@ -98,8 +95,9 @@ void urldecode(char *s, char *end)
     *s++ = '\0';
 }
 
-int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
+int process_srs(server_t *srsd, void* vconfig)
 {
+    srs_config_t* config = vconfig;
     int res = buffer_read(&srsd->ibuf, srsd->fd, -1);
 
     if ((res < 0 && errno != EINTR && errno != EAGAIN) || res == 0)
@@ -114,6 +112,9 @@ int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
             if (srsd->ibuf.len > BUFSIZ) {
                 syslog(LOG_ERR, "unreasonnable amount of data without a \\n");
                 return -1;
+            }
+            if (srsd->obuf.len) {
+              epoll_modify(srsd->fd, EPOLLIN | EPOLLOUT, srsd);
             }
             return 0;
         }
@@ -134,10 +135,10 @@ int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
 
         urldecode(p, q);
 
-        if (srsd->decoder) {
-            err = srs_reverse(srs, buf, ssizeof(buf), p);
+        if (srsd->data == (void*)decoder_ptr) {
+            err = srs_reverse(config->srs, buf, ssizeof(buf), p);
         } else {
-            err = srs_forward(srs, buf, ssizeof(buf), p, domain);
+            err = srs_forward(config->srs, buf, ssizeof(buf), p, config->domain);
         }
 
         if (err == 0) {
@@ -160,48 +161,15 @@ int process_srs(srs_t *srs, const char *domain, srsd_t *srsd)
       skip:
         buffer_consume(&srsd->ibuf, nl - srsd->ibuf.data);
     }
-
+    if (srsd->obuf.len) {
+      epoll_modify(srsd->fd, EPOLLIN | EPOLLOUT, srsd);
+    }
     return 0;
 }
 
 int start_listener(int port, bool decoder)
 {
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_addr   = { htonl(INADDR_LOOPBACK) },
-    };
-    srsd_t *tmp;
-    int sock;
-
-    addr.sin_port = htons(port);
-    sock = tcp_listen_nonblock((const struct sockaddr *)&addr, sizeof(addr));
-    if (sock < 0) {
-        return -1;
-    }
-
-    tmp           = srsd_new();
-    tmp->fd       = sock;
-    tmp->decoder  = decoder;
-    tmp->listener = true;
-    epoll_register(sock, EPOLLIN, tmp);
-    return 0;
-}
-
-void start_client(srsd_t *srsd)
-{
-    srsd_t *tmp;
-    int sock;
-
-    sock = accept_nonblock(srsd->fd);
-    if (sock < 0) {
-        UNIXERR("accept");
-        return;
-    }
-
-    tmp          = srsd_new();
-    tmp->decoder = srsd->decoder;
-    tmp->fd      = sock;
-    epoll_register(sock, EPOLLIN, tmp);
+    return start_server(port, decoder ? srsd_new_decoder : srsd_new_encoder, NULL);
 }
 
 /* }}} */
@@ -243,59 +211,6 @@ void usage(void)
 }
 
 /* }}} */
-
-int main_loop(srs_t *srs, const char *domain, int port_enc, int port_dec)
-{
-    if (start_listener(port_enc, false) < 0)
-        return EXIT_FAILURE;
-    if (start_listener(port_dec, true) < 0)
-        return EXIT_FAILURE;
-
-    while (!sigint) {
-        struct epoll_event evts[1024];
-        int n;
-
-        n = epoll_select(evts, countof(evts), -1);
-        if (n < 0) {
-            if (errno != EAGAIN && errno != EINTR) {
-                UNIXERR("epoll_wait");
-                return EXIT_FAILURE;
-            }
-            continue;
-        }
-
-        while (--n >= 0) {
-            srsd_t *srsd = evts[n].data.ptr;
-
-            if (srsd->listener) {
-                start_client(srsd);
-                continue;
-            }
-
-            if (evts[n].events & EPOLLIN) {
-                if (process_srs(srs, domain, srsd) < 0) {
-                    srsd_delete(&srsd);
-                    continue;
-                }
-                if (srsd->obuf.len) {
-                    epoll_register(srsd->fd, EPOLLIN | EPOLLOUT, srsd);
-                }
-            }
-
-            if ((evts[n].events & EPOLLOUT) && srsd->obuf.len) {
-                if (buffer_write(&srsd->obuf, srsd->fd) < 0) {
-                    srsd_delete(&srsd);
-                    continue;
-                }
-                if (!srsd->obuf.len) {
-                    epoll_modify(srsd->fd, EPOLLIN, srsd);
-                }
-            }
-        }
-    }
-
-    return EXIT_SUCCESS;
-}
 
 static srs_t *srs_read_secrets(const char *sfile)
 {
@@ -398,7 +313,19 @@ int main(int argc, char *argv[])
     }
 
     pidfile_refresh();
-    res = main_loop(srs, argv[optind], port_enc, port_dec);
+    {
+      srs_config_t config = {
+        .srs    = srs,
+        .domain = argv[optind]
+      };
+
+      if (start_listener(port_enc, false) < 0)
+          return EXIT_FAILURE;
+      if (start_listener(port_dec, true) < 0)
+          return EXIT_FAILURE;
+
+      res = server_loop(srsd_stater, NULL, process_srs, &config);
+    }
     syslog(LOG_INFO, "Stopping...");
     return res;
 }

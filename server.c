@@ -105,7 +105,7 @@ static int start_client(server_t *server, start_client_t starter,
     }
 
     if (starter) {
-        data = starter();
+        data = starter(server);
         if (data == NULL) {
             close(sock);
             return -1;

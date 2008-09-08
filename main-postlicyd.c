@@ -31,6 +31,7 @@
 
 /*
  * Copyright © 2006-2007 Pierre Habouzit
+ * Copyright © 2008 Florent Bruneau
  */
 
 #include <getopt.h>
@@ -92,7 +93,7 @@ typedef struct query_t {
     const char *eoq;
 } query_t;
 
-static query_t *query_new()
+static query_t *query_new(void)
 {
     return p_new(query_t, 1);
 }
@@ -102,6 +103,11 @@ static void query_delete(query_t **query)
     if (*query) {
         p_delete(query);
     }
+}
+
+static void *query_starter(server_t* server)
+{
+    return query_new();
 }
 
 static int postfix_parsejob(query_t *query, char *p)
@@ -332,7 +338,7 @@ int main(int argc, char *argv[])
     if (start_listener(port) < 0)
         return EXIT_FAILURE;
 
-    (void)server_loop((start_client_t)query_new, (delete_client_t)query_delete,
+    (void)server_loop(query_starter, (delete_client_t)query_delete,
                       policy_run, NULL);
 
     syslog(LOG_INFO, "Stopping...");

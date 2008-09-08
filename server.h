@@ -42,7 +42,7 @@ typedef struct server_t server_t;
 
 typedef void *(*start_listener_t)(void);
 typedef void  (*delete_client_t)(void*);
-typedef void *(*start_client_t)(void);
+typedef void *(*start_client_t)(server_t*);
 typedef int   (*run_client_t)(server_t*, void*);
 
 struct server_t {
