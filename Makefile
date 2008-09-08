@@ -47,7 +47,7 @@ GENERATED = tokens.h tokens.c
 
 lib_SOURCES = str.c buffer.c common.c epoll.c $(GENERATED)
 
-postlicyd_SOURCES = greylist.c rbl.c main-postlicyd.c lib.a
+postlicyd_SOURCES = greylist.c rbl.c main-postlicyd.c server.c lib.a
 postlicyd_LIBADD  = $(TC_LIBS)
 
 pfix-srsd_SOURCES = main-srsd.c lib.a

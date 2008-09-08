@@ -39,6 +39,7 @@
 #include "common.h"
 #include "epoll.h"
 #include "tokens.h"
+#include "server.h"
 
 #define DAEMON_NAME             "postlicyd"
 #define DEFAULT_PORT            10000
@@ -91,30 +92,16 @@ typedef struct query_t {
     const char *eoq;
 } query_t;
 
-typedef struct plicyd_t {
-    unsigned listener : 1;
-    int fd;
-    buffer_t ibuf;
-    buffer_t obuf;
-    query_t q;
-} plicyd_t;
-
-
-static plicyd_t *plicyd_new(void)
+static void* query_new()
 {
-    plicyd_t *plicyd = p_new(plicyd_t, 1);
-    plicyd->fd = -1;
-    return plicyd;
+    return p_new(query_t, 1);
 }
 
-static void plicyd_delete(plicyd_t **plicyd)
+static void query_delete(void *arg)
 {
-    if (*plicyd) {
-        if ((*plicyd)->fd >= 0)
-            close((*plicyd)->fd);
-        buffer_wipe(&(*plicyd)->ibuf);
-        buffer_wipe(&(*plicyd)->obuf);
-        p_delete(plicyd);
+    query_t **query = arg;
+    if (*query) {
+        p_delete(query);
     }
 }
 
@@ -213,23 +200,23 @@ static int postfix_parsejob(query_t *query, char *p)
 }
 
 __attribute__((format(printf,2,0)))
-static void policy_answer(plicyd_t *pcy, const char *fmt, ...)
+static void policy_answer(server_t *pcy, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
     buffer_addvf(&pcy->obuf, fmt, args);
     va_end(args);
     buffer_addstr(&pcy->obuf, "\n\n");
-    buffer_consume(&pcy->ibuf, pcy->q.eoq - pcy->ibuf.data);
+    buffer_consume(&pcy->ibuf, ((query_t*)(pcy->data))->eoq - pcy->ibuf.data);
     epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
 }
 
-static void policy_process(plicyd_t *pcy)
+static void policy_process(server_t *pcy)
 {
     policy_answer(pcy, "DUNNO");
 }
 
-static int policy_run(plicyd_t *pcy)
+static int policy_run(server_t *pcy, void* config)
 {
     ssize_t search_offs = MAX(0, pcy->ibuf.len - 1);
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
@@ -250,9 +237,9 @@ static int policy_run(plicyd_t *pcy)
     if (!(eoq = strstr(pcy->ibuf.data + search_offs, "\n\n")))
         return 0;
 
-    if (postfix_parsejob(&pcy->q, pcy->ibuf.data) < 0)
+    if (postfix_parsejob(pcy->data, pcy->ibuf.data) < 0)
         return -1;
-    pcy->q.eoq = eoq + strlen("\n\n");
+    ((query_t*)pcy->data)->eoq = eoq + strlen("\n\n");
     epoll_modify(pcy->fd, 0, pcy);
     policy_process(pcy);
     return 0;
@@ -260,40 +247,7 @@ static int policy_run(plicyd_t *pcy)
 
 int start_listener(int port)
 {
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_addr   = { htonl(INADDR_LOOPBACK) },
-    };
-    plicyd_t *tmp;
-    int sock;
-
-    addr.sin_port = htons(port);
-    sock = tcp_listen_nonblock((const struct sockaddr *)&addr, sizeof(addr));
-    if (sock < 0) {
-        return -1;
-    }
-
-    tmp           = plicyd_new();
-    tmp->fd       = sock;
-    tmp->listener = true;
-    epoll_register(sock, EPOLLIN, tmp);
-    return 0;
-}
-
-void start_client(plicyd_t *d)
-{
-    plicyd_t *tmp;
-    int sock;
-
-    sock = accept_nonblock(d->fd);
-    if (sock < 0) {
-        UNIXERR("accept");
-        return;
-    }
-
-    tmp     = plicyd_new();
-    tmp->fd = sock;
-    epoll_register(sock, EPOLLIN, tmp);
+    return start_server(port, NULL, NULL);
 }
 
 /* administrivia {{{ */
@@ -379,45 +333,7 @@ int main(int argc, char *argv[])
     if (start_listener(port) < 0)
         return EXIT_FAILURE;
 
-    while (!sigint) {
-        struct epoll_event evts[1024];
-        int n;
-
-        n = epoll_select(evts, countof(evts), -1);
-        if (n < 0) {
-            if (errno != EAGAIN && errno != EINTR) {
-                UNIXERR("epoll_wait");
-                return EXIT_FAILURE;
-            }
-            continue;
-        }
-
-        while (--n >= 0) {
-            plicyd_t *d = evts[n].data.ptr;
-
-            if (d->listener) {
-                start_client(d);
-                continue;
-            }
-
-            if (evts[n].events & EPOLLIN) {
-                if (policy_run(d) < 0) {
-                    plicyd_delete(&d);
-                    continue;
-                }
-            }
-
-            if ((evts[n].events & EPOLLOUT) && d->obuf.len) {
-                if (buffer_write(&d->obuf, d->fd) < 0) {
-                    plicyd_delete(&d);
-                    continue;
-                }
-                if (!d->obuf.len) {
-                    epoll_modify(d->fd, EPOLLIN, d);
-                }
-            }
-        }
-    }
+    (void)server_loop(query_new, query_delete, policy_run, NULL);
 
     syslog(LOG_INFO, "Stopping...");
     return EXIT_SUCCESS;
