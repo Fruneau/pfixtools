@@ -92,14 +92,13 @@ typedef struct query_t {
     const char *eoq;
 } query_t;
 
-static void* query_new()
+static query_t *query_new()
 {
     return p_new(query_t, 1);
 }
 
-static void query_delete(void *arg)
+static void query_delete(query_t **query)
 {
-    query_t **query = arg;
     if (*query) {
         p_delete(query);
     }
@@ -333,7 +332,8 @@ int main(int argc, char *argv[])
     if (start_listener(port) < 0)
         return EXIT_FAILURE;
 
-    (void)server_loop(query_new, query_delete, policy_run, NULL);
+    (void)server_loop((start_client_t)query_new, (delete_client_t)query_delete,
+                      policy_run, NULL);
 
     syslog(LOG_INFO, "Stopping...");
     return EXIT_SUCCESS;
