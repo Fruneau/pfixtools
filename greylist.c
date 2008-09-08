@@ -172,6 +172,11 @@ c_net(const char *c_addr, const char *c_name, char *cnet, int cnetlen)
 bool try_greylist(const char *sender, const char *c_addr,
                   const char *c_name, const char *rcpt)
 {
+#define INCR_AWL                                              \
+    aent.count++;                                             \
+    aent.last = now;                                          \
+    tcbdbput(awl_db, c_addr, c_addrlen, &aent, sizeof(aent));
+
     char sbuf[BUFSIZ], cnet[64], key[BUFSIZ];
     const void *res;
 
@@ -181,19 +186,29 @@ bool try_greylist(const char *sender, const char *c_addr,
 
     int len, klen, c_addrlen = strlen(c_addr);
 
-
+    /* Auto whitelist clients.
+     */
     if (greylist_cfg.client_awl) {
         res = tcbdbget3(awl_db, c_addr, c_addrlen, &len);
         if (res && len == sizeof(aent)) {
             memcpy(&aent, res, len);
         }
+
+        /* Whitelist if count is enough.
+         */
         if (aent.count > greylist_cfg.client_awl) {
-            if (now < aent.last + 3600)
-                goto incr_aent;
+            if (now < aent.last + 3600) {
+                INCR_AWL
+            }
+
+            /* OK.
+             */
             return true;
         }
     }
 
+    /* Lookup.
+     */
     klen = snprintf(key, sizeof(key), "%s/%s/%s",
                     c_net(c_addr, c_name, cnet, sizeof(cnet)),
                     sender_normalize(sender, sbuf, sizeof(sbuf)), rcpt);
@@ -204,21 +219,37 @@ bool try_greylist(const char *sender, const char *c_addr,
         memcpy(&oent, res, len);
     }
 
+    /* Discard stored first-seen if it is the first retrial and
+     * it is beyong the retry window.
+     */
     if (oent.last - oent.first < greylist_cfg.delay
-    &&  now - oent.first > greylist_cfg.retry_window)
-    {
+        &&  now - oent.first > greylist_cfg.retry_window) {
         oent.first = now;
     }
+
+    /* Update.
+     */
     oent.last = now;
     tcbdbput(obj_db, key, klen, &oent, sizeof(oent));
+
+    /* Auto whitelist clients:
+     *  algorithm:
+     *    - on successful entry in the greylist db of a triplet:
+     *        - client not whitelisted yet ? -> increase count
+     *                                       -> withelist if count > limit
+     *        - client whitelisted already ? -> update last-seen timestamp.
+     */
     if (oent.first + greylist_cfg.delay < now) {
         if (greylist_cfg.client_awl) {
-          incr_aent:
-            aent.count++;
-            aent.last = now;
-            tcbdbput(awl_db, c_addr, c_addrlen, &aent, sizeof(aent));
+            INCR_AWL
         }
+
+        /* OK
+         */
         return true;
     }
+
+    /* DUNNO
+     */
     return false;
 }
