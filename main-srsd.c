@@ -240,8 +240,7 @@ int main(int argc, char *argv[])
     int port_enc = DEFAULT_ENCODER_PORT;
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
-
-    srs_t *srs;
+    srs_config_t config;
 
     for (int c = 0; (c = getopt(argc, argv, "hfu" "e:d:p:")) >= 0; ) {
         switch (c) {
@@ -271,26 +270,14 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    srs = srs_read_secrets(argv[optind + 1]);
-    if (!srs) {
+    config.domain = argv[optind];
+    config.srs = srs_read_secrets(argv[optind + 1]);
+    if (!config.srs
+        || common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP,
+                        daemonize) != EXIT_SUCCESS
+        || start_listener(port_enc, false) < 0
+        || start_listener(port_dec, true) < 0) {
         return EXIT_FAILURE;
     }
-
-    if (common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP, daemonize)
-          != EXIT_SUCCESS) {
-        return EXIT_FAILURE;
-    }
-    {
-      srs_config_t config = {
-        .srs    = srs,
-        .domain = argv[optind]
-      };
-
-      if (start_listener(port_enc, false) < 0)
-          return EXIT_FAILURE;
-      if (start_listener(port_dec, true) < 0)
-          return EXIT_FAILURE;
-
-      return server_loop(srsd_stater, NULL, process_srs, &config);
-    }
+    return server_loop(srsd_stater, NULL, process_srs, &config);
 }

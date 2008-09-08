@@ -274,6 +274,7 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
+    bool unsafe = false;
     const char *pidfile = NULL;
     bool daemonize = true;
     int port = DEFAULT_PORT;
@@ -282,6 +283,9 @@ int main(int argc, char *argv[])
         switch (c) {
           case 'p':
             pidfile = optarg;
+            break;
+          case 'u':
+            unsafe = true;
             break;
           case 'l':
             port = atoi(optarg);
@@ -300,14 +304,11 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (common_setup(pidfile, false, RUNAS_USER, RUNAS_GROUP, daemonize)
-          != EXIT_SUCCESS) {
+    if (common_setup(pidfile, false, RUNAS_USER, RUNAS_GROUP,
+                     daemonize) != EXIT_SUCCESS
+        || start_listener(port) < 0) {
         return EXIT_FAILURE;
     }
-
-    if (start_listener(port) < 0)
-        return EXIT_FAILURE;
-
     return server_loop(query_starter, (delete_client_t)query_delete,
                        policy_run, NULL);
 }
