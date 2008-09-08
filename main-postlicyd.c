@@ -47,6 +47,8 @@
 #define RUNAS_USER              "nobody"
 #define RUNAS_GROUP             "nogroup"
 
+DECLARE_MAIN
+
 enum smtp_state {
     SMTP_UNKNOWN,
     SMTP_CONNECT,
@@ -257,26 +259,6 @@ int start_listener(int port)
 
 /* administrivia {{{ */
 
-static int main_initialize(void)
-{
-    openlog("postlicyd", LOG_PID, LOG_MAIL);
-    signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT,  &common_sighandler);
-    signal(SIGTERM, &common_sighandler);
-    signal(SIGHUP,  &common_sighandler);
-    signal(SIGSEGV, &common_sighandler);
-    syslog(LOG_INFO, "Starting...");
-    return 0;
-}
-
-static void main_shutdown(void)
-{
-    closelog();
-}
-
-module_init(main_initialize);
-module_exit(main_shutdown);
-
 void usage(void)
 {
     fputs("usage: "DAEMON_NAME" [options] config\n"
@@ -318,29 +300,14 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (pidfile_open(pidfile) < 0) {
-        syslog(LOG_CRIT, "unable to write pidfile %s", pidfile);
+    if (common_setup(pidfile, false, RUNAS_USER, RUNAS_GROUP, daemonize)
+          != EXIT_SUCCESS) {
         return EXIT_FAILURE;
     }
-
-    if (drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
-        syslog(LOG_CRIT, "unable to drop privileges");
-        return EXIT_FAILURE;
-    }
-
-    if (daemonize && daemon_detach() < 0) {
-        syslog(LOG_CRIT, "unable to fork");
-        return EXIT_FAILURE;
-    }
-
-    pidfile_refresh();
 
     if (start_listener(port) < 0)
         return EXIT_FAILURE;
 
-    (void)server_loop(query_starter, (delete_client_t)query_delete,
-                      policy_run, NULL);
-
-    syslog(LOG_INFO, "Stopping...");
-    return EXIT_SUCCESS;
+    return server_loop(query_starter, (delete_client_t)query_delete,
+                       policy_run, NULL);
 }

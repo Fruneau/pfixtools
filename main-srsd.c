@@ -49,8 +49,7 @@
 #define RUNAS_USER              "nobody"
 #define RUNAS_GROUP             "nogroup"
 
-#define __tostr(x)  #x
-#define STR(x)      __tostr(x)
+DECLARE_MAIN
 
 typedef struct srs_config_t {
     srs_t* srs;
@@ -175,25 +174,6 @@ int start_listener(int port, bool decoder)
 /* }}} */
 /* administrivia {{{ */
 
-static int main_initialize(void)
-{
-    openlog(DAEMON_NAME, LOG_PID, LOG_MAIL);
-    signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT,  &common_sighandler);
-    signal(SIGTERM, &common_sighandler);
-    signal(SIGHUP,  &common_sighandler);
-    signal(SIGSEGV, &common_sighandler);
-    syslog(LOG_INFO, "Starting...");
-    return 0;
-}
-
-static void main_shutdown(void)
-{
-    closelog();
-}
-
-module_init(main_initialize);
-module_exit(main_shutdown);
 
 void usage(void)
 {
@@ -261,7 +241,6 @@ int main(int argc, char *argv[])
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
 
-    int res;
     srs_t *srs;
 
     for (int c = 0; (c = getopt(argc, argv, "hfu" "e:d:p:")) >= 0; ) {
@@ -297,22 +276,10 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (pidfile_open(pidfile) < 0) {
-        syslog(LOG_CRIT, "unable to write pidfile %s", pidfile);
+    if (common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP, daemonize)
+          != EXIT_SUCCESS) {
         return EXIT_FAILURE;
     }
-
-    if (!unsafe && drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
-        syslog(LOG_CRIT, "unable to drop privileges");
-        return EXIT_FAILURE;
-    }
-
-    if (daemonize && daemon_detach() < 0) {
-        syslog(LOG_CRIT, "unable to fork");
-        return EXIT_FAILURE;
-    }
-
-    pidfile_refresh();
     {
       srs_config_t config = {
         .srs    = srs,
@@ -324,8 +291,6 @@ int main(int argc, char *argv[])
       if (start_listener(port_dec, true) < 0)
           return EXIT_FAILURE;
 
-      res = server_loop(srsd_stater, NULL, process_srs, &config);
+      return server_loop(srsd_stater, NULL, process_srs, &config);
     }
-    syslog(LOG_INFO, "Stopping...");
-    return res;
 }

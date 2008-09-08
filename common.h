@@ -31,6 +31,7 @@
 
 /*
  * Copyright © 2007 Pierre Habouzit
+ * Copyright © 2008 Florent Bruneau
  */
 
 #ifndef PFIXTOOLS_COMMON_H
@@ -60,6 +61,9 @@
         syslog(LOG_ERR, "%s:%d:%s: %s: %m",             \
                __FILE__, __LINE__, __func__, fun)
 
+#define __tostr(x)  #x
+#define STR(x)      __tostr(x)
+
 typedef int  (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
 
@@ -85,5 +89,29 @@ int drop_privileges(const char *user, const char *group);
 
 int pidfile_open(const char *name);
 int pidfile_refresh(void);
+
+int common_setup(const char* pidfile, bool unsafe, const char* runas_user,
+                 const char* runas_group, bool daemonize);
+
+#define DECLARE_MAIN                                              \
+    static int main_initialize(void)                              \
+    {                                                             \
+        openlog(DAEMON_NAME, LOG_PID, LOG_MAIL);                  \
+        signal(SIGPIPE, SIG_IGN);                                 \
+        signal(SIGINT,  &common_sighandler);                      \
+        signal(SIGTERM, &common_sighandler);                      \
+        signal(SIGHUP,  &common_sighandler);                      \
+        signal(SIGSEGV, &common_sighandler);                      \
+        syslog(LOG_INFO, "Starting...");                          \
+        return 0;                                                 \
+    }                                                             \
+                                                                  \
+    static void main_shutdown(void)                               \
+    {                                                             \
+        closelog();                                               \
+    }                                                             \
+                                                                  \
+    module_init(main_initialize);                                 \
+    module_exit(main_shutdown);
 
 #endif

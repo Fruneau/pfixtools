@@ -130,7 +130,7 @@ int server_loop(start_client_t starter, delete_client_t deleter,
         if (n < 0) {
             if (errno != EAGAIN && errno != EINTR) {
                 UNIXERR("epoll_wait");
-                return -1;
+                return EXIT_FAILURE;
             }
             continue;
         }
@@ -161,5 +161,5 @@ int server_loop(start_client_t starter, delete_client_t deleter,
             }
         }
     }
-    return 0;
+    return EXIT_SUCCESS;
 }

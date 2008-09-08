@@ -31,6 +31,7 @@
 
 /*
  * Copyright © 2007 Pierre Habouzit
+ * Copyright © 2008 Florent Bruneau
  */
 
 #include <fcntl.h>
@@ -259,11 +260,34 @@ static void pidfile_close(void)
     }
 }
 
+int common_setup(const char* pidfilename, bool unsafe, const char* runas_user,
+                 const char* runas_group, bool daemonize)
+{
+    if (pidfile_open(pidfilename) < 0) {
+        syslog(LOG_CRIT, "unable to write pidfile %s", pidfilename);
+        return EXIT_FAILURE;
+    }
+
+    if (!unsafe && drop_privileges(runas_user, runas_group) < 0) {
+        syslog(LOG_CRIT, "unable to drop privileges");
+        return EXIT_FAILURE;
+    }
+
+    if (daemonize && daemon_detach() < 0) {
+        syslog(LOG_CRIT, "unable to fork");
+        return EXIT_FAILURE;
+    }
+
+    pidfile_refresh();
+    return EXIT_SUCCESS;
+}
+
 extern initcall_t __madinit[];
 extern exitcall_t __madexit[];
 
 static void common_shutdown(void)
 {
+    syslog(LOG_INFO, "Stopping...");
     pidfile_close();
 
     for (int i = -1; __madexit[i]; i--) {
