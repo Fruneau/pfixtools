@@ -60,7 +60,7 @@ $(CLEAN_TARGETS): clean-%:
 $(DISTCLEAN_TARGETS): distclean-%:
 	make -C $* distclean
 
-$(INSTALL_TARGETS): install-%: install-dir
+$(INSTALL_TARGETS): install-%: % install-dir
 	make -C $* install
 
 install-dir:
