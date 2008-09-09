@@ -29,44 +29,15 @@
 #  THE POSSIBILITY OF SUCH DAMAGE.                                           #
 ##############################################################################
 
-prefix ?= /usr/local
+include ../mk/tc.mk
 
-PROGRAMS = postlicyd pfix-srsd
-LIBS     = common
-SUBDIRS  = $(LIBS) $(PROGRAMS)
+PROGRAMS  = postlicyd
+GENERATED = tokens.h tokens.c
+TESTS     = test-rbl
 
-CLEAN_TARGETS     = $(addprefix clean-,$(SUBDIRS))
-DISTCLEAN_TARGETS = $(addprefix distclean-,$(SUBDIRS))
-INSTALL_TARGETS   = $(addprefix install-,$(SUBDIRS))
+postlicyd_SOURCES = greylist.c rbl.c main-postlicyd.c $(GENERATED) ../common/lib.a
+postlicyd_LIBADD  = $(TC_LIBS)
 
-# RULES ###################################################################{{{
+tst-rbl_SOURCES   = tst-rbl.c
 
-all: $(SUBDIRS)
-
-clean: $(CLEAN_TARGETS)
-
-distclean: $(DISTCLEAN_TARGETS)
-
-install: all $(INSTALL_TARGETS)
-
-$(PROGRAMS): $(LIBS)
-
-$(SUBDIRS): %:
-	make -C $@ all
-
-$(CLEAN_TARGETS): clean-%:
-	make -C $* clean
-
-$(DISTCLEAN_TARGETS): distclean-%:
-	make -C $* distclean
-
-$(INSTALL_TARGETS): install-%: install-dir
-	make -C $* install
-
-install-dir:
-	install -d $(DESTDIR)$(prefix)/sbin
-	install -d $(DESTDIR)/etc/pfixtools
-
-.PHONY: clean distclean install install-dir $(SUBDIRS) $(CLEAN_TARGETS) \
-				$(DISTCLEAN_TARGETS) $(INSTALL_TARGETS)
-###########################################################################}}}
+include ../mk/common.mk
