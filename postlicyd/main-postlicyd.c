@@ -39,7 +39,7 @@
 #include "buffer.h"
 #include "common.h"
 #include "epoll.h"
-#include "tokens.h"
+#include "policy_tokens.h"
 #include "server.h"
 
 #define DAEMON_NAME             "postlicyd"
@@ -144,8 +144,8 @@ static int postfix_parsejob(query_t *query, char *p)
         for (vlen = p - v; vlen && isblank(v[vlen]); vlen--);
         p += 1; /* skip \n */
 
-        vtk = tokenize(v, vlen);
-        switch (tokenize(k, klen)) {
+        vtk = policy_tokenize(v, vlen);
+        switch (policy_tokenize(k, klen)) {
 #define CASE(up, low)  case PTK_##up: query->low = v; v[vlen] = '\0'; break;
             CASE(HELO_NAME,           helo_name);
             CASE(QUEUE_ID,            queue_id);

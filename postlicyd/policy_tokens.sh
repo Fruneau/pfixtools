@@ -1,4 +1,4 @@
-#! /bin/sh -e
+#! /bin/bash -e
 
 die() {
     echo "$@" 1>&2
@@ -58,7 +58,7 @@ typedef enum postlicyd_token {
 extern const char *ptokens[PTK_count];
 
 __attribute__((pure))
-postlicyd_token tokenize(const char *s, ssize_t len);
+postlicyd_token policy_tokenize(const char *s, ssize_t len);
 #endif /* MUTT_LIB_LUA_LUA_TOKEN_H */
 EOF
 }
@@ -70,13 +70,14 @@ do_tokens() {
 }
 
 do_c() {
+    this=`basename "$0"`
     cat <<EOF | gperf -m16 -l -t -C -F",0" -Ntokenize_aux | \
         sed -e '/__gnu_inline__/d;s/\<\(__\|\)inline\>//g'
 %{
 `do_hdr`
 
 #include "str.h"
-#include "tokens.h"
+#include "`echo "${this%.sh}"`.h"
 
 static const struct tok *
 tokenize_aux(const char *str, unsigned int len);
@@ -91,7 +92,7 @@ const char *ptokens[PTK_count] = {
 `grep_self "$0" | sed -e 's/.*/    "&",/'`
 };
 
-postlicyd_token tokenize(const char *s, ssize_t len)
+postlicyd_token policy_tokenize(const char *s, ssize_t len)
 {
     if (len < 0)
         len = m_strlen(s);

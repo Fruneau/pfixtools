@@ -6,12 +6,12 @@ CFLAGS  += --std=gnu99 -D_GNU_SOURCE -I../ -I../common
 
 INSTALL_PROGS = $(addprefix install-,$(PROGRAMS))
 
+all: $(GENERATED) $(LIBS) $(PROGRAMS) | $(GENERATED)
+
 install: all $(INSTALL_PROGS)
 
 $(INSTALL_PROGS): install-%:
 	install $* $(DESTDIR)$(prefix)/sbin
-
-all: $(GENERATED) $(LIBS) $(PROGRAMS) | $(GENERATED)
 
 clean:
 	$(RM) $(LIBS:=.a) $(PROGRAMS) $(TESTS) .*.o .*.dep

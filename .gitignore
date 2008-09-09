@@ -1,8 +1,8 @@
-/tokens.[hc]
+*_tokens.[hc]
 
-/postlicyd
-/tst-rbl
-/pfix-srsd
+/postlicyd/postlicyd
+/postlicyd/tst-rbl
+/pfix-srsd/pfix-srsd
 
 *.[ao]
 .tags
