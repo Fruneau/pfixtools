@@ -56,8 +56,12 @@ typedef struct srs_config_t {
     const char* domain;
 } srs_config_t;
 
-static const char* decoder_ptr = "decoder";
-static const char* encoder_ptr = "encoder";
+
+/* Server {{{1
+ */
+
+static const char* const decoder_ptr = "decoder";
+static const char* const encoder_ptr = "encoder";
 
 static void *srsd_new_decoder(void)
 {
@@ -69,10 +73,19 @@ static void *srsd_new_encoder(void)
     return (void*)encoder_ptr;
 }
 
-static void *srsd_stater(server_t *server)
+static void *srsd_starter(server_t *server)
 {
     return server->data;
 }
+
+int start_listener(int port, bool decoder)
+{
+    return start_server(port, decoder ? srsd_new_decoder : srsd_new_encoder, NULL);
+}
+
+
+/* Processing {{{1
+ */
 
 void urldecode(char *s, char *end)
 {
@@ -166,31 +179,42 @@ int process_srs(server_t *srsd, void* vconfig)
     return 0;
 }
 
-int start_listener(int port, bool decoder)
+
+/* config {{{1
+ */
+
+static srs_config_t config = {
+    .srs = NULL,
+    .domain = NULL
+};
+
+/** overload srs_free since the lib is not properly maintained.
+ */
+#undef srs_free
+
+inline void srs_free(srs_t* srs)
 {
-    return start_server(port, decoder ? srsd_new_decoder : srsd_new_encoder, NULL);
+    int  i;
+    for (i = 0; i < srs->numsecrets; i++) {
+        memset(srs->secrets[i], 0, strlen(srs->secrets[i]));
+        free(srs->secrets[i]);
+        srs->secrets[i] = '\0';
+    }
+    if (srs->secrets) {
+        free(srs->secrets);
+    }
+    free(srs);
 }
 
-/* }}} */
-/* administrivia {{{ */
-
-
-void usage(void)
+static void config_shutdown(void)
 {
-    fputs("usage: "DAEMON_NAME" [options] domain secrets\n"
-          "\n"
-          "Options:\n"
-          "    -e <port>    port to listen to for encoding requests\n"
-          "                 (default: "STR(DEFAULT_ENCODER_PORT)")\n"
-          "    -d <port>    port to listen to for decoding requests\n"
-          "                 (default: "STR(DEFAULT_DECODER_PORT)")\n"
-          "    -p <pidfile> file to write our pid to\n"
-          "    -u           unsafe mode: don't drop privilegies\n"
-          "    -f           stay in foreground\n"
-         , stderr);
+    if (config.srs) {
+        srs_free(config.srs);
+        config.srs = NULL;
+    }
 }
 
-/* }}} */
+module_exit(config_shutdown);
 
 static srs_t *srs_read_secrets(const char *sfile)
 {
@@ -233,6 +257,27 @@ static srs_t *srs_read_secrets(const char *sfile)
     return NULL;
 }
 
+/* administrivia {{{1
+ */
+
+void usage(void)
+{
+    fputs("usage: "DAEMON_NAME" [options] domain secrets\n"
+          "\n"
+          "Options:\n"
+          "    -e <port>    port to listen to for encoding requests\n"
+          "                 (default: "STR(DEFAULT_ENCODER_PORT)")\n"
+          "    -d <port>    port to listen to for decoding requests\n"
+          "                 (default: "STR(DEFAULT_DECODER_PORT)")\n"
+          "    -p <pidfile> file to write our pid to\n"
+          "    -u           unsafe mode: don't drop privilegies\n"
+          "    -f           stay in foreground\n"
+         , stderr);
+}
+
+/* }}}
+ */
+
 int main(int argc, char *argv[])
 {
     bool unsafe  = false;
@@ -240,7 +285,6 @@ int main(int argc, char *argv[])
     int port_enc = DEFAULT_ENCODER_PORT;
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
-    srs_config_t config;
 
     for (int c = 0; (c = getopt(argc, argv, "hfu" "e:d:p:")) >= 0; ) {
         switch (c) {
@@ -279,5 +323,5 @@ int main(int argc, char *argv[])
         || start_listener(port_dec, true) < 0) {
         return EXIT_FAILURE;
     }
-    return server_loop(srsd_stater, NULL, process_srs, &config);
+    return server_loop(srsd_starter, NULL, process_srs, &config);
 }
