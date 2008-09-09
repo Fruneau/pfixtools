@@ -190,8 +190,6 @@ static srs_config_t config = {
 
 /** overload srs_free since the lib is not properly maintained.
  */
-#undef srs_free
-
 inline void srs_free(srs_t* srs)
 {
     int  i;
