@@ -33,11 +33,84 @@
  * Copyright © 2008 Florent Bruneau
  */
 
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+
 #include "common.h"
+#include "str.h"
 #include "trie.h"
 
-int main(void)
+static trie_t *create_trie_from_file(const char *file)
 {
+    trie_t *db;
+    const char *map, *p, *end;
+    struct stat st;
+    int fd;
+    char line[BUFSIZ];
+
+    fd = open(file, O_RDONLY, 0000);
+    if (fd < 0) {
+        UNIXERR("open");
+        return NULL;
+    }
+
+    if (fstat(fd, &st) < 0) {
+        UNIXERR("fstat");
+        close(fd);
+        return NULL;
+    }
+
+    p = map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (map == MAP_FAILED) {
+        UNIXERR("mmap");
+        close(fd);
+        return NULL;
+    }
+    close(fd);
+
+    end = map + st.st_size;
+    while (end > map && end[-1] != '\n') {
+        --end;
+    }
+    if (end != map + st.st_size) {
+        syslog(LOG_WARNING, "file %s miss a final \\n, ignoring last line",
+               file);
+    }
+
+    db = trie_new();
+    while (p < end && p != NULL) {
+        const char *eol = (char *)memchr(p, '\n', end - p);
+        if (eol == NULL) {
+            eol = end;
+        }
+        if (eol - p > BUFSIZ) {
+            p = eol - BUFSIZ;
+        }
+        int i = 0;
+#if 0
+        for (const char *s = eol - 1 ; s >= p ; --s) {
+            line[i++] = ascii_tolower(*s);
+        }
+#else
+        memcpy(line, p, eol - p);
+        i = eol - p;
+#endif
+        line[i] = '\0';
+        trie_insert(db, line);
+        p = eol + 1;
+    }
+    munmap((void*)map, st.st_size);
+    return db;
+}
+
+
+int main(int argc, char *argv[])
+{
+    /* Trivial tests
+     */
     trie_t *trie = trie_new();
     trie_insert(trie, "abcdefghi");
     trie_insert(trie, "abcde123654789");
@@ -45,7 +118,6 @@ int main(void)
     trie_insert(trie, "abcde123654789");
     trie_insert(trie, "coucou");
     trie_insert(trie, "coucou chez vous");
-    trie_inspect(trie);
 
 #define ASSERT_TRUE(str)                            \
     if (!trie_lookup(trie, str)) {                  \
@@ -57,7 +129,6 @@ int main(void)
         printf("\"%s\" found in trie\n", str);      \
         return 1;                                   \
     }
-
     ASSERT_FALSE("");
     ASSERT_FALSE("coucou ");
     ASSERT_FALSE("abcde123");
@@ -65,7 +136,14 @@ int main(void)
     ASSERT_TRUE("abcdefghi");
     ASSERT_TRUE("coucou");
     ASSERT_FALSE("coucou chez vous tous");
-
     trie_delete(&trie);
+
+    /* Perf test
+     */
+    if (argc > 1) {
+        trie = create_trie_from_file(argv[1]);
+//        trie_inspect(trie);
+        trie_delete(&trie);
+    }
     return 0;
 }

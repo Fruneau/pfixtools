@@ -58,7 +58,6 @@ struct trie_t {
     bool locked;
 };
 
-
 trie_t *trie_new()
 {
     return p_new(trie_t, 1);
@@ -143,7 +142,6 @@ static inline void trie_grow(trie_t *trie, int delta)
         next_size = p_alloc_nr(next_size);
     } while (trie->entries_len + delta > next_size);
     p_allocgrow(&trie->entries, next_size, &trie->entries_size);
-    printf("After grow: %d\n", trie->entries_size);
 }
 
 static inline int trie_entry_new(trie_t *trie)
@@ -156,7 +154,8 @@ static inline int trie_add_leaf(trie_t *trie, const char *key)
 {
     trie_entry_t *entry;
     entry = &trie->entries[trie_entry_new(trie)];
-    entry->c     = m_strdup(key);
+    entry->c     = strdup(key); /* don't use m_strdup
+                                   since m_strdup("") == NULL */
     entry->c_len = m_strlen(key) + 1;
     entry->c_own = true;
     return trie->entries_len - 1;
