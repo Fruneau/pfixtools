@@ -31,6 +31,6 @@
 
 LIBS = lib
 
-lib_SOURCES = str.c buffer.c common.c epoll.c server.c
+lib_SOURCES = str.c buffer.c common.c epoll.c server.c trie.c
 
 include ../mk/common.mk
