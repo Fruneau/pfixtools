@@ -90,7 +90,7 @@ static trie_t *create_trie_from_file(const char *file)
             p = eol - BUFSIZ;
         }
         int i = 0;
-#if 0
+#if 1
         for (const char *s = eol - 1 ; s >= p ; --s) {
             line[i++] = ascii_tolower(*s);
         }
