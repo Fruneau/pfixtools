@@ -173,6 +173,9 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     /* Lookup may perform serveral I/O, so avoid swap.
      */
     db->locked = lock && mlock(db->ips, db->len * sizeof(*(db->ips))) == 0;
+    if (lock && !db->locked) {
+        UNIXERR("mlock");
+    }
 
     if (db->len) {
 #       define QSORT_TYPE uint32_t
@@ -207,7 +210,7 @@ bool rbldb_ipv4_lookup(rbldb_t *db, uint32_t ip)
     int l = 0, r = db->len;
 
     while (l < r) {
-        int i = (r + 1) / 2;
+        int i = (r + l) / 2;
 
         if (db->ips[i] == ip)
             return true;
