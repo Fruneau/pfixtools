@@ -132,7 +132,7 @@ ssize_t m_strcpy(char *dst, ssize_t n, const char *src)
  */
 ssize_t m_strncpy(char *dst, ssize_t n, const char *src, ssize_t l)
 {
-    ssize_t len = MIN(m_strlen(src), l);
+    ssize_t len = m_strnlen(src, l);
 
     if (n > 0) {
         ssize_t dlen = MIN(n - 1, len);
