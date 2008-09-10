@@ -33,26 +33,19 @@
  * Copyright © 2008 Florent Bruneau
  */
 
-#ifndef PFIXTOOLS_TRIE_H
-#define PFIXTOOLS_TRIE_H
-
 #include "common.h"
+#include "trie.h"
 
-typedef struct trie_t trie_t;
-
-trie_t *trie_new(void);
-void trie_delete(trie_t **trie);
-
-__attribute__((nonnull(1,2)))
-void trie_insert(trie_t *trie, const char* key);
-
-/*__attribute__((nonnull(1)))
-bool trie_lock(trie_t *trie); */
-
-__attribute__((nonnull(1,2)))
-bool trie_lookup(const trie_t *trie, const char* key);
-
-__attribute__((nonnull(1)))
-void trie_inspect(const trie_t *trie);
-
-#endif
+int main(void)
+{
+    trie_t *trie = trie_new();
+    trie_insert(trie, "abcdefghi");
+    trie_insert(trie, "abcde123654789");
+    trie_insert(trie, "abcde123456789");
+    trie_insert(trie, "abcde123654789");
+    trie_insert(trie, "coucou");
+    trie_insert(trie, "coucou chez vous");
+    trie_inspect(trie);
+    trie_delete(&trie);
+    return 0;
+}

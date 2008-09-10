@@ -29,8 +29,10 @@
 #  THE POSSIBILITY OF SUCH DAMAGE.                                           #
 ##############################################################################
 
-LIBS = lib
+LIBS  = lib
+TESTS = tst-trie
 
 lib_SOURCES = str.c buffer.c common.c epoll.c server.c trie.c
+tst-trie_SOURCES = tst-trie.c lib.a
 
 include ../mk/common.mk

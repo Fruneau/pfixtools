@@ -76,6 +76,7 @@ void trie_delete(trie_t **trie)
             }
             p_delete(&(entry->children));
         }
+        p_delete(&(*trie)->entries);
         p_delete(trie);
     }
 }
@@ -132,23 +133,37 @@ static inline trie_entry_t* trie_entry_child(const trie_t *trie,
     return NULL;
 }
 
-static void trie_grow(trie_t *trie, int delta)
+static inline void trie_grow(trie_t *trie, int delta)
 {
-    p_allocgrow(&trie->entries, trie->entries_len + delta, &trie->entries_size);
+    int next_size = trie->entries_size;
+    if (next_size > trie->entries_len + delta) {
+        return;
+    }
+    do {
+        next_size = p_alloc_nr(next_size);
+    } while (trie->entries_len + delta > next_size);
+    p_allocgrow(&trie->entries, next_size, &trie->entries_size);
+    printf("After grow: %d\n", trie->entries_size);
 }
 
-static int trie_add_leaf(trie_t *trie, const char *key)
+static inline int trie_entry_new(trie_t *trie)
+{
+    memset(trie->entries + trie->entries_len, 0, sizeof(trie_entry_t));
+    return trie->entries_len++;
+}
+
+static inline int trie_add_leaf(trie_t *trie, const char *key)
 {
     trie_entry_t *entry;
-    trie_grow(trie, 1);
-    entry = &trie->entries[trie->entries_len++];
+    entry = &trie->entries[trie_entry_new(trie)];
     entry->c     = m_strdup(key);
     entry->c_len = m_strlen(key) + 1;
     entry->c_own = true;
     return trie->entries_len - 1;
 }
 
-static void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry, int pchild)
+static inline void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry,
+                                           int pchild)
 {
     const char c = trie->entries[pchild].c[0];
     int start = 0;
@@ -176,13 +191,13 @@ static void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry, int pchil
             entry->children + start,
             sizeof(int) * (entry->children_len - start));
     entry->children[start] = pchild;
+    ++entry->children_len;
 }
 
-static void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
+static inline void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
 {
     trie_entry_t *child;
-    trie_grow(trie, 2);
-    child    = &trie->entries[trie->entries_len++];
+    child    = &trie->entries[trie_entry_new(trie)];
     if (pos == 0) {
         child->c     = entry->c;
         child->c_len = entry->c_len;
@@ -194,7 +209,7 @@ static void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
         child->c     = entry->c + pos;
         child->c_len = entry->c_len - pos;
         child->c_own = false;
-        entry->c_len -= pos;
+        entry->c_len = pos;
     }
     child->children      = entry->children;
     child->children_len  = entry->children_len;
@@ -207,6 +222,7 @@ static void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
 
 void trie_insert(trie_t *trie, const char* key)
 {
+    trie_grow(trie, 2);
     if (trie->entries_len == 0) {
         (void)trie_add_leaf(trie, key);
     } else {
@@ -214,6 +230,9 @@ void trie_insert(trie_t *trie, const char* key)
         while (true) {
             int pos = 0;
             if (trie_entry_c_match(current, key, &pos)) {
+                if (current->c_len && current->c[current->c_len - 1] == '\0') {
+                    return;
+                }
                 trie_entry_t *next = NULL;
                 key += pos;
                 next = trie_entry_child(trie, current, key);
@@ -256,4 +275,36 @@ bool trie_lookup(const trie_t *trie, const char *key)
             }
         }
     }
+}
+
+
+/* Debug {{{1
+ */
+
+static inline void trie_entry_inspect(const trie_t *trie,
+                                      const trie_entry_t *entry, int level)
+{
+    for (int i = 0 ; i < level ; ++i) {
+        fputs("  ", stdout);
+    }
+    if (entry->c == NULL) {
+        fputs("(nil)", stdout);
+    } else {
+        for (int i = 0 ; i < entry->c_len ; ++i) {
+            if (entry->c[i]) {
+                printf("%c ", entry->c[i]);
+            } else {
+                fputs("\\0 ", stdout);
+            }
+        }
+    }
+    fputs("\n", stdout);
+    for (int i = 0 ; i < entry->children_len ; ++i) {
+        trie_entry_inspect(trie, &trie->entries[entry->children[i]], level + 1);
+    }
+}
+
+void trie_inspect(const trie_t *trie)
+{
+    trie_entry_inspect(trie, trie->entries, 0);
 }
