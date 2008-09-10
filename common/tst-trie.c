@@ -46,6 +46,26 @@ int main(void)
     trie_insert(trie, "coucou");
     trie_insert(trie, "coucou chez vous");
     trie_inspect(trie);
+
+#define ASSERT_TRUE(str)                            \
+    if (!trie_lookup(trie, str)) {                  \
+        printf("\"%s\" not found in trie\n", str);  \
+        return 1;                                   \
+    }
+#define ASSERT_FALSE(str)                           \
+    if (trie_lookup(trie, str)) {                   \
+        printf("\"%s\" found in trie\n", str);      \
+        return 1;                                   \
+    }
+
+    ASSERT_FALSE("");
+    ASSERT_FALSE("coucou ");
+    ASSERT_FALSE("abcde123");
+    ASSERT_FALSE("abcde");
+    ASSERT_TRUE("abcdefghi");
+    ASSERT_TRUE("coucou");
+    ASSERT_FALSE("coucou chez vous tous");
+
     trie_delete(&trie);
     return 0;
 }
