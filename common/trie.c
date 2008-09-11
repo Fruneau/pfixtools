@@ -41,25 +41,25 @@
 typedef struct trie_entry_t trie_entry_t;
 
 struct trie_entry_t {
-    int  c_offset;
-    int  c_len;
+    int32_t  c_offset;
+    int32_t  c_len;
 
-    int children_offset;
-    int children_len;
+    int32_t children_offset;
+    int32_t children_len;
 };
 
 struct trie_t {
     trie_entry_t *entries;
-    int entries_len;
-    int entries_size;
+    int32_t entries_len;
+    int32_t entries_size;
 
     char *c;
-    int  c_len;
-    int  c_size;
+    int32_t  c_len;
+    int32_t  c_size;
 
     char **keys;
-    int  keys_len;
-    int  keys_size;
+    int32_t  keys_len;
+    int32_t  keys_size;
 
     bool locked;
 };
@@ -345,14 +345,14 @@ static inline void trie_entry_inspect(const trie_t *trie,
                                       const trie_entry_t *entry, int level)
 {
     static int max_depth = 0;
-    static int leafs     = 0;
+    static int leaves    = 0;
     static int depth_sum = 0;
 
     if (trie_entry_is_leaf(entry)) {
         if (level > max_depth) {
             max_depth = level;
         }
-        ++leafs;
+        ++leaves;
         depth_sum += level;
     }
     for (int i = 0 ; i < level ; ++i) {
@@ -379,9 +379,9 @@ static inline void trie_entry_inspect(const trie_t *trie,
     if (level == 0) {
         printf("Average char per node: %d\n", trie->c_len / trie->entries_len);
         printf("Number of nodes: %d\n", trie->entries_len);
-        printf("Number of leafs: %d\n", leafs);
+        printf("Number of leaves: %d\n", leaves);
         printf("Max depth: %d\n", max_depth);
-        printf("Average leaf depth: %d\n", depth_sum / leafs);
+        printf("Average leaf depth: %d\n", depth_sum / leaves);
         printf("Memory used: %d\n", (trie->entries_size * sizeof(trie_entry_t))
                                   + (trie->c_size) + sizeof(trie_t));
     }
