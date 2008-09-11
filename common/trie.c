@@ -57,9 +57,13 @@ struct trie_t {
     int32_t  c_len;
     int32_t  c_size;
 
-    char **keys;
+    char     *keys;
     int32_t  keys_len;
     int32_t  keys_size;
+
+    int      *keys_offset;
+    int32_t  keys_offset_len;
+    int32_t  keys_offset_size;
 
     bool locked;
 };
@@ -71,11 +75,10 @@ trie_t *trie_new(void)
 
 static inline void trie_cleanup_build_data(trie_t *trie)
 {
-    for (int i = 0 ; i < trie->keys_len ; ++i) {
-        p_delete(&trie->keys[i]);
-    }
     p_delete(&trie->keys);
+    p_delete(&trie->keys_offset);
     trie->keys_len = trie->keys_size = 0;
+    trie->keys_offset_len = trie->keys_offset_size = 0;
 }
 
 void trie_delete(trie_t **trie)
@@ -231,8 +234,14 @@ static inline void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
 void trie_insert(trie_t *trie, const char* key)
 {
     assert(trie->entries == NULL && "Trie already compiled");
-    GROW(trie->keys, 1, trie->keys_len, trie->keys_size);
-    trie->keys[trie->keys_len++] = strdup(key);
+
+    int len = m_strlen(key) + 1;
+    GROW(trie->keys, len, trie->keys_len, trie->keys_size);
+    memcpy(trie->keys + trie->keys_len, key, len);
+
+    GROW(trie->keys_offset, 1, trie->keys_offset_len, trie->keys_offset_size);
+    trie->keys_offset[trie->keys_offset_len++] = trie->keys_len;
+    trie->keys_len += len;
 }
 
 
@@ -245,18 +254,19 @@ static inline void trie_compile_aux(trie_t *trie, int id,
     char current = '\0';
 
     for (int off_diff = initial_diff ; fork_pos == 0 ; ++off_diff, ++offset) {
-        current = trie->keys[first_key][offset];
+        current = trie->keys[trie->keys_offset[first_key] + offset];
         for (int i = first_key + 1 ; i < last_key ; ++i) {
-            if (trie->keys[i][offset] != current) {
+            const char *str = trie->keys + trie->keys_offset[i];
+            const char c = str[offset];
+            if (c != current) {
                 trie_grow(trie, 2);
                 if (fork_pos == 0) {
                     trie_entry_split(trie, &trie->entries[id], off_diff);
                 }
                 trie_entry_insert_child(trie, &trie->entries[id],
-                                        trie_add_leaf(trie, trie->keys[i] +
-                                                      offset));
+                                        trie_add_leaf(trie, str + offset));
                 forks[fork_pos++] = i;
-                current = trie->keys[i][offset];
+                current = c;
             }
         }
         if (fork_pos == 0 && current == '\0') {
@@ -275,23 +285,21 @@ static inline void trie_compile_aux(trie_t *trie, int id,
     }
 }
 
-typedef char *str_t;
-
 void trie_compile(trie_t *trie, bool memlock)
 {
     assert(trie->entries == NULL && "Trie already compiled");
     assert(trie->keys != NULL && "Trying to compile an empty trie");
     {
-#       define QSORT_TYPE str_t
-#       define QSORT_BASE trie->keys
-#       define QSORT_NELT trie->keys_len
-#       define QSORT_LT(a,b) strcmp(*a, *b) < 0
+#       define QSORT_TYPE int
+#       define QSORT_BASE trie->keys_offset
+#       define QSORT_NELT trie->keys_offset_len
+#       define QSORT_LT(a,b) strcmp(trie->keys + *a, trie->keys + *b) < 0
 #       include "qsort.c"
     }
 
     trie_grow(trie, trie->keys_len);
-    trie_compile_aux(trie, trie_add_leaf(trie, trie->keys[0]),
-                     0, trie->keys_len, 0, 0);
+    trie_compile_aux(trie, trie_add_leaf(trie, trie->keys),
+                     0, trie->keys_offset_len, 0, 0);
     trie_cleanup_build_data(trie);
     p_shrink(&trie->entries, trie->entries_len, &trie->entries_size);
     p_shrink(&trie->c, trie->c_len, &trie->c_size);
