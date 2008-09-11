@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     trie_insert(trie, "coucou chez vous");
     trie_insert(trie, "debout !");
     trie_compile(trie, false);
-    trie_inspect(trie);
+    trie_inspect(trie, true);
 
 #define ASSERT_TRUE(str)                            \
     if (!trie_lookup(trie, str)) {                  \
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
      */
     if (argc > 1) {
         trie = create_trie_from_file(argv[1]);
-//        trie_inspect(trie);
+        trie_inspect(trie, false);
         trie_delete(&trie);
     }
     return 0;

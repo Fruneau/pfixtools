@@ -53,6 +53,6 @@ __attribute__((nonnull(1,2)))
 bool trie_lookup(const trie_t *trie, const char* key);
 
 __attribute__((nonnull(1)))
-void trie_inspect(const trie_t *trie);
+void trie_inspect(const trie_t *trie, bool show_content);
 
 #endif

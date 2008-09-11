@@ -199,7 +199,6 @@ static inline void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry,
         entry->children_len    = 1;
     } else {
         if (entry->children_offset + entry->children_len != pchild) {
-            trie_inspect(trie);
             printf("Inserting child %d while offset is %d[%d]\n",
                    pchild, entry->children_offset, entry->children_len);
             abort();
@@ -344,7 +343,7 @@ bool trie_lookup(const trie_t *trie, const char *key)
 /* Debug {{{1
  */
 
-static inline void trie_entry_inspect(const trie_t *trie,
+static inline void trie_entry_inspect(const trie_t *trie, bool show_content,
                                       const trie_entry_t *entry, int level)
 {
     static int max_depth = 0;
@@ -358,26 +357,28 @@ static inline void trie_entry_inspect(const trie_t *trie,
         ++leaves;
         depth_sum += level;
     }
-    for (int i = 0 ; i < level ; ++i) {
-        fputs("  ", stdout);
-    }
-    if (entry->c_len == 0) {
-        fputs("(nil)", stdout);
-    } else {
-        const char *c = trie->c + entry->c_offset;
-        printf("(%d) ", entry->c_len);
-        for (int i = 0 ; i < entry->c_len ; ++i) {
-            if (c[i]) {
-                printf("%c ", c[i]);
-            } else {
-                fputs("\\0 ", stdout);
+    if (show_content) {
+        for (int i = 0 ; i < level ; ++i) {
+            fputs("  ", stdout);
+        }
+        if (entry->c_len == 0) {
+            fputs("(nil)", stdout);
+        } else {
+            const char *c = trie->c + entry->c_offset;
+            printf("(%d) ", entry->c_len);
+            for (int i = 0 ; i < entry->c_len ; ++i) {
+                if (c[i]) {
+                    printf("%c ", c[i]);
+                } else {
+                    fputs("\\0 ", stdout);
+                }
             }
         }
+        fputs("\n", stdout);
     }
-    fputs("\n", stdout);
     for (int i = entry->children_offset ;
           i < entry->children_offset + entry->children_len ; ++i) {
-        trie_entry_inspect(trie, &trie->entries[i], level + 1);
+        trie_entry_inspect(trie, show_content, &trie->entries[i], level + 1);
     }
     if (level == 0) {
         printf("Average char per node: %d\n", trie->c_len / trie->entries_len);
@@ -390,7 +391,7 @@ static inline void trie_entry_inspect(const trie_t *trie,
     }
 }
 
-void trie_inspect(const trie_t *trie)
+void trie_inspect(const trie_t *trie, bool show_content)
 {
-    trie_entry_inspect(trie, trie->entries, 0);
+    trie_entry_inspect(trie, show_content, trie->entries, 0);
 }
