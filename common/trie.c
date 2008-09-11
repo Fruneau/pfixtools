@@ -344,11 +344,17 @@ bool trie_lookup(const trie_t *trie, const char *key)
 static inline void trie_entry_inspect(const trie_t *trie,
                                       const trie_entry_t *entry, int level)
 {
-    static int c_sum = 0;
-    static int nodes = 0;
+    static int max_depth = 0;
+    static int leafs     = 0;
+    static int depth_sum = 0;
 
-    ++nodes;
-    c_sum += entry->c_len;
+    if (trie_entry_is_leaf(entry)) {
+        if (level > max_depth) {
+            max_depth = level;
+        }
+        ++leafs;
+        depth_sum += level;
+    }
     for (int i = 0 ; i < level ; ++i) {
         fputs("  ", stdout);
     }
@@ -371,7 +377,13 @@ static inline void trie_entry_inspect(const trie_t *trie,
         trie_entry_inspect(trie, &trie->entries[i], level + 1);
     }
     if (level == 0) {
-        printf("Mean char per node: %d\n", c_sum / nodes);
+        printf("Average char per node: %d\n", trie->c_len / trie->entries_len);
+        printf("Number of nodes: %d\n", trie->entries_len);
+        printf("Number of leafs: %d\n", leafs);
+        printf("Max depth: %d\n", max_depth);
+        printf("Average leaf depth: %d\n", depth_sum / leafs);
+        printf("Memory used: %d\n", (trie->entries_size * sizeof(trie_entry_t))
+                                  + (trie->c_size) + sizeof(trie_t));
     }
 }
 

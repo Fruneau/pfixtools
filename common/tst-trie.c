@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
      */
     if (argc > 1) {
         trie = create_trie_from_file(argv[1]);
-//        trie_inspect(trie);
+        trie_inspect(trie);
         trie_delete(&trie);
     }
     return 0;
