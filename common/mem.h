@@ -53,6 +53,14 @@
 #define p_dupstr(p, len)        xmemdupstr((p), (len))
 #define p_realloc(pp, count)    xrealloc((void*)(pp), sizeof(**(pp)) * (count))
 
+#  define p_shrink(pp, goalnb, allocnb)           \
+    do {                                          \
+        if (*(allocnb) > goalnb) {                \
+            p_realloc(pp, goalnb);                \
+            *(allocnb) = goalnb;                  \
+        }                                         \
+    } while(0)
+
 #  define p_alloc_nr(x) (((x) + 16) * 3 / 2)
 #  define p_allocgrow(pp, goalnb, allocnb)                  \
     do {                                                    \

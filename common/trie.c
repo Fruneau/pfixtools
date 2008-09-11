@@ -33,6 +33,8 @@
  * Copyright © 2008 Florent Bruneau
  */
 
+#include <sys/mman.h>
+
 #include "str.h"
 #include "trie.h"
 
@@ -67,9 +69,19 @@ trie_t *trie_new(void)
     return p_new(trie_t, 1);
 }
 
+static inline void trie_cleanup_build_data(trie_t *trie)
+{
+    for (int i = 0 ; i < trie->keys_len ; ++i) {
+        p_delete(&trie->keys[i]);
+    }
+    p_delete(&trie->keys);
+    trie->keys_len = trie->keys_size = 0;
+}
+
 void trie_delete(trie_t **trie)
 {
     if (*trie) {
+        trie_cleanup_build_data(*trie);
         p_delete(&(*trie)->entries);
         p_delete(&(*trie)->c);
         p_delete(trie);
@@ -259,20 +271,25 @@ static inline void trie_compile_aux(trie_t *trie, int id,
     }
 }
 
-static inline void trie_cleanup_build_data(trie_t *trie)
-{
-    for (int i = 0 ; i < trie->keys_len ; ++i) {
-        p_delete(&trie->keys[i]);
-    }
-    p_delete(&trie->keys);
-}
 
 static inline void trie_shrink(trie_t *trie)
 {
+    p_shrink(&trie->entries, trie->entries_len, &trie->entries_size);
+    p_shrink(&trie->c, trie->c_len, &trie->c_size);
 }
 
 static inline void trie_lock(trie_t *trie)
 {
+    if (mlock(trie->entries, sizeof(trie_entry_t) * trie->entries_len) != 0) {
+        UNIXERR("mlock");
+        return;
+    }
+    if (mlock(trie->c, trie->c_len) != 0) {
+        UNIXERR("mlock");
+        munlock(trie->entries, sizeof(trie_entry_t) * trie->entries_len);
+        return;
+    }
+    trie->locked = true;
 }
 
 typedef char *str_t;
@@ -339,6 +356,7 @@ static inline void trie_entry_inspect(const trie_t *trie,
         fputs("(nil)", stdout);
     } else {
         const char *c = trie->c + entry->c_offset;
+        printf("(%d) ", entry->c_len);
         for (int i = 0 ; i < entry->c_len ; ++i) {
             if (c[i]) {
                 printf("%c ", c[i]);

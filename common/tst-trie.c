@@ -117,7 +117,6 @@ int main(int argc, char *argv[])
     trie_t *trie = trie_new();
     trie_insert(trie, "abcde123456789");
     trie_insert(trie, "abcde123654789");
-    trie_insert(trie, "abcde123654789");
     trie_insert(trie, "abcdefghi");
     trie_insert(trie, "coucou");
     trie_insert(trie, "coucou chez vous");
@@ -139,16 +138,21 @@ int main(int argc, char *argv[])
     ASSERT_FALSE("coucou ");
     ASSERT_FALSE("abcde123");
     ASSERT_FALSE("abcde");
+    ASSERT_FALSE("coucou chez vous tous");
+    ASSERT_TRUE("abcde123456789");
+    ASSERT_TRUE("abcde123654789");
     ASSERT_TRUE("abcdefghi");
     ASSERT_TRUE("coucou");
-    ASSERT_FALSE("coucou chez vous tous");
+    ASSERT_TRUE("coucou chez vous");
+    ASSERT_TRUE("debout !");
+
     trie_delete(&trie);
 
     /* Perf test
      */
     if (argc > 1) {
         trie = create_trie_from_file(argv[1]);
-        trie_inspect(trie);
+//        trie_inspect(trie);
         trie_delete(&trie);
     }
     return 0;
