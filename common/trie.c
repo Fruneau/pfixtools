@@ -229,6 +229,7 @@ static inline void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
 
 void trie_insert(trie_t *trie, const char* key)
 {
+    assert(trie->entries == NULL && "Trie already compiled");
     GROW(trie->keys, 1, trie->keys_len, trie->keys_size);
     trie->keys[trie->keys_len++] = strdup(key);
 }
@@ -298,6 +299,8 @@ typedef char *str_t;
 
 void trie_compile(trie_t *trie, bool memlock)
 {
+    assert(trie->entries == NULL && "Trie already compiled");
+    assert(trie->keys != NULL && "Trying to compile an empty trie");
     {
 #       define QSORT_TYPE str_t
 #       define QSORT_BASE trie->keys
@@ -318,6 +321,7 @@ void trie_compile(trie_t *trie, bool memlock)
 
 bool trie_lookup(const trie_t *trie, const char *key)
 {
+    assert(trie->keys == NULL && "Can't lookup: trie not compiled");
     if (trie->entries_len == 0) {
         return false;
     } else {
