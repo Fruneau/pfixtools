@@ -46,8 +46,8 @@ EOF
 do_h() {
     do_hdr
     cat <<EOF
-#ifndef PFIXTOOLS_FILTERS_H
-#define PFIXTOOLS_FILTERS_H
+#ifndef PFIXTOOLS_FILTERS_TOKENS_H
+#define PFIXTOOLS_FILTERS_TOKENS_H
 
 typedef enum filter_token {
     FTK_UNKNOWN = -1,

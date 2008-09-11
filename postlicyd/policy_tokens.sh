@@ -46,8 +46,8 @@ EOF
 do_h() {
     do_hdr
     cat <<EOF
-#ifndef PFIXTOOLS_TOKENS_H
-#define PFIXTOOLS_TOKENS_H
+#ifndef PFIXTOOLS_POLICY_TOKENS_H
+#define PFIXTOOLS_POLICY_TOKENS_H
 
 typedef enum postlicyd_token {
     PTK_UNKNOWN = -1,

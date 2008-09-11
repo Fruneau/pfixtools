@@ -31,6 +31,7 @@
 
 /*
  * Copyright © 2007 Pierre Habouzit
+ * Copyright © 2008 Florent Bruneau
  */
 
 #include <arpa/inet.h>
