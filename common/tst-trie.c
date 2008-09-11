@@ -104,8 +104,6 @@ static trie_t *create_trie_from_file(const char *file)
     }
     munmap((void*)map, st.st_size);
     trie_compile(db, false);
-    printf("OK\n");
-    sleep(10);
     return db;
 }
 
@@ -140,6 +138,7 @@ int main(int argc, char *argv[])
     ASSERT_FALSE("abcde");
     ASSERT_FALSE("coucou chez vous tous");
     ASSERT_TRUE("abcde123456789");
+    ASSERT_TRUE("abcde123456789");
     ASSERT_TRUE("abcde123654789");
     ASSERT_TRUE("abcdefghi");
     ASSERT_TRUE("coucou");
@@ -152,7 +151,7 @@ int main(int argc, char *argv[])
      */
     if (argc > 1) {
         trie = create_trie_from_file(argv[1]);
-        trie_inspect(trie);
+//        trie_inspect(trie);
         trie_delete(&trie);
     }
     return 0;

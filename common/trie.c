@@ -258,6 +258,9 @@ static inline void trie_compile_aux(trie_t *trie, int id,
                 current = trie->keys[i][offset];
             }
         }
+        if (fork_pos == 0 && current == '\0') {
+            return;
+        }
     }
     forks[fork_pos] = last_key;
 
