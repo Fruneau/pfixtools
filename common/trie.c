@@ -82,6 +82,7 @@ void trie_delete(trie_t **trie)
 {
     if (*trie) {
         trie_cleanup_build_data(*trie);
+        trie_unlock(*trie);
         p_delete(&(*trie)->entries);
         p_delete(&(*trie)->c);
         p_delete(trie);
@@ -274,27 +275,6 @@ static inline void trie_compile_aux(trie_t *trie, int id,
     }
 }
 
-
-static inline void trie_shrink(trie_t *trie)
-{
-    p_shrink(&trie->entries, trie->entries_len, &trie->entries_size);
-    p_shrink(&trie->c, trie->c_len, &trie->c_size);
-}
-
-static inline void trie_lock(trie_t *trie)
-{
-    if (mlock(trie->entries, sizeof(trie_entry_t) * trie->entries_len) != 0) {
-        UNIXERR("mlock");
-        return;
-    }
-    if (mlock(trie->c, trie->c_len) != 0) {
-        UNIXERR("mlock");
-        munlock(trie->entries, sizeof(trie_entry_t) * trie->entries_len);
-        return;
-    }
-    trie->locked = true;
-}
-
 typedef char *str_t;
 
 void trie_compile(trie_t *trie, bool memlock)
@@ -313,7 +293,8 @@ void trie_compile(trie_t *trie, bool memlock)
     trie_compile_aux(trie, trie_add_leaf(trie, trie->keys[0]),
                      0, trie->keys_len, 0, 0);
     trie_cleanup_build_data(trie);
-    trie_shrink(trie);
+    p_shrink(&trie->entries, trie->entries_len, &trie->entries_size);
+    p_shrink(&trie->c, trie->c_len, &trie->c_size);
     if (memlock) {
         trie_lock(trie);
     }
@@ -343,6 +324,32 @@ bool trie_lookup(const trie_t *trie, const char *key)
     }
 }
 
+void trie_lock(trie_t *trie)
+{
+    if (trie->locked) {
+        return;
+    }
+    if (mlock(trie->entries, sizeof(trie_entry_t) * trie->entries_len) != 0) {
+        UNIXERR("mlock");
+        return;
+    }
+    if (mlock(trie->c, trie->c_len) != 0) {
+        UNIXERR("mlock");
+        munlock(trie->entries, sizeof(trie_entry_t) * trie->entries_len);
+        return;
+    }
+    trie->locked = true;
+}
+
+void trie_unlock(trie_t *trie)
+{
+    if (!trie->locked) {
+        return;
+    }
+    munlock(trie->entries, sizeof(trie_entry_t) * trie->entries_len);
+    munlock(trie->c, trie->c_len);
+    trie->locked = false;
+}
 
 /* Debug {{{1
  */

@@ -49,6 +49,12 @@ void trie_insert(trie_t *trie, const char* key);
 __attribute__((nonnull(1)))
 void trie_compile(trie_t *trie, bool memlock);
 
+__attribute__((nonnull(1)))
+void trie_lock(trie_t *trie);
+
+__attribute__((nonnull(1)))
+void trie_unlock(trie_t *trie);
+
 __attribute__((nonnull(1,2)))
 bool trie_lookup(const trie_t *trie, const char* key);
 
