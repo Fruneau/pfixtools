@@ -42,11 +42,8 @@ struct trie_entry_t {
     int  c_offset;
     int  c_len;
 
-    int* children;
+    int children_offset;
     int children_len;
-    int children_size;
-
-    bool locked;
 };
 
 struct trie_t {
@@ -57,6 +54,10 @@ struct trie_t {
     char *c;
     int  c_len;
     int  c_size;
+
+    char **keys;
+    int  keys_len;
+    int  keys_size;
 
     bool locked;
 };
@@ -69,10 +70,6 @@ trie_t *trie_new(void)
 void trie_delete(trie_t **trie)
 {
     if (*trie) {
-        for (int i = 0 ; i < (*trie)->entries_len ; ++i) {
-            trie_entry_t *entry = &(*trie)->entries[i];
-            p_delete(&(entry->children));
-        }
         p_delete(&(*trie)->entries);
         p_delete(&(*trie)->c);
         p_delete(trie);
@@ -120,13 +117,13 @@ static inline trie_entry_t* trie_entry_child(const trie_t *trie,
                                              const trie_entry_t* entry,
                                              const char *key)
 {
-    int start = 0;
-    int end   = entry->children_len;
+    int start = entry->children_offset;
+    int end   = start + entry->children_len;
     const char c = *key;
 
     while (start < end) {
         int mid = (start + end) / 2;
-        trie_entry_t* child = &trie->entries[entry->children[mid]];
+        trie_entry_t* child = &trie->entries[mid];
         const char c2 = trie->c[child->c_offset];
 
         if (child->c_len) {
@@ -185,34 +182,18 @@ static inline int trie_add_leaf(trie_t *trie, const char *key)
 static inline void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry,
                                            int pchild)
 {
-    const char c = trie->c[trie->entries[pchild].c_offset];
-    int start = 0;
-    int end   = entry->children_len;
-
-    p_allocgrow(&entry->children, entry->children_len + 1, &entry->children_size);
-    while (start < end) {
-        int mid = (start + end) / 2;
-        const trie_entry_t* child = &trie->entries[entry->children[mid]];
-        const char c2 = trie->c[child->c_offset];
-
-        if (child->c_len) {
-            if (c2 == c) {
-                abort();
-            }
-            if (c < c2) {
-                end = mid;
-            } else {
-                start = mid + 1;
-            }
-        } else {
+    if (entry->children_len == 0) {
+        entry->children_offset = pchild;
+        entry->children_len    = 1;
+    } else {
+        if (entry->children_offset + entry->children_len != pchild) {
+            trie_inspect(trie);
+            printf("Inserting child %d while offset is %d[%d]\n",
+                   pchild, entry->children_offset, entry->children_len);
             abort();
         }
+        ++entry->children_len;
     }
-    memmove(entry->children + start + 1,
-            entry->children + start,
-            sizeof(int) * (entry->children_len - start));
-    entry->children[start] = pchild;
-    ++entry->children_len;
 }
 
 static inline void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
@@ -229,45 +210,90 @@ static inline void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
         child->c_len    = entry->c_len - pos;
         entry->c_len    = pos;
     }
-    child->children      = entry->children;
-    child->children_len  = entry->children_len;
-    child->children_size = entry->children_size;
-    entry->children      = NULL;
-    entry->children_len  = 0;
-    entry->children_size = 0;
-    trie_entry_insert_child(trie, entry, trie->entries_len - 1);
+    child->children_offset = entry->children_offset;
+    child->children_len    = entry->children_len;
+    entry->children_offset = trie->entries_len - 1;
+    entry->children_len    = 1;
 }
 
 void trie_insert(trie_t *trie, const char* key)
 {
-    trie_grow(trie, 2);
-    if (trie->entries_len == 0) {
-        (void)trie_add_leaf(trie, key);
-    } else {
-        trie_entry_t *current = trie->entries;
-        while (true) {
-            int pos = 0;
-            if (trie_entry_c_match(trie, current, key, &pos)) {
-                if (trie_entry_is_leaf(current)) {
-                    return;
+    GROW(trie->keys, 1, trie->keys_len, trie->keys_size);
+    trie->keys[trie->keys_len++] = strdup(key);
+}
+
+
+static inline void trie_compile_aux(trie_t *trie, int id,
+                                    int first_key, int last_key, int offset,
+                                    int initial_diff)
+{
+    int forks[256];
+    int fork_pos = 0;
+    char current = '\0';
+
+    for (int off_diff = initial_diff ; fork_pos == 0 ; ++off_diff, ++offset) {
+        current = trie->keys[first_key][offset];
+        for (int i = first_key + 1 ; i < last_key ; ++i) {
+            if (trie->keys[i][offset] != current) {
+                trie_grow(trie, 2);
+                if (fork_pos == 0) {
+                    trie_entry_split(trie, &trie->entries[id], off_diff);
                 }
-                trie_entry_t *next = NULL;
-                key += pos;
-                next = trie_entry_child(trie, current, key);
-                if (next == NULL) {
-                    trie_entry_insert_child(trie, current,
-                                            trie_add_leaf(trie, key));
-                    return;
-                } else {
-                    current = next;
-                }
-            } else {
-                trie_entry_split(trie, current, pos);
-                trie_entry_insert_child(trie, current,
-                                        trie_add_leaf(trie, key + pos));
-                return;
+                trie_entry_insert_child(trie, &trie->entries[id],
+                                        trie_add_leaf(trie, trie->keys[i] +
+                                                      offset));
+                forks[fork_pos++] = i;
+                current = trie->keys[i][offset];
             }
         }
+    }
+    forks[fork_pos] = last_key;
+
+    const int children_len = trie->entries[id].children_len;
+    for (int i = 0 ; i < children_len ; ++i) {
+        int child = trie->entries[id].children_offset + i;
+        if (forks[i] - 1 > first_key) {
+            trie_compile_aux(trie, child, first_key, forks[i], offset, 1);
+        }
+        first_key = forks[i];
+    }
+}
+
+static inline void trie_cleanup_build_data(trie_t *trie)
+{
+    for (int i = 0 ; i < trie->keys_len ; ++i) {
+        p_delete(&trie->keys[i]);
+    }
+    p_delete(&trie->keys);
+}
+
+static inline void trie_shrink(trie_t *trie)
+{
+}
+
+static inline void trie_lock(trie_t *trie)
+{
+}
+
+typedef char *str_t;
+
+void trie_compile(trie_t *trie, bool memlock)
+{
+    {
+#       define QSORT_TYPE str_t
+#       define QSORT_BASE trie->keys
+#       define QSORT_NELT trie->keys_len
+#       define QSORT_LT(a,b) strcmp(*a, *b) < 0
+#       include "qsort.c"
+    }
+
+    trie_grow(trie, trie->keys_len);
+    trie_compile_aux(trie, trie_add_leaf(trie, trie->keys[0]),
+                     0, trie->keys_len, 0, 0);
+    trie_cleanup_build_data(trie);
+    trie_shrink(trie);
+    if (memlock) {
+        trie_lock(trie);
     }
 }
 
@@ -322,8 +348,9 @@ static inline void trie_entry_inspect(const trie_t *trie,
         }
     }
     fputs("\n", stdout);
-    for (int i = 0 ; i < entry->children_len ; ++i) {
-        trie_entry_inspect(trie, &trie->entries[entry->children[i]], level + 1);
+    for (int i = entry->children_offset ;
+          i < entry->children_offset + entry->children_len ; ++i) {
+        trie_entry_inspect(trie, &trie->entries[i], level + 1);
     }
     if (level == 0) {
         printf("Mean char per node: %d\n", c_sum / nodes);
