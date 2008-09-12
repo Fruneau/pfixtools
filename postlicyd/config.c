@@ -83,25 +83,29 @@ config_t *config_read(const char *file)
     linep = p = map.map;
 
 #define READ_ERROR(Fmt, ...)                                                   \
-    syslog(LOG_ERR, "config file %s:%d:%d: " Fmt, file, line + 1,              \
-           p - linep + 1, ##__VA_ARGS__)
-#define ADD_IN_BUFFER(Buffer, Len, Char)                                       \
-    if ((Len) >= BUFSIZ - 1) {                                                 \
-        READ_ERROR("unreasonnable long line");                                 \
+    do {                                                                       \
+        syslog(LOG_ERR, "config file %s:%d:%d: " Fmt, file, line + 1,          \
+               p - linep + 1, ##__VA_ARGS__);                                  \
         goto error;                                                            \
-    }                                                                          \
-    (Buffer)[(Len)++] = (Char);                                                \
-    (Buffer)[(Len)]   = '\0';
-
+    } while (0)
+#define ADD_IN_BUFFER(Buffer, Len, Char)                                       \
+    do {                                                                       \
+        if ((Len) >= BUFSIZ - 1) {                                             \
+            READ_ERROR("unreasonnable long line");                             \
+        }                                                                      \
+        (Buffer)[(Len)++] = (Char);                                            \
+        (Buffer)[(Len)]   = '\0';                                              \
+    } while (0)
 #define READ_NEXT(OnEOF)                                                       \
-    if (*p == '\n') {                                                          \
-        ++line;                                                                \
-        linep = p + 1;                                                         \
-    }                                                                          \
-    if (++p >= map.end) {                                                      \
-        OnEOF;                                                                 \
-    }                                                                          \
-    syslog(LOG_ERR, "Read char '%c' at %d", *p, __LINE__);
+    do {                                                                       \
+        if (*p == '\n') {                                                      \
+            ++line;                                                            \
+            linep = p + 1;                                                     \
+        }                                                                      \
+        if (++p >= map.end) {                                                  \
+            OnEOF;                                                             \
+        }                                                                      \
+    } while (0)
 #define READ_BLANK(OnEOF)                                                      \
     do {                                                                       \
         bool in_comment = false;                                               \
@@ -120,11 +124,10 @@ config_t *config_read(const char *file)
         (Buffer)[0] = '\0';                                                    \
         if (!isalpha(*p)) {                                                    \
             READ_ERROR("invalid %s, unexpected character '%c'", Name, *p);     \
-            goto error;                                                        \
         }                                                                      \
         do {                                                                   \
             ADD_IN_BUFFER(Buffer, Len, *p);                                    \
-            READ_NEXT(goto badeof)                                             \
+            READ_NEXT(goto badeof);                                            \
         } while (isalnum(*p) || *p == '_');                                    \
     } while (0)
 #define READ_STRING(Name, Buffer, Len, OnEOF)                                  \
@@ -138,7 +141,6 @@ config_t *config_read(const char *file)
                 while (true) {                                                 \
                     if (*p == '\n') {                                          \
                         READ_ERROR("string must not contain EOL");             \
-                        goto error;                                            \
                     } else if (escaped) {                                      \
                         ADD_IN_BUFFER(Buffer, Len, *p);                        \
                         escaped = false;                                       \
@@ -156,7 +158,6 @@ config_t *config_read(const char *file)
             }                                                                  \
             if (*p != ';') {                                                   \
                 READ_ERROR("%s must end with a ';'", Name);                    \
-                goto error;                                                    \
             }                                                                  \
         } else {                                                               \
             bool escaped = false;                                              \
@@ -182,13 +183,11 @@ config_t *config_read(const char *file)
                 ADD_IN_BUFFER(Buffer, Len, '\\');                              \
             }                                                                  \
         }                                                                      \
-        READ_NEXT(OnEOF)                                                       \
-        syslog(LOG_ERR, "string read: %s", Buffer);                            \
+        READ_NEXT(OnEOF);                                                      \
     } while(0)
 
 
 read_section:
-    syslog(LOG_ERR, "read_section");
     if (p >= map.end) {
         goto ok;
     }
@@ -201,18 +200,16 @@ read_section:
     READ_BLANK(goto badeof);
     switch (*p) {
       case '=':
-        READ_NEXT(goto badeof)
+        READ_NEXT(goto badeof);
         goto read_param_value;
       case '{':
-        READ_NEXT(goto badeof)
+        READ_NEXT(goto badeof);
         goto read_filter;
       default:
         READ_ERROR("invalid character '%c', expected '=' or '{'", *p);
-        goto error;
     }
 
 read_param_value:
-    syslog(LOG_ERR, "read_param_value: key=%s", key);
     READ_BLANK(goto badeof);
     READ_STRING("parameter value", value, value_len, ;);
     /* TODO: Insert parameter in the configuration.
@@ -220,17 +217,14 @@ read_param_value:
     goto read_section;
 
 read_filter:
-    syslog(LOG_ERR, "read_filter: key=%s", key);
     /* TODO: Create a filter with the given name.
      */
     READ_BLANK(goto badeof);
     while (*p != '}') {
         READ_TOKEN("filter parameter name", key, key_len);
-        syslog(LOG_ERR, "read parameter: key=%s", key);
         READ_BLANK(goto badeof);
         if (*p != '=') {
             READ_ERROR("invalid character '%c', expected '='", *p);
-            goto error;
         }
         READ_NEXT(goto badeof);
         READ_BLANK(goto badeof);
@@ -239,7 +233,7 @@ read_filter:
         /* TODO: Insert parameter in the filter.
          */
     }
-    READ_NEXT(;)
+    READ_NEXT(;);
     /* TODO: Check the filter.
      */
     goto read_section;
