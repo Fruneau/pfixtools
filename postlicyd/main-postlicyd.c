@@ -42,6 +42,7 @@
 #include "policy_tokens.h"
 #include "server.h"
 #include "query.h"
+#include "config.h"
 
 #define DAEMON_NAME             "postlicyd"
 #define DEFAULT_PORT            10000
@@ -257,6 +258,11 @@ int main(int argc, char *argv[])
 
     if (argc - optind != 1) {
         usage();
+        return EXIT_FAILURE;
+    }
+
+    config_t *config = config_read(argv[optind]);
+    if (config == NULL) {
         return EXIT_FAILURE;
     }
 

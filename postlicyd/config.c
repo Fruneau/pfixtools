@@ -69,6 +69,7 @@ config_t *config_read(const char *file)
     file_map_t map;
     const char *p;
     int line = 0;
+    const char *linep;
 
     char key[BUFSIZ];
     char value[BUFSIZ];
@@ -79,10 +80,11 @@ config_t *config_read(const char *file)
     }
 
     config = config_new();
-    p = map.map;
+    linep = p = map.map;
 
 #define READ_ERROR(Fmt, ...)                                                   \
-    syslog(LOG_ERR, "config file %s:%d: " Fmt, file, line, ##__VA_ARGS__)
+    syslog(LOG_ERR, "config file %s:%d:%d: " Fmt, file, line + 1,              \
+           p - linep + 1, ##__VA_ARGS__)
 #define ADD_IN_BUFFER(Buffer, Len, Char)                                       \
     if ((Len) >= BUFSIZ - 1) {                                                 \
         READ_ERROR("unreasonnable long line");                                 \
@@ -92,16 +94,26 @@ config_t *config_read(const char *file)
     (Buffer)[(Len)]   = '\0';
 
 #define READ_NEXT(OnEOF)                                                       \
+    if (*p == '\n') {                                                          \
+        ++line;                                                                \
+        linep = p + 1;                                                         \
+    }                                                                          \
     if (++p >= map.end) {                                                      \
         OnEOF;                                                                 \
-    }
+    }                                                                          \
+    syslog(LOG_ERR, "Read char '%c' at %d", *p, __LINE__);
 #define READ_BLANK(OnEOF)                                                      \
-    while (isblank(*p)) {                                                      \
-        if (*p == '\n') {                                                      \
-            ++line;                                                            \
+    do {                                                                       \
+        bool in_comment = false;                                               \
+        while (in_comment || isspace(*p) || *p == '#') {                       \
+            if (*p == '\n') {                                                  \
+                in_comment = false;                                            \
+            } else if (*p == '#') {                                            \
+                in_comment = true;                                             \
+            }                                                                  \
+            READ_NEXT(OnEOF);                                                  \
         }                                                                      \
-        READ_NEXT(OnEOF);                                                      \
-    }
+    } while (0)
 #define READ_TOKEN(Name, Buffer, Len)                                          \
     do {                                                                       \
         (Len) = 0;                                                             \
@@ -112,11 +124,6 @@ config_t *config_read(const char *file)
         }                                                                      \
         do {                                                                   \
             ADD_IN_BUFFER(Buffer, Len, *p);                                    \
-            if ((Len) >= BUFSIZ - 1) {                                         \
-                READ_ERROR("unreasonnable long token");                        \
-                goto error;                                                    \
-            }                                                                  \
-            (Buffer)[(Len)++] = *p;                                            \
             READ_NEXT(goto badeof)                                             \
         } while (isalnum(*p) || *p == '_');                                    \
     } while (0)
@@ -153,8 +160,7 @@ config_t *config_read(const char *file)
             }                                                                  \
         } else {                                                               \
             bool escaped = false;                                              \
-            READ_NEXT(goto badeof);                                            \
-            while (*p != ';' && isascii(*p) && isprint(*p)) {                  \
+            while (*p != ';' && isascii(*p) && (isprint(*p) || isspace(*p))) { \
                 if (escaped) {                                                 \
                     if (*p == '\r' || *p == '\n') {                            \
                         READ_BLANK(goto badeof);                               \
@@ -177,10 +183,12 @@ config_t *config_read(const char *file)
             }                                                                  \
         }                                                                      \
         READ_NEXT(OnEOF)                                                       \
+        syslog(LOG_ERR, "string read: %s", Buffer);                            \
     } while(0)
 
 
 read_section:
+    syslog(LOG_ERR, "read_section");
     if (p >= map.end) {
         goto ok;
     }
@@ -204,6 +212,7 @@ read_section:
     }
 
 read_param_value:
+    syslog(LOG_ERR, "read_param_value: key=%s", key);
     READ_BLANK(goto badeof);
     READ_STRING("parameter value", value, value_len, ;);
     /* TODO: Insert parameter in the configuration.
@@ -211,16 +220,26 @@ read_param_value:
     goto read_section;
 
 read_filter:
+    syslog(LOG_ERR, "read_filter: key=%s", key);
     /* TODO: Create a filter with the given name.
      */
     READ_BLANK(goto badeof);
     while (*p != '}') {
         READ_TOKEN("filter parameter name", key, key_len);
+        syslog(LOG_ERR, "read parameter: key=%s", key);
+        READ_BLANK(goto badeof);
+        if (*p != '=') {
+            READ_ERROR("invalid character '%c', expected '='", *p);
+            goto error;
+        }
+        READ_NEXT(goto badeof);
         READ_BLANK(goto badeof);
         READ_STRING("filter parameter value", value, value_len, goto badeof);
+        READ_BLANK(goto badeof);
         /* TODO: Insert parameter in the filter.
          */
     }
+    READ_NEXT(;)
     /* TODO: Check the filter.
      */
     goto read_section;
