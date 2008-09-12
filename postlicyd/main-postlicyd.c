@@ -41,6 +41,7 @@
 #include "epoll.h"
 #include "policy_tokens.h"
 #include "server.h"
+#include "query.h"
 
 #define DAEMON_NAME             "postlicyd"
 #define DEFAULT_PORT            10000
@@ -48,67 +49,6 @@
 #define RUNAS_GROUP             "nogroup"
 
 DECLARE_MAIN
-
-enum smtp_state {
-    SMTP_UNKNOWN,
-    SMTP_CONNECT,
-    SMTP_EHLO,
-    SMTP_HELO = SMTP_EHLO,
-    SMTP_MAIL,
-    SMTP_RCPT,
-    SMTP_DATA,
-    SMTP_END_OF_MESSAGE,
-    SMTP_VRFY,
-    SMTP_ETRN,
-};
-
-/* \see http://www.postfix.org/SMTPD_POLICY_README.html */
-typedef struct query_t {
-    unsigned state : 4;
-    unsigned esmtp : 1;
-
-    const char *helo_name;
-    const char *queue_id;
-    const char *sender;
-    const char *recipient;
-    const char *recipient_count;
-    const char *client_address;
-    const char *client_name;
-    const char *reverse_client_name;
-    const char *instance;
-
-    /* postfix 2.2+ */
-    const char *sasl_method;
-    const char *sasl_username;
-    const char *sasl_sender;
-    const char *size;
-    const char *ccert_subject;
-    const char *ccert_issuer;
-    const char *ccert_fingerprint;
-
-    /* postfix 2.3+ */
-    const char *encryption_protocol;
-    const char *encryption_cipher;
-    const char *encryption_keysize;
-    const char *etrn_domain;
-
-    /* postfix 2.5+ */
-    const char *stress;
-
-    const char *eoq;
-} query_t;
-
-static query_t *query_new(void)
-{
-    return p_new(query_t, 1);
-}
-
-static void query_delete(query_t **query)
-{
-    if (*query) {
-        p_delete(query);
-    }
-}
 
 static void *query_starter(server_t* server)
 {
