@@ -38,6 +38,7 @@
 
 #include "common.h"
 #include "mem.h"
+#include <sys/mman.h>
 
 #define PRIV_ARRAY(Type)                                                       \
     struct {                                                                   \
@@ -118,7 +119,13 @@
         array_wipe(array);                                                     \
     } while (0)
 
+#define array_lock(array)                                                      \
+    !(mlock((array).data, (array).len * sizeof(*(array).data)) != 0)
+#define array_unlock(array)                                                    \
+    (void)munlock((array).data, (array).len * sizeof(*(array).data))
+
 ARRAY(char)
 ARRAY(int)
+ARRAY(uint32_t)
 
 #endif

@@ -33,8 +33,6 @@
  * Copyright © 2008 Florent Bruneau
  */
 
-#include <sys/mman.h>
-
 #include "array.h"
 #include "str.h"
 #include "trie.h"
@@ -304,13 +302,13 @@ void trie_lock(trie_t *trie)
     if (trie->locked) {
         return;
     }
-    if (mlock(trie->entries.data, sizeof(trie_entry_t) * trie->entries.len) != 0) {
+    if (!array_lock(trie->entries)) {
         UNIXERR("mlock");
         return;
     }
-    if (mlock(trie->c.data, trie->c.len) != 0) {
+    if (!array_lock(trie->c)) {
         UNIXERR("mlock");
-        munlock(trie->entries.data, sizeof(trie_entry_t) * trie->entries.len);
+        array_unlock(trie->entries);
         return;
     }
     trie->locked = true;
@@ -321,8 +319,8 @@ void trie_unlock(trie_t *trie)
     if (!trie->locked) {
         return;
     }
-    munlock(trie->entries.data, sizeof(trie_entry_t) * trie->entries.len);
-    munlock(trie->c.data, trie->c.len);
+    array_unlock(trie->entries);
+    array_unlock(trie->entries);
     trie->locked = false;
 }
 

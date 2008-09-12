@@ -42,6 +42,7 @@
 #include "rbl.h"
 #include "str.h"
 #include "file.h"
+#include "array.h"
 
 #define IPv4_BITS        5
 #define IPv4_PREFIX(ip)  ((uint32_t)(ip) >> IPv4_BITS)
@@ -58,9 +59,8 @@ enum {
 };
 
 struct rbldb_t {
-    uint32_t len, size;
-    uint32_t *ips;
-    bool     locked;
+    A(uint32_t) ips;
+    bool        locked;
 };
 
 static int get_o(const char *s, const char **out)
@@ -145,31 +145,28 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         if (parse_ipv4(p, &p, &ip) < 0) {
             p = (char *)memchr(p, '\n', end - p) + 1;
         } else {
-            if (db->len >= db->size) {
-                db->size += 64 * 1024;
-                p_realloc(&db->ips, db->size);
-            }
-            db->ips[db->len++] = ip;
+            array_add(db->ips, ip);
         }
     }
     file_map_close(&map);
 
     /* Lookup may perform serveral I/O, so avoid swap.
      */
-    db->locked = lock && mlock(db->ips, db->len * sizeof(*(db->ips))) == 0;
+    array_adjust(db->ips);
+    db->locked = lock && array_lock(db->ips);
     if (lock && !db->locked) {
         UNIXERR("mlock");
     }
 
-    if (db->len) {
+    if (db->ips.len) {
 #       define QSORT_TYPE uint32_t
-#       define QSORT_BASE db->ips
-#       define QSORT_NELT db->len
+#       define QSORT_BASE db->ips.data
+#       define QSORT_NELT db->ips.len
 #       define QSORT_LT(a,b) *a < *b
 #       include "qsort.c"
     }
 
-    syslog(LOG_INFO, "rbl %s loaded, %d IPs", file, db->len);
+    syslog(LOG_INFO, "rbl %s loaded, %d IPs", file, db->ips.len);
     return db;
 }
 
@@ -177,29 +174,29 @@ void rbldb_delete(rbldb_t **db)
 {
     if (*db) {
         if ((*db)->locked) {
-            (void)munlock((*db)->ips, (*db)->len * sizeof(*(*db)->ips));
+            array_unlock((*db)->ips);
         }
-        p_delete(&(*db)->ips);
+        array_wipe((*db)->ips);
         p_delete(&(*db));
     }
 }
 
 uint32_t rbldb_stats(rbldb_t *rbl)
 {
-    return rbl->len;
+    return rbl->ips.len;
 }
 
 bool rbldb_ipv4_lookup(rbldb_t *db, uint32_t ip)
 {
-    int l = 0, r = db->len;
+    int l = 0, r = db->ips.len;
 
     while (l < r) {
         int i = (r + l) / 2;
 
-        if (db->ips[i] == ip)
+        if (array_elt(db->ips, i) == ip)
             return true;
 
-        if (ip < db->ips[i]) {
+        if (ip < array_elt(db->ips, i)) {
             r = i;
         } else {
             l = i + 1;
