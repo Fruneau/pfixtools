@@ -39,12 +39,9 @@
 #include <stdarg.h>
 #include "mem.h"
 #include "str.h"
+#include "array.h"
 
-typedef struct buffer_t {
-    char *data;
-    ssize_t len;
-    ssize_t size;
-} buffer_t;
+typedef char_array_t buffer_t;
 
 #define BUFFER_INIT {NULL, 0, 0}
 
