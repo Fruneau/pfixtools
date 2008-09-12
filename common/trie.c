@@ -52,10 +52,10 @@ struct trie_entry_t {
 ARRAY(trie_entry_t)
 
 struct trie_t {
-    trie_entry_t_array_t entries;
-    char_array_t         c;
-    char_array_t         keys;
-    int_array_t          keys_offset;
+    A(trie_entry_t) entries;
+    A(char)         c;
+    A(char)         keys;
+    A(int)          keys_offset;
 
     bool locked;
 };

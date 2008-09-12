@@ -60,6 +60,7 @@
             p_delete(array);                                                   \
         }                                                                      \
     }
+#define A(Type) Type ## _array_t
 
 #define ARRAY_INIT { NULL, 0, 0 }
 
@@ -106,6 +107,16 @@
     } while (0)
 #define array_elt(array, n) (array).data[(n)]
 #define array_ptr(array, n) (array).data + (n)
+
+#define array_foreach(array, action)                                           \
+    for (int __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                         \
+        action(array_ptr(array, __Ai));                                        \
+    }
+#define array_deep_wipe(array, wipe)                                           \
+    do {                                                                       \
+        array_foreach(array, wipe);                                            \
+        array_wipe(array);                                                     \
+    } while (0)
 
 ARRAY(char)
 ARRAY(int)

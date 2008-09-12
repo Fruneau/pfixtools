@@ -41,7 +41,7 @@
 #include "str.h"
 #include "array.h"
 
-typedef char_array_t buffer_t;
+typedef A(char) buffer_t;
 
 #define BUFFER_INIT {NULL, 0, 0}
 
