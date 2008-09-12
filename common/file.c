@@ -33,104 +33,70 @@
  * Copyright © 2008 Florent Bruneau
  */
 
-#include "common.h"
-#include "str.h"
-#include "trie.h"
+#include <sys/mman.h>
+#include <sys/stat.h>
+
 #include "file.h"
 
-static trie_t *create_trie_from_file(const char *file)
+file_map_t *file_map_new(const char *file, bool memlock)
 {
-    trie_t *db;
-    file_map_t map;
-    const char *p, *end;
-    char line[BUFSIZ];
-
-    if (!file_map_open(&map, file, false)) {
+    file_map_t *map = p_new(file_map_t, 1);
+    if (!file_map_open(map, file, memlock)) {
+        p_delete(&map);
         return NULL;
     }
-    p   = map.map;
-    end = map.end;
-    while (end > p && end[-1] != '\n') {
-        --end;
-    }
-    if (end != map.end) {
-        syslog(LOG_WARNING, "file %s miss a final \\n, ignoring last line",
-               file);
-    }
-
-    db = trie_new();
-    while (p < end && p != NULL) {
-        const char *eol = (char *)memchr(p, '\n', end - p);
-        if (eol == NULL) {
-            eol = end;
-        }
-        if (eol - p > BUFSIZ) {
-            p = eol - BUFSIZ;
-        }
-        int i = 0;
-#if 1
-        for (const char *s = eol - 1 ; s >= p ; --s) {
-            line[i++] = ascii_tolower(*s);
-        }
-#else
-        memcpy(line, p, eol - p);
-        i = eol - p;
-#endif
-        line[i] = '\0';
-        trie_insert(db, line);
-        p = eol + 1;
-    }
-    file_map_close(&map);
-    trie_compile(db, false);
-    return db;
+    return map;
 }
 
-
-int main(int argc, char *argv[])
+void file_map_delete(file_map_t **map)
 {
-    /* Trivial tests
-     */
-    trie_t *trie = trie_new();
-    trie_insert(trie, "abcde123456789");
-    trie_insert(trie, "abcde123654789");
-    trie_insert(trie, "abcdefghi");
-    trie_insert(trie, "coucou");
-    trie_insert(trie, "coucou chez vous");
-    trie_insert(trie, "debout !");
-    trie_compile(trie, false);
-    trie_inspect(trie, true);
-
-#define ASSERT_TRUE(str)                            \
-    if (!trie_lookup(trie, str)) {                  \
-        printf("\"%s\" not found in trie\n", str);  \
-        return 1;                                   \
+    if (*map) {
+        file_map_close(*map);
+        p_delete(map);
     }
-#define ASSERT_FALSE(str)                           \
-    if (trie_lookup(trie, str)) {                   \
-        printf("\"%s\" found in trie\n", str);      \
-        return 1;                                   \
-    }
-    ASSERT_FALSE("");
-    ASSERT_FALSE("coucou ");
-    ASSERT_FALSE("abcde123");
-    ASSERT_FALSE("abcde");
-    ASSERT_FALSE("coucou chez vous tous");
-    ASSERT_TRUE("abcde123456789");
-    ASSERT_TRUE("abcde123456789");
-    ASSERT_TRUE("abcde123654789");
-    ASSERT_TRUE("abcdefghi");
-    ASSERT_TRUE("coucou");
-    ASSERT_TRUE("coucou chez vous");
-    ASSERT_TRUE("debout !");
+}
 
-    trie_delete(&trie);
+bool file_map_open(file_map_t *map, const char *file, bool memlock)
+{
+    struct stat st;
+    int fd;
 
-    /* Perf test
-     */
-    if (argc > 1) {
-        trie = create_trie_from_file(argv[1]);
-        trie_inspect(trie, false);
-        trie_delete(&trie);
+    fd = open(file, O_RDONLY, 0000);
+    if (fd < 0) {
+        UNIXERR("open");
+        return false;
     }
-    return 0;
+
+    if (fstat(fd, &st) < 0) {
+        UNIXERR("fstat");
+        close(fd);
+        return false;
+    }
+
+    map->map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (map->map == MAP_FAILED) {
+        UNIXERR("mmap");
+        close(fd);
+        map->map = NULL;
+        return false;
+    }
+    close(fd);
+
+    map->end = map->map + st.st_size;
+    map->locked = memlock && mlock(map->map, st.st_size) == 0;
+    return true;
+}
+
+void file_map_close(file_map_t *map)
+{
+    if (!map->map) {
+        return;
+    }
+    if (map->locked) {
+        munlock(map->map, map->end - map->map);
+    }
+    munmap((void*)map->map, map->end - map->map);
+    map->map = NULL;
+    map->end = NULL;
+    map->locked = false;
 }

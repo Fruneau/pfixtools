@@ -35,14 +35,13 @@
  */
 
 #include <arpa/inet.h>
-#include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
 
 #include "common.h"
 #include "rbl.h"
 #include "str.h"
+#include "file.h"
 
 #define IPv4_BITS        5
 #define IPv4_PREFIX(ip)  ((uint32_t)(ip) >> IPv4_BITS)
@@ -119,35 +118,19 @@ static int parse_ipv4(const char *s, const char **out, uint32_t *ip)
 rbldb_t *rbldb_create(const char *file, bool lock)
 {
     rbldb_t *db;
-    const char *map, *p, *end;
-    struct stat st;
-    int fd;
+    file_map_t map;
+    const char *p, *end;
 
-    fd = open(file, O_RDONLY, 0000);
-    if (fd < 0) {
-        UNIXERR("open");
+    if (!file_map_open(&map, file, false)) {
         return NULL;
     }
 
-    if (fstat(fd, &st) < 0) {
-        UNIXERR("fstat");
-        close(fd);
-        return NULL;
-    }
-
-    p = map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (map == MAP_FAILED) {
-        UNIXERR("mmap");
-        close(fd);
-        return NULL;
-    }
-    close(fd);
-
-    end = map + st.st_size;
-    while (end > map && end[-1] != '\n') {
+    p   = map.map;
+    end = map.end;
+    while (end > p && end[-1] != '\n') {
         --end;
     }
-    if (end != map + st.st_size) {
+    if (end != map.end) {
         syslog(LOG_WARNING, "file %s miss a final \\n, ignoring last line",
                file);
     }
@@ -169,7 +152,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
             db->ips[db->len++] = ip;
         }
     }
-    munmap((void*)map, st.st_size);
+    file_map_close(&map);
 
     /* Lookup may perform serveral I/O, so avoid swap.
      */
