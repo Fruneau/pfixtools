@@ -53,6 +53,9 @@ void filter_register(const char *type, filter_constructor_t constructor,
 
 bool filter_build(filter_t *filter)
 {
+    if (filter->type == FTK_UNKNOWN || filter->name == NULL) {
+        return false;
+    }
     filter_constructor_t constructor = constructors[filter->type];
     if (constructor) {
         return constructor(filter);
@@ -66,8 +69,8 @@ void filter_wipe(filter_t *filter)
     if (destructor) {
         destructor(filter);
     }
-    p_delete(&filter->hooks);
-    p_delete(&filter->params);
+    array_deep_wipe(filter->hooks, filter_hook_wipe);
+    array_deep_wipe(filter->params, filter_params_wipe);
     p_delete(&filter->name);
 }
 
@@ -76,12 +79,11 @@ filter_result_t filter_run(const filter_t *filter, const query_t *query)
     return runners[filter->type](filter, query);
 }
 
-bool filter_set_name(filter_t *filter, const char *name, ssize_t len)
+void filter_set_name(filter_t *filter, const char *name, ssize_t len)
 {
     filter->name = p_new(char, len + 1);
     memcpy(filter->name, name, len);
     filter->name[len] = '\0';
-    return true;
 }
 
 bool filter_set_type(filter_t *filter, const char *type, ssize_t len)
@@ -93,11 +95,19 @@ bool filter_set_type(filter_t *filter, const char *type, ssize_t len)
 bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
                       const char *value, ssize_t value_len)
 {
+    filter_params_t param;
+    param.name = strdup(name);
+    param.value = strdup(value);
+    array_add(filter->params, param);
     return true;
 }
 
 bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
                      const char *value, ssize_t value_len)
 {
+    filter_hook_t hook;
+    hook.name  = strdup(name);
+    hook.value = strdup(value);
+    array_add(filter->hooks, hook);
     return true;
 }

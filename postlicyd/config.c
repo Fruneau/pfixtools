@@ -38,10 +38,8 @@
 #include "config.h"
 
 struct config_t {
-    filter_t *filters;
-    int filters_len;
-    int filters_size;
-
+    A(filter_t)        filters;
+    A(filter_params_t) params;
     int entry_point;
 };
 
@@ -55,17 +53,16 @@ static inline config_t *config_new(void)
 void config_delete(config_t **config)
 {
     if (*config) {
-        for (int i = 0 ; i < (*config)->filters_len ; ++i) {
-            filter_wipe((*config)->filters + i);
-        }
-        p_delete(&(*config)->filters);
+        array_deep_wipe((*config)->filters, filter_wipe);
+        array_deep_wipe((*config)->params, filter_params_wipe);
+        p_delete(config);
     }
 }
 
 config_t *config_read(const char *file)
 {
     config_t *config;
-    //filter_t *filter = NULL;
+    filter_t filter;
     file_map_t map;
     const char *p;
     int line = 0;
@@ -217,8 +214,8 @@ read_param_value:
     goto read_section;
 
 read_filter:
-    /* TODO: Create a filter with the given name.
-     */
+    filter_init(&filter);
+    filter_set_name(&filter, key, key_len);
     READ_BLANK(goto badeof);
     while (*p != '}') {
         READ_TOKEN("filter parameter name", key, key_len);
@@ -230,12 +227,28 @@ read_filter:
         READ_BLANK(goto badeof);
         READ_STRING("filter parameter value", value, value_len, goto badeof);
         READ_BLANK(goto badeof);
-        /* TODO: Insert parameter in the filter.
-         */
+        if (strcmp(key, "type") == 0) {
+            if (!filter_set_type(&filter, value, value_len)) {
+                READ_ERROR("unknow filter type (%s) for filter %s",
+                           value, filter.name);
+            }
+        } else if (key_len > 3 && strncmp(key, "on_", 3) == 0) {
+            if (!filter_add_hook(&filter, key + 3, key_len - 3,
+                                 value, value_len)) {
+                READ_ERROR("hook %s not supported by filter %s",
+                           key + 3, filter.name);
+            }
+        } else {
+            if (!filter_add_param(&filter, key, key_len, value, value_len)) {
+                goto error;
+            }
+        }
     }
     READ_NEXT(;);
-    /* TODO: Check the filter.
-     */
+    if (!filter_build(&filter)) {
+        READ_ERROR("invalid filter %s", filter.name);
+    }
+    array_add(config->filters, filter);
     goto read_section;
 
 ok:
