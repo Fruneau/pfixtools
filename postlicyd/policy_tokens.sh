@@ -59,7 +59,7 @@ extern const char *ptokens[PTK_count];
 
 __attribute__((pure))
 postlicyd_token policy_tokenize(const char *s, ssize_t len);
-#endif /* MUTT_LIB_LUA_LUA_TOKEN_H */
+#endif /* PFIXTOOLS_POLICY_TOKENS_H */
 EOF
 }
 

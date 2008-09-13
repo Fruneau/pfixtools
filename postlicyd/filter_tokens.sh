@@ -59,7 +59,7 @@ extern const char *ftokens[FTK_count];
 
 __attribute__((pure))
 filter_token filter_tokenize(const char *s, ssize_t len);
-#endif /* MUTT_LIB_LUA_LUA_TOKEN_H */
+#endif /* PFIXTOOLS_FILTERS_TOKENS_H */
 EOF
 }
 
@@ -108,7 +108,7 @@ EOF
 }
 
 grep_self() {
-    grep '^## ' "$1" | cut -d' ' -f2
+    grep 'filter_register( *"' *.c | sed 's/.*filter_register( *"\(.*\)" *,.*/\1/'
 }
 
 trap "rm -f $1" 1 2 3 15
@@ -121,8 +121,3 @@ esac
 chmod -w $1
 
 exit 0
-
-############ Put tokens here ############
-## rbl
-## greylist
-## poisonous
