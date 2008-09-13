@@ -48,6 +48,7 @@
     }
 #define ARRAY(Type)                                                            \
     typedef PRIV_ARRAY(Type) Type ## _array_t;                                 \
+    typedef PRIV_ARRAY(Type*) Type ## _ptr_array_t;                            \
                                                                                \
     static inline Type ## _array_t *Type ## _array_new(void)                   \
     {                                                                          \
@@ -60,8 +61,22 @@
             array_wipe(**array);                                               \
             p_delete(array);                                                   \
         }                                                                      \
+    }                                                                          \
+                                                                               \
+    static inline Type ## _ptr_array_t *Type ## _ptr_array_new(void)           \
+    {                                                                          \
+        return p_new(Type ## _ptr_array_t, 1);                                 \
+    }                                                                          \
+                                                                               \
+    static inline void Type ## _ptr_array_delete(Type ## _ptr_array_t **array) \
+    {                                                                          \
+        if (*array) {                                                          \
+            array_wipe(**array);                                               \
+            p_delete(array);                                                   \
+        }                                                                      \
     }
 #define A(Type) Type ## _array_t
+#define PA(Type) Type ## _ptr_array_t
 
 #define ARRAY_INIT { NULL, 0, 0 }
 

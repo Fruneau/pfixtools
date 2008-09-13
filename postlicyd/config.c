@@ -36,6 +36,7 @@
 #include "file.h"
 #include "filter.h"
 #include "config.h"
+#include "str.h"
 
 struct config_t {
     A(filter_t)        filters;
@@ -234,8 +235,8 @@ read_param_value:
     READ_STRING("parameter value", value, value_len, ;);
     {
         filter_params_t param;
-        param.name = strdup(key);
-        param.value = strdup(value);
+        param.name = m_strdup(key);
+        param.value = m_strdup(value);
         array_add(config->params, param);
     }
     goto read_section;

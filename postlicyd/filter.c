@@ -46,6 +46,9 @@ void filter_register(const char *type, filter_constructor_t constructor,
 {
     filter_token tok = filter_tokenize(type, m_strlen(type));
     assert(tok != FTK_UNKNOWN && "Unknown filter type");
+
+    syslog(LOG_INFO, "filter type %s registered", type);
+
     runners[tok] = runner;
     constructors[tok] = constructor;
     destructors[tok] = destructor;
@@ -121,8 +124,8 @@ bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
                       const char *value, ssize_t value_len)
 {
     filter_params_t param;
-    param.name = strdup(name);
-    param.value = strdup(value);
+    param.name = m_strdup(name);
+    param.value = m_strdup(value);
     array_add(filter->params, param);
     return true;
 }
@@ -131,9 +134,9 @@ bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
                      const char *value, ssize_t value_len)
 {
     filter_hook_t hook;
-    hook.name  = strdup(name);
+    hook.name  = m_strdup(name);
     hook.postfix = (strncmp(value, "postfix:", 8) == 0);
-    hook.value = strdup(hook.postfix ? value + 8 : value);
+    hook.value = m_strdup(hook.postfix ? value + 8 : value);
     hook.filter_id = -1;
     array_add(filter->hooks, hook);
     return true;

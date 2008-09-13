@@ -52,6 +52,8 @@
 #define DEBUG(...)
 #endif
 
+/* Implementation */
+
 enum {
     BALANCED    = 0,
     LEFT_HEAVY  = 1,
@@ -62,6 +64,7 @@ struct rbldb_t {
     A(uint32_t) ips;
     bool        locked;
 };
+ARRAY(rbldb_t)
 
 static int get_o(const char *s, const char **out)
 {
@@ -170,23 +173,28 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     return db;
 }
 
+static void rbldb_wipe(rbldb_t *db)
+{
+    if (db->locked) {
+      array_unlock(db->ips);
+    }
+    array_wipe(db->ips);
+}
+
 void rbldb_delete(rbldb_t **db)
 {
     if (*db) {
-        if ((*db)->locked) {
-            array_unlock((*db)->ips);
-        }
-        array_wipe((*db)->ips);
+        rbldb_wipe(*db);
         p_delete(&(*db));
     }
 }
 
-uint32_t rbldb_stats(rbldb_t *rbl)
+uint32_t rbldb_stats(const rbldb_t *rbl)
 {
     return rbl->ips.len;
 }
 
-bool rbldb_ipv4_lookup(rbldb_t *db, uint32_t ip)
+bool rbldb_ipv4_lookup(const rbldb_t *db, uint32_t ip)
 {
     int l = 0, r = db->ips.len;
 
@@ -204,3 +212,171 @@ bool rbldb_ipv4_lookup(rbldb_t *db, uint32_t ip)
     }
     return false;
 }
+
+
+/* postlicyd filter declaration */
+
+#include "filter.h"
+
+typedef struct rbl_filter_t {
+    PA(rbldb_t) rbls;
+    A(int)      weights;
+
+    int32_t     hard_threshold;
+    int32_t     soft_threshold;
+} rbl_filter_t;
+
+static rbl_filter_t *rbl_filter_new(void)
+{
+    return p_new(rbl_filter_t, 1);
+}
+
+static void rbl_filter_delete(rbl_filter_t **rbl)
+{
+    if (*rbl) {
+        array_deep_wipe((*rbl)->rbls, rbldb_delete);
+        array_wipe((*rbl)->weights);
+        p_delete(rbl);
+    }
+}
+
+
+static bool rbl_filter_constructor(filter_t *filter)
+{
+    rbl_filter_t *data = rbl_filter_new();
+
+#define PARSE_CHECK(Expr, Str, ...)                                            \
+    if (!(Expr)) {                                                             \
+        syslog(LOG_ERR, Str, ##__VA_ARGS__);                                   \
+        rbl_filter_delete(&data);                                              \
+        return false;                                                          \
+    }
+
+    foreach (filter_params_t *param, filter->params) {
+        /* file parameter is:
+         *  [no]lock:weight:filename
+         *  valid options are:
+         *    - lock:   memlock the database in memory.
+         *    - nolock: don't memlock the database in memory [default].
+         *    - \d+:    a number describing the weight to give to the match
+         *              the given list [mandatory]
+         *  the file pointed by filename MUST be a valid ip list issued from
+         *  the rsync (or equivalent) service of a (r)bl.
+         */
+        if (strcmp(param->name, "file") == 0) {
+            bool lock = false;
+            int  weight = 0;
+            rbldb_t *rbl = NULL;
+            const char *current = param->value;
+            const char *p = m_strchrnul(param->value, ':');
+            char *next = NULL;
+            for (int i = 0 ; i < 3 ; ++i) {
+                PARSE_CHECK(i == 2 || *p, 
+                            "file parameter must contains a locking state and a weight option");
+                switch (i) {
+                  case 0:
+                    if ((p - current) == 4 && strncmp(current, "lock", 4) == 0) {
+                        lock = true;
+                    } else if ((p - current) == 6 && strncmp(current, "nolock", 6) == 0) {
+                        lock = false;
+                    } else {
+                        PARSE_CHECK(false, "illegal locking state %.*s",
+                                    p - current, current);
+                    }
+                    break;
+
+                  case 1:
+                    weight = strtol(current, &next, 10);
+                    PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
+                                "illegal weight value %.*s",
+                                (p - current), current);
+                    break;
+
+                  case 2:
+                    rbl = rbldb_create(current, lock);
+                    PARSE_CHECK(rbl != NULL,
+                                "cannot load rbl db from %s", current);
+                    array_add(data->rbls, rbl);
+                    array_add(data->weights, weight);
+                    break;
+                }
+                current = p + 1;
+                p = m_strchrnul(current, ':');
+            }
+
+        /* hard_threshold parameter is an integer.
+         *  If the matching score of a ip get a score gretter than this threshold,
+         *  the hook "hard_match" is called.
+         * hard_threshold = 0 means, that all matches are hard matches.
+         * default is 0;
+         */
+        } else if (strcmp(param->name, "hard_threshold") == 0) {
+            char *next;
+            data->hard_threshold = strtol(param->value, &next, 10);
+            PARSE_CHECK(*next, "invalid threshold value %s", param->value);
+
+        /* soft_threshold parameter is an integer.
+         *  if the matching score of an ip get a score getter than this threshold
+         *  and smaller or equal than the hard_threshold, the hook "soft_match"
+         *  is called.
+         * default is 0;
+         */
+        } else if (strcmp(param->name, "hard_threshold") == 0) {
+            char *next;
+            data->soft_threshold = strtol(param->value, &next, 10);
+            PARSE_CHECK(*next, "invalid threshold value %s", param->value);
+
+        } else {
+            syslog(LOG_INFO, "ignored parameter %s in rbl filter %s",
+                   filter->name, param->name);
+        }
+    }}
+
+    PARSE_CHECK(data->rbls.len, 
+                "no file parameter in the filter %s", filter->name);
+    filter->data = data;
+    return true;
+}
+
+static void rbl_filter_destructor(filter_t *filter)
+{
+    rbl_filter_t *data = filter->data;
+    rbl_filter_delete(&data);
+    filter->data = data;
+}
+
+static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
+{
+    uint32_t ip;
+    int32_t sum = 0;
+    const char *end = NULL;
+    const rbl_filter_t *data = filter->data;
+
+    if (parse_ipv4(query->client_address, &end, &ip) != 0) {
+        syslog(LOG_WARNING, "invalid client address: %s, expected ipv4",
+               query->client_address);
+        return "error";
+    }
+    for (int i = 0 ; i < data->rbls.len ; ++i) {
+        const rbldb_t *rbl = array_elt(data->rbls, i);
+        int weight   = array_elt(data->weights, i);
+        if (rbldb_ipv4_lookup(rbl, ip)) {
+            sum += weight;
+        }
+    }
+    if (sum > data->hard_threshold) {
+        return "hard_match";
+    } else if (sum > data->soft_threshold) {
+        return "soft_match";
+    } else {
+        return "fail";
+    }
+}
+
+static int rbl_init(void)
+{
+    filter_register("rbl", rbl_filter_constructor, rbl_filter_destructor,
+                    rbl_filter);
+    return 0;
+}
+module_init(rbl_init);
