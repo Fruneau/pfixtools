@@ -53,13 +53,38 @@ void filter_register(const char *type, filter_constructor_t constructor,
 
 bool filter_build(filter_t *filter)
 {
+    bool ret = true;
     if (filter->type == FTK_UNKNOWN || filter->name == NULL) {
         return false;
     }
+    if (filter->hooks.len > 0) {
+#       define QSORT_TYPE filter_hook_t
+#       define QSORT_BASE filter->hooks.data
+#       define QSORT_NELT filter->hooks.len
+#       define QSORT_LT(a,b) strcmp(a->name, b->name) < 0
+#       include "qsort.c"
+    }
     filter_constructor_t constructor = constructors[filter->type];
     if (constructor) {
-        return constructor(filter);
+        ret = constructor(filter);
     }
+    array_deep_wipe(filter->params, filter_params_wipe);
+    return ret;
+}
+
+bool filter_update_references(filter_t *filter, A(filter_t) *filter_list)
+{
+    foreach (filter_hook_t *hook, filter->hooks) {
+        if (!hook->postfix) {
+            hook->filter_id = filter_find_with_name(filter_list, hook->value);
+            if (hook->filter_id == -1) {
+                syslog(LOG_ERR, "invalid filter name %s for hook %s",
+                       hook->value, hook->name);
+                return false;
+            }
+            p_delete(&hook->value);
+        }
+    }}
     return true;
 }
 
@@ -107,7 +132,9 @@ bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
 {
     filter_hook_t hook;
     hook.name  = strdup(name);
-    hook.value = strdup(value);
+    hook.postfix = (strncmp(value, "postfix:", 8) == 0);
+    hook.value = strdup(hook.postfix ? value + 8 : value);
+    hook.filter_id = -1;
     array_add(filter->hooks, hook);
     return true;
 }

@@ -109,6 +109,10 @@
 #define array_elt(array, n) (array).data[(n)]
 #define array_ptr(array, n) (array).data + (n)
 
+#define foreach(var, array)                                                    \
+    for (int __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                         \
+        var = array_ptr(array, __Ai);
+
 #define array_foreach(array, action)                                           \
     for (int __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                         \
         action(array_ptr(array, __Ai));                                        \

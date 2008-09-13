@@ -59,6 +59,28 @@ void config_delete(config_t **config)
     }
 }
 
+
+static bool config_second_pass(config_t *config)
+{
+    bool ok = true;
+    if (config->filters.len > 0) {
+#       define QSORT_TYPE filter_t
+#       define QSORT_BASE config->filters.data
+#       define QSORT_NELT config->filters.len
+#       define QSORT_LT(a,b) strcmp(a->name, b->name) < 0
+#       include "qsort.c"
+    }
+
+    foreach (filter_t *filter, config->filters) {
+        if (!filter_update_references(filter, &config->filters)) {
+            ok = false;
+            break;
+        }
+    }}
+
+    return ok;
+}
+
 config_t *config_read(const char *file)
 {
     config_t *config;
@@ -77,6 +99,7 @@ config_t *config_read(const char *file)
     }
 
     config = config_new();
+    filter_init(&filter);
     linep = p = map.map;
 
 #define READ_ERROR(Fmt, ...)                                                   \
@@ -209,12 +232,15 @@ read_section:
 read_param_value:
     READ_BLANK(goto badeof);
     READ_STRING("parameter value", value, value_len, ;);
-    /* TODO: Insert parameter in the configuration.
-     */
+    {
+        filter_params_t param;
+        param.name = strdup(key);
+        param.value = strdup(value);
+        array_add(config->params, param);
+    }
     goto read_section;
 
 read_filter:
-    filter_init(&filter);
     filter_set_name(&filter, key, key_len);
     READ_BLANK(goto badeof);
     while (*p != '}') {
@@ -249,15 +275,22 @@ read_filter:
         READ_ERROR("invalid filter %s", filter.name);
     }
     array_add(config->filters, filter);
+    filter_init(&filter);
     goto read_section;
 
 ok:
+    if (!config_second_pass(config)) {
+        goto error;
+    }
+    file_map_close(&map);
     return config;
 
 badeof:
     syslog(LOG_ERR, "Unexpected end of file");
 
 error:
+    filter_wipe(&filter);
     config_delete(&config);
+    file_map_close(&map);
     return NULL;
 }

@@ -46,6 +46,9 @@ typedef filter_token filter_type_t;
 typedef struct filter_hook_t {
     char *name;
     char *value;
+
+    bool postfix;
+    int filter_id;
 } filter_hook_t;
 ARRAY(filter_hook_t)
 
@@ -60,12 +63,13 @@ typedef struct filter_t {
     filter_type_t type;
 
     A(filter_hook_t)   hooks;
-    A(filter_params_t) params;
     void *data;
+
+    A(filter_params_t) params;
 } filter_t;
 ARRAY(filter_t)
 
-#define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, ARRAY_INIT, NULL }
+#define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, NULL, ARRAY_INIT }
 
 typedef const char *filter_result_t;
 typedef filter_result_t (*filter_runner_t)(const filter_t *filter,
@@ -100,6 +104,30 @@ bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
 
 __attribute__((nonnull(1)))
 bool filter_build(filter_t *filter);
+
+__attribute__((nonnull(1,2)))
+static inline int filter_find_with_name(A(filter_t) *array, const char *name)
+{
+    int start = 0;
+    int end   = array->len;
+
+    while (start < end) {
+        int mid = (start + end) / 2;
+        int cmp = strcmp(name, array_elt(*array, mid).name);
+
+        if (cmp == 0) {
+            return mid;
+        } else if (cmp < 0) {
+            end = mid;
+        } else {
+            start = mid + 1;
+        }
+    }
+    return -1;
+}
+
+__attribute__((nonnull(1,2)))
+bool filter_update_references(filter_t *filter, A(filter_t) *array);
 
 __attribute__((nonnull(1)))
 static inline void filter_hook_wipe(filter_hook_t *hook)
