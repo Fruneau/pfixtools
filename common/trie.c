@@ -150,7 +150,7 @@ static inline int trie_entry_new(trie_t *trie)
 {
     const trie_entry_t e = TRIE_ENTRY_INIT;
     array_add(trie->entries, e);
-    return trie->entries.len;
+    return trie->entries.len - 1;
 }
 
 static inline int trie_add_leaf(trie_t *trie, const char *key)
