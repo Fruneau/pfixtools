@@ -277,6 +277,10 @@ int main(int argc, char *argv[])
         || start_listener(port) < 0) {
         return EXIT_FAILURE;
     }
-    return server_loop(query_starter, (delete_client_t)query_delete,
-                       policy_run, NULL);
+    {
+        int res = server_loop(query_starter, (delete_client_t)query_delete,
+                              policy_run, config);
+        config_delete(&config);
+        return res;
+    }
 }

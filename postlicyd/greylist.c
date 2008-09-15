@@ -78,8 +78,8 @@ static bool greylist_initialize(greylist_config_t *config,
         if (!tcbdbopen(config->awl_db, path, BDBOWRITER | BDBOCREAT)) {
             tcbdbdel(config->awl_db);
             config->awl_db = NULL;
+            return false;
         }
-        return false;
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
@@ -216,6 +216,7 @@ static bool try_greylist(const greylist_config_t *config,
 
             /* OK.
              */
+            syslog(LOG_INFO, "client whitelisted");
             return true;
         }
     }
@@ -259,11 +260,13 @@ static bool try_greylist(const greylist_config_t *config,
 
         /* OK
          */
+        syslog(LOG_INFO, "client whitelisted");
         return true;
     }
 
     /* DUNNO
      */
+    syslog(LOG_INFO, "client greylisted");
     return false;
 }
 

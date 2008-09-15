@@ -49,7 +49,7 @@ filter_type_t filter_register(const char *type, filter_constructor_t constructor
     filter_token tok = filter_tokenize(type, m_strlen(type));
     CHECK_FILTER(tok);
 
-    syslog(LOG_INFO, "filter type %s registered", type);
+    syslog(LOG_DEBUG, "filter type %s registered", type);
 
     runners[tok] = runner;
     constructors[tok] = constructor;
@@ -64,7 +64,7 @@ filter_result_t filter_hook_register(filter_type_t filter,
     CHECK_FILTER(filter);
     CHECK_HOOK(tok);
 
-    syslog(LOG_INFO, "hook %s registered for filter type %s", name,
+    syslog(LOG_DEBUG, "hook %s registered for filter type %s", name,
            ftokens[filter]);
 
     hooks[filter][tok] = true;
