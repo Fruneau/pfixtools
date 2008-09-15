@@ -34,19 +34,12 @@
  */
 
 #include "file.h"
-#include "filter.h"
 #include "config.h"
 #include "str.h"
 
 #define config_param_register(Param)
 
 config_param_register("first_filter");
-
-struct config_t {
-    A(filter_t)        filters;
-    A(filter_params_t) params;
-    int entry_point;
-};
 
 static inline config_t *config_new(void)
 {
@@ -82,6 +75,23 @@ static bool config_second_pass(config_t *config)
             break;
         }
     }}
+
+    config->entry_point = -1;
+    foreach (filter_param_t *param, config->params) {
+        switch (param->type) {
+          case ATK_FIRST_FILTER:
+            config->entry_point = filter_find_with_name(&config->filters,
+                                                        param->value);
+            break;
+          default: break;
+        }
+    }}
+    array_deep_wipe(config->params, filter_params_wipe);
+
+    if (config->entry_point == -1) {
+        ok = false;
+        syslog(LOG_ERR, "no entry point defined");
+    }
 
     return ok;
 }
@@ -238,7 +248,7 @@ read_param_value:
     READ_BLANK(goto badeof);
     READ_STRING("parameter value", value, value_len, ;);
     {
-        filter_params_t param;
+        filter_param_t param;
         param.type  = param_tokenize(key, key_len);
         if (param.type != ATK_UNKNOWN) {
             param.value = m_strdup(value);

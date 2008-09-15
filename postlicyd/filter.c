@@ -154,7 +154,7 @@ bool filter_set_type(filter_t *filter, const char *type, ssize_t len)
 bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
                       const char *value, ssize_t value_len)
 {
-    filter_params_t param;
+    filter_param_t param;
     param.type = param_tokenize(name, name_len);
     if (param.type == ATK_UNKNOWN) {
         syslog(LOG_ERR, "unknown parameter %.*s", name_len, name);

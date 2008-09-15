@@ -56,11 +56,11 @@ typedef struct filter_hook_t {
 } filter_hook_t;
 ARRAY(filter_hook_t)
 
-typedef struct filter_params_t {
+typedef struct filter_param_t {
     filter_param_id_t type;
     char *value;
-} filter_params_t;
-ARRAY(filter_params_t)
+} filter_param_t;
+ARRAY(filter_param_t)
 
 typedef struct filter_t {
     char *name;
@@ -69,7 +69,7 @@ typedef struct filter_t {
     A(filter_hook_t)   hooks;
     void *data;
 
-    A(filter_params_t) params;
+    A(filter_param_t) params;
 } filter_t;
 ARRAY(filter_t)
 
@@ -154,7 +154,7 @@ static inline void filter_hook_wipe(filter_hook_t *hook)
 }
 
 __attribute__((nonnull(1)))
-static inline void filter_params_wipe(filter_params_t *param)
+static inline void filter_params_wipe(filter_param_t *param)
 {
     p_delete(&param->value);
 }

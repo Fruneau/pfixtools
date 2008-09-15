@@ -252,7 +252,7 @@ static bool rbl_filter_constructor(filter_t *filter)
         return false;                                                          \
     }
 
-    foreach (filter_params_t *param, filter->params) {
+    foreach (filter_param_t *param, filter->params) {
         switch (param->type) {
           /* file parameter is:
            *  [no]lock:weight:filename

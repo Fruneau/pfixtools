@@ -36,7 +36,15 @@
 #ifndef PFIXTOOLS_CONFIG_H
 #define PFIXTOOLS_CONFIG_H
 
+#include "filter.h"
+
 typedef struct config_t config_t;
+
+struct config_t {
+    A(filter_t)        filters;
+    A(filter_param_t)  params;
+    int entry_point;
+};
 
 __attribute__((nonnull(1)))
 config_t *config_read(const char *file);
