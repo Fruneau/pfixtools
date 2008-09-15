@@ -317,7 +317,7 @@ static bool rbl_filter_constructor(filter_t *filter)
           case ATK_HARD_THRESHOLD: {
             char *next;
             data->hard_threshold = strtol(param->value, &next, 10);
-            PARSE_CHECK(*next, "invalid threshold value %s", param->value);
+            PARSE_CHECK(!*next, "invalid threshold value %s", param->value);
           } break;
 
           /* soft_threshold parameter is an integer.
@@ -329,7 +329,7 @@ static bool rbl_filter_constructor(filter_t *filter)
           case ATK_SOFT_THRESHOLD: {
             char *next;
             data->soft_threshold = strtol(param->value, &next, 10);
-            PARSE_CHECK(*next, "invalid threshold value %s", param->value);
+            PARSE_CHECK(!*next, "invalid threshold value %s", param->value);
           } break;
 
           default: break;

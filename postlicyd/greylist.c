@@ -36,16 +36,25 @@
 #include <tcbdb.h>
 
 #include "common.h"
-#include "greylist.h"
 #include "str.h"
 
-struct greylist_cfg greylist_cfg = {
-   .lookup_by_host = false,
-   .delay          = 300,
-   .retry_window   = 2 * 24 * 2600,
-   .client_awl     = 5,
-};
-static TCBDB *awl_db, *obj_db;
+
+typedef struct greylist_config_t {
+    unsigned lookup_by_host : 1;
+    int delay;
+    int retry_window;
+    int client_awl;
+
+    TCBDB *awl_db;
+    TCBDB *obj_db;
+} greylist_config_t;
+
+#define GREYLIST_INIT { .lookup_by_host = false,       \
+                        .delay = 300,                  \
+                        .retry_window = 2 * 24 * 2600, \
+                        .client_awl = 5,               \
+                        .awl_db = NULL,                \
+                        .obj_db = NULL }
 
 struct awl_entry {
     int32_t count;
@@ -57,51 +66,52 @@ struct obj_entry {
     time_t last;
 };
 
-int greylist_initialize(const char *directory, const char *prefix)
+
+static bool greylist_initialize(greylist_config_t *config,
+                                const char *directory, const char *prefix)
 {
     char path[PATH_MAX];
 
-    if (greylist_cfg.client_awl) {
+    if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        awl_db = tcbdbnew();
-        if (!tcbdbopen(awl_db, path, BDBOWRITER | BDBOCREAT)) {
-            tcbdbdel(awl_db);
-            awl_db = NULL;
+        config->awl_db = tcbdbnew();
+        if (!tcbdbopen(config->awl_db, path, BDBOWRITER | BDBOCREAT)) {
+            tcbdbdel(config->awl_db);
+            config->awl_db = NULL;
         }
-        return -1;
+        return false;
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    obj_db = tcbdbnew();
-    if (!tcbdbopen(obj_db, path, BDBOWRITER | BDBOCREAT)) {
-        tcbdbdel(obj_db);
-        obj_db = NULL;
-        if (awl_db) {
-            tcbdbdel(awl_db);
-            awl_db = NULL;
+    config->obj_db = tcbdbnew();
+    if (!tcbdbopen(config->obj_db, path, BDBOWRITER | BDBOCREAT)) {
+        tcbdbdel(config->obj_db);
+        config->obj_db = NULL;
+        if (config->awl_db) {
+            tcbdbdel(config->awl_db);
+            config->awl_db = NULL;
         }
-        return -1;
+        return false;
     }
 
-    return 0;
+    return true;
 }
 
-static void greylist_shutdown(void)
+static void greylist_shutdown(greylist_config_t *config)
 {
-    if (awl_db) {
-        tcbdbsync(awl_db);
-        tcbdbdel(awl_db);
-        awl_db = NULL;
+    if (config->awl_db) {
+        tcbdbsync(config->awl_db);
+        tcbdbdel(config->awl_db);
+        config->awl_db = NULL;
     }
-    if (obj_db) {
-        tcbdbsync(obj_db);
-        tcbdbdel(obj_db);
-        obj_db = NULL;
+    if (config->obj_db) {
+        tcbdbsync(config->obj_db);
+        tcbdbdel(config->obj_db);
+        config->obj_db = NULL;
     }
 }
-module_exit(greylist_shutdown);
 
-const char *sender_normalize(const char *sender, char *buf, int len)
+static const char *sender_normalize(const char *sender, char *buf, int len)
 {
     const char *at = strchr(sender, '@');
     int rpos = 0, wpos = 0, userlen;
@@ -136,13 +146,14 @@ const char *sender_normalize(const char *sender, char *buf, int len)
     return buf;
 }
 
-static const char *
-c_net(const char *c_addr, const char *c_name, char *cnet, int cnetlen)
+static const char *c_net(const greylist_config_t *config,
+                         const char *c_addr, const char *c_name,
+                         char *cnet, int cnetlen)
 {
     char ip2[4], ip3[4];
     const char *dot, *p;
 
-    if (greylist_cfg.lookup_by_host)
+    if (config->lookup_by_host)
         return c_addr;
 
     if (!(dot = strchr(c_addr, '.')))
@@ -169,13 +180,15 @@ c_net(const char *c_addr, const char *c_name, char *cnet, int cnetlen)
     return cnet;
 }
 
-bool try_greylist(const char *sender, const char *c_addr,
-                  const char *c_name, const char *rcpt)
+static bool try_greylist(const greylist_config_t *config,
+                         const char *sender, const char *c_addr,
+                         const char *c_name, const char *rcpt)
 {
 #define INCR_AWL                                              \
     aent.count++;                                             \
     aent.last = now;                                          \
-    tcbdbput(awl_db, c_addr, c_addrlen, &aent, sizeof(aent));
+    tcbdbput(config->awl_db, c_addr, c_addrlen, &aent,        \
+             sizeof(aent));
 
     char sbuf[BUFSIZ], cnet[64], key[BUFSIZ];
     const void *res;
@@ -188,15 +201,15 @@ bool try_greylist(const char *sender, const char *c_addr,
 
     /* Auto whitelist clients.
      */
-    if (greylist_cfg.client_awl) {
-        res = tcbdbget3(awl_db, c_addr, c_addrlen, &len);
+    if (config->client_awl) {
+        res = tcbdbget3(config->awl_db, c_addr, c_addrlen, &len);
         if (res && len == sizeof(aent)) {
             memcpy(&aent, res, len);
         }
 
         /* Whitelist if count is enough.
          */
-        if (aent.count > greylist_cfg.client_awl) {
+        if (aent.count > config->client_awl) {
             if (now < aent.last + 3600) {
                 INCR_AWL
             }
@@ -210,11 +223,11 @@ bool try_greylist(const char *sender, const char *c_addr,
     /* Lookup.
      */
     klen = snprintf(key, sizeof(key), "%s/%s/%s",
-                    c_net(c_addr, c_name, cnet, sizeof(cnet)),
+                    c_net(config, c_addr, c_name, cnet, sizeof(cnet)),
                     sender_normalize(sender, sbuf, sizeof(sbuf)), rcpt);
     klen = MIN(klen, ssizeof(key) - 1);
 
-    res = tcbdbget3(obj_db, key, klen, &len);
+    res = tcbdbget3(config->obj_db, key, klen, &len);
     if (res && len == sizeof(oent)) {
         memcpy(&oent, res, len);
     }
@@ -222,15 +235,15 @@ bool try_greylist(const char *sender, const char *c_addr,
     /* Discard stored first-seen if it is the first retrial and
      * it is beyong the retry window.
      */
-    if (oent.last - oent.first < greylist_cfg.delay
-        &&  now - oent.first > greylist_cfg.retry_window) {
+    if (oent.last - oent.first < config->delay
+        &&  now - oent.first > config->retry_window) {
         oent.first = now;
     }
 
     /* Update.
      */
     oent.last = now;
-    tcbdbput(obj_db, key, klen, &oent, sizeof(oent));
+    tcbdbput(config->obj_db, key, klen, &oent, sizeof(oent));
 
     /* Auto whitelist clients:
      *  algorithm:
@@ -239,8 +252,8 @@ bool try_greylist(const char *sender, const char *c_addr,
      *                                       -> withelist if count > limit
      *        - client whitelisted already ? -> update last-seen timestamp.
      */
-    if (oent.first + greylist_cfg.delay < now) {
-        if (greylist_cfg.client_awl) {
+    if (oent.first + config->delay < now) {
+        if (config->client_awl) {
             INCR_AWL
         }
 
@@ -253,3 +266,110 @@ bool try_greylist(const char *sender, const char *c_addr,
      */
     return false;
 }
+
+
+/* postlicyd filter declaration */
+
+#include "filter.h"
+
+static greylist_config_t *greylist_config_new(void)
+{
+    const greylist_config_t g = GREYLIST_INIT;
+    greylist_config_t *config = p_new(greylist_config_t, 1);
+    *config = g;
+    return config;
+}
+
+static void greylist_config_delete(greylist_config_t **config)
+{
+    if (*config) {
+        greylist_shutdown(*config);
+        p_delete(config);
+    }
+}
+
+static bool greylist_filter_constructor(filter_t *filter)
+{
+    const char* path   = NULL;
+    const char* prefix = NULL;
+    greylist_config_t *config = greylist_config_new();
+
+#define PARSE_CHECK(Expr, Str, ...)                                            \
+    if (!(Expr)) {                                                             \
+        syslog(LOG_ERR, Str, ##__VA_ARGS__);                                   \
+        greylist_config_delete(&config);                                       \
+        return false;                                                          \
+    }
+
+    foreach (filter_param_t *param, filter->params) {
+        switch (param->type) {
+          case ATK_PATH:
+            path = param->value;
+            break;
+
+          case ATK_PREFIX:
+            prefix = param->value;
+            break;
+
+          case ATK_LOOKUP_BY_HOST:
+            config->lookup_by_host = (atoi(param->value) != 0);
+            break;
+
+          case ATK_RETRY_WINDOW:
+            config->retry_window = atoi(param->value);
+            break;
+
+          case ATK_CLIENT_AWL:
+            config->client_awl = atoi(param->value);
+            break;
+
+          default: break;
+        }
+    }}
+
+    PARSE_CHECK(path, "path to greylist db not given");
+    PARSE_CHECK(greylist_initialize(config, path, prefix ? prefix : ""),
+                "can not load greylist database");
+
+    filter->data = config;
+    return true;
+}
+
+static void greylist_filter_destructor(filter_t *filter)
+{
+    greylist_config_t *data = filter->data;
+    greylist_config_delete(&data);
+    filter->data = data;
+}
+
+static filter_result_t greylist_filter(const filter_t *filter,
+                                       const query_t *query)
+{
+    const greylist_config_t *config = filter->data;
+    return try_greylist(config, query->sender, query->client_address,
+                        query->client_name, query->recipient) ?
+           HTK_MATCH : HTK_FAIL;
+}
+
+static int greylist_init(void)
+{
+    filter_type_t type =  filter_register("greylist", greylist_filter_constructor,
+                                          greylist_filter_destructor,
+                                          greylist_filter);
+    /* Hooks.
+     */
+    (void)filter_hook_register(type, "error");
+    (void)filter_hook_register(type, "fail");
+    (void)filter_hook_register(type, "match");
+
+    /* Parameters.
+     */
+    (void)filter_param_register(type, "lookup_by_host");
+    (void)filter_param_register(type, "delay");
+    (void)filter_param_register(type, "retry_window");
+    (void)filter_param_register(type, "client_awl");
+    (void)filter_param_register(type, "path");
+    (void)filter_param_register(type, "prefix");
+    return 0;
+}
+module_init(greylist_init)
