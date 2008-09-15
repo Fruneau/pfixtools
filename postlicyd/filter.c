@@ -133,9 +133,26 @@ void filter_wipe(filter_t *filter)
     p_delete(&filter->name);
 }
 
-filter_result_t filter_run(const filter_t *filter, const query_t *query)
+filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
 {
-    return runners[filter->type](filter, query);
+    int start = 0;
+    int end   = filter->hooks.len;
+    filter_result_t res = runners[filter->type](filter, query);
+
+    while (start < end) {
+        int mid = (start + end) / 2;
+        filter_hook_t *hook = array_ptr(filter->hooks, mid);
+        if (hook->type == res) {
+            return hook;
+        } else if (res < hook->type) {
+            end = mid;
+        } else {
+            start = mid + 1;
+        }
+    }
+    syslog(LOG_WARNING, "missing hook %s for filter %s", 
+           htokens[res], filter->name);
+    return NULL;
 }
 
 void filter_set_name(filter_t *filter, const char *name, ssize_t len)

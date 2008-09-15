@@ -163,7 +163,7 @@ __attribute__((nonnull(1)))
 void filter_wipe(filter_t *filter);
 
 __attribute__((nonnull(1,2)))
-filter_result_t filter_run(const filter_t *filter, const query_t *query);
+filter_hook_t *filter_run(const filter_t *filter, const query_t *query);
 
 
 #endif

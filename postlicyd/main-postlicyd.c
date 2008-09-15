@@ -166,25 +166,31 @@ static void policy_answer(server_t *pcy, const char *fmt, ...)
     epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
 }
 
-static bool policy_run_filter(const query_t* query, void* filter, void* conf)
-{
-    return false;
-}
-
-static void policy_process(server_t *pcy)
+static void policy_process(server_t *pcy, config_t *config)
 {
     const query_t* query = pcy->data;
-    if (!policy_run_filter(query, NULL, NULL)) {
-        policy_answer(pcy, "DUNNO");
+    filter_t *filter = array_ptr(config->filters, config->entry_point);
+    while (true) {
+        filter_hook_t *hook = filter_run(filter, query);
+        if (hook == NULL) {
+            policy_answer(pcy, "DUNNO");
+            return;
+        } else if (hook->postfix) {
+            policy_answer(pcy, "%s", hook->value);
+            return;
+        } else {
+            filter = array_ptr(config->filters, hook->filter_id);
+        }
     }
 }
 
-static int policy_run(server_t *pcy, void* config)
+static int policy_run(server_t *pcy, void* vconfig)
 {
     ssize_t search_offs = MAX(0, pcy->ibuf.len - 1);
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
     const char *eoq;
-    query_t* query = pcy->data;
+    query_t  *query  = pcy->data;
+    config_t *config = vconfig;
 
     if (nb < 0) {
         if (errno == EAGAIN || errno == EINTR)
@@ -205,7 +211,7 @@ static int policy_run(server_t *pcy, void* config)
         return -1;
     query->eoq = eoq + strlen("\n\n");
     epoll_modify(pcy->fd, 0, pcy);
-    policy_process(pcy);
+    policy_process(pcy, config);
     return 0;
 }
 
