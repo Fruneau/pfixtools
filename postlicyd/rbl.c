@@ -253,17 +253,18 @@ static bool rbl_filter_constructor(filter_t *filter)
     }
 
     foreach (filter_params_t *param, filter->params) {
-        /* file parameter is:
-         *  [no]lock:weight:filename
-         *  valid options are:
-         *    - lock:   memlock the database in memory.
-         *    - nolock: don't memlock the database in memory [default].
-         *    - \d+:    a number describing the weight to give to the match
-         *              the given list [mandatory]
-         *  the file pointed by filename MUST be a valid ip list issued from
-         *  the rsync (or equivalent) service of a (r)bl.
-         */
-        if (strcmp(param->name, "file") == 0) {
+        switch (param->type) {
+          /* file parameter is:
+           *  [no]lock:weight:filename
+           *  valid options are:
+           *    - lock:   memlock the database in memory.
+           *    - nolock: don't memlock the database in memory [default].
+           *    - \d+:    a number describing the weight to give to the match
+           *              the given list [mandatory]
+           *  the file pointed by filename MUST be a valid ip list issued from
+           *  the rsync (or equivalent) service of a (r)bl.
+           */
+          case ATK_FILE: {
             bool lock = false;
             int  weight = 0;
             rbldb_t *rbl = NULL;
@@ -271,13 +272,15 @@ static bool rbl_filter_constructor(filter_t *filter)
             const char *p = m_strchrnul(param->value, ':');
             char *next = NULL;
             for (int i = 0 ; i < 3 ; ++i) {
-                PARSE_CHECK(i == 2 || *p, 
-                            "file parameter must contains a locking state and a weight option");
+                PARSE_CHECK(i == 2 || *p,
+                            "file parameter must contains a locking state "
+                            "and a weight option");
                 switch (i) {
                   case 0:
                     if ((p - current) == 4 && strncmp(current, "lock", 4) == 0) {
                         lock = true;
-                    } else if ((p - current) == 6 && strncmp(current, "nolock", 6) == 0) {
+                    } else if ((p - current) == 6
+                               && strncmp(current, "nolock", 6) == 0) {
                         lock = false;
                     } else {
                         PARSE_CHECK(false, "illegal locking state %.*s",
@@ -303,32 +306,33 @@ static bool rbl_filter_constructor(filter_t *filter)
                 current = p + 1;
                 p = m_strchrnul(current, ':');
             }
+          } break;
 
-        /* hard_threshold parameter is an integer.
-         *  If the matching score of a ip get a score gretter than this threshold,
-         *  the hook "hard_match" is called.
-         * hard_threshold = 0 means, that all matches are hard matches.
-         * default is 0;
-         */
-        } else if (strcmp(param->name, "hard_threshold") == 0) {
+          /* hard_threshold parameter is an integer.
+           *  If the matching score is greater than this threshold,
+           *  the hook "hard_match" is called.
+           * hard_threshold = 0 means, that all matches are hard matches.
+           * default is 0;
+           */
+          case ATK_HARD_THRESHOLD: {
             char *next;
             data->hard_threshold = strtol(param->value, &next, 10);
             PARSE_CHECK(*next, "invalid threshold value %s", param->value);
+          } break;
 
-        /* soft_threshold parameter is an integer.
-         *  if the matching score of an ip get a score getter than this threshold
-         *  and smaller or equal than the hard_threshold, the hook "soft_match"
-         *  is called.
-         * default is 0;
-         */
-        } else if (strcmp(param->name, "hard_threshold") == 0) {
+          /* soft_threshold parameter is an integer.
+           *  if the matching score is greater than this threshold
+           *  and smaller or equal than the hard_threshold, the hook "soft_match"
+           *  is called.
+           * default is 0;
+           */
+          case ATK_SOFT_THRESHOLD: {
             char *next;
             data->soft_threshold = strtol(param->value, &next, 10);
             PARSE_CHECK(*next, "invalid threshold value %s", param->value);
+          } break;
 
-        } else {
-            syslog(LOG_INFO, "ignored parameter %s in rbl filter %s",
-                   filter->name, param->name);
+          default: break;
         }
     }}
 
@@ -377,10 +381,18 @@ static int rbl_init(void)
 {
     filter_type_t type =  filter_register("rbl", rbl_filter_constructor,
                                           rbl_filter_destructor, rbl_filter);
+    /* Hooks.
+     */
     (void)filter_hook_register(type, "error");
     (void)filter_hook_register(type, "fail");
     (void)filter_hook_register(type, "hard_match");
     (void)filter_hook_register(type, "soft_match");
+
+    /* Parameters.
+     */
+    (void)filter_param_register(type, "file");
+    (void)filter_param_register(type, "hard_threshold");
+    (void)filter_param_register(type, "soft_threshold");
     return 0;
 }
 module_init(rbl_init);

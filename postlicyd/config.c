@@ -38,6 +38,10 @@
 #include "config.h"
 #include "str.h"
 
+#define config_param_register(Param)
+
+config_param_register("first_filter");
+
 struct config_t {
     A(filter_t)        filters;
     A(filter_params_t) params;
@@ -235,9 +239,11 @@ read_param_value:
     READ_STRING("parameter value", value, value_len, ;);
     {
         filter_params_t param;
-        param.name = m_strdup(key);
-        param.value = m_strdup(value);
-        array_add(config->params, param);
+        param.type  = param_tokenize(key, key_len);
+        if (param.type != ATK_UNKNOWN) {
+            param.value = m_strdup(value);
+            array_add(config->params, param);
+        }
     }
     goto read_section;
 
@@ -266,9 +272,10 @@ read_filter:
                            key + 3, filter.name);
             }
         } else {
-            if (!filter_add_param(&filter, key, key_len, value, value_len)) {
-                goto error;
-            }
+            /* filter_add_param failure mean unknown type or unsupported type.
+             * this are non-fatal errors.
+             */
+            (void)filter_add_param(&filter, key, key_len, value, value_len);
         }
     }
     READ_NEXT(;);

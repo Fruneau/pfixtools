@@ -41,6 +41,7 @@ static filter_runner_t      runners[FTK_count];
 static filter_constructor_t constructors[FTK_count];
 static filter_destructor_t  destructors[FTK_count];
 static bool                 hooks[FTK_count][HTK_count];
+static bool                 params[FTK_count][ATK_count];
 
 filter_type_t filter_register(const char *type, filter_constructor_t constructor,
                               filter_destructor_t destructor, filter_runner_t runner)
@@ -67,6 +68,20 @@ filter_result_t filter_hook_register(filter_type_t filter,
            ftokens[filter]);
 
     hooks[filter][tok] = true;
+    return tok;
+}
+
+filter_param_id_t filter_param_register(filter_type_t filter,
+                                        const char *name)
+{
+    filter_param_id_t tok = param_tokenize(name, m_strlen(name));
+    CHECK_FILTER(filter);
+    CHECK_PARAM(tok);
+
+    syslog(LOG_INFO, "param %s registered for filter type %s", name,
+           ftokens[filter]);
+
+    params[filter][tok] = true;
     return tok;
 }
 
@@ -140,7 +155,16 @@ bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
                       const char *value, ssize_t value_len)
 {
     filter_params_t param;
-    param.name = m_strdup(name);
+    param.type = param_tokenize(name, name_len);
+    if (param.type == ATK_UNKNOWN) {
+        syslog(LOG_ERR, "unknown parameter %.*s", name_len, name);
+        return false;
+    }
+    if (!params[filter->type][param.type]) {
+        syslog(LOG_ERR, "hook %s is not valid for filter %s",
+               atokens[param.type], ftokens[filter->type]);
+        return false;
+    }
     param.value = m_strdup(value);
     array_add(filter->params, param);
     return true;
@@ -156,7 +180,7 @@ bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
         return false;
     }
     if (!hooks[filter->type][hook.type]) {
-        syslog(LOG_ERR, "hook %s is valid for filter %s",
+        syslog(LOG_ERR, "hook %s not is valid for filter %s",
                htokens[hook.type], ftokens[filter->type]);
         return false;
     }

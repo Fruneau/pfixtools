@@ -39,11 +39,13 @@
 #include "common.h"
 #include "filter_tokens.h"
 #include "hook_tokens.h"
+#include "param_tokens.h"
 #include "query.h"
 #include "array.h"
 
 typedef filter_token filter_type_t;
 typedef hook_token   filter_result_t;
+typedef param_token  filter_param_id_t;
 
 typedef struct filter_hook_t {
     filter_result_t type;
@@ -55,7 +57,7 @@ typedef struct filter_hook_t {
 ARRAY(filter_hook_t)
 
 typedef struct filter_params_t {
-    char *name;
+    filter_param_id_t type;
     char *value;
 } filter_params_t;
 ARRAY(filter_params_t)
@@ -78,6 +80,9 @@ ARRAY(filter_t)
 #define CHECK_HOOK(Hook)                                                       \
     assert(Hook != HTK_UNKNOWN && Hook != HTK_count                            \
            && "Unknown hook")
+#define CHECK_PARAM(Param)                                                     \
+    assert(Param != ATK_UNKNOWN && Param != ATK_count                          \
+           && "Unknown param")
 
 typedef filter_result_t (*filter_runner_t)(const filter_t *filter,
                                            const query_t *query);
@@ -90,6 +95,9 @@ filter_type_t filter_register(const char *type, filter_constructor_t constructor
 
 __attribute__((nonnull(2)))
 filter_result_t filter_hook_register(filter_type_t filter, const char *name);
+
+__attribute__((nonnull(2)))
+filter_param_id_t filter_param_register(filter_type_t filter, const char *name);
 
 __attribute__((nonnull(1)))
 static inline void filter_init(filter_t *filter)
@@ -148,7 +156,6 @@ static inline void filter_hook_wipe(filter_hook_t *hook)
 __attribute__((nonnull(1)))
 static inline void filter_params_wipe(filter_params_t *param)
 {
-    p_delete(&param->name);
     p_delete(&param->value);
 }
 

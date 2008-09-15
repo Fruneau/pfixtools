@@ -34,12 +34,18 @@ include ../mk/tc.mk
 PROGRAMS  = postlicyd
 GENERATED = policy_tokens.h policy_tokens.c \
 						filter_tokens.h filter_tokens.c \
-						hook_tokens.h hook_tokens.c
+						hook_tokens.h hook_tokens.c \
+						param_tokens.h param_tokens.c
 TESTS     = test-rbl
 
-postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c greylist.c rbl.c $(GENERATED)
+FILTERS		= rbl.c greylist.c
+
+postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c $(FILTERS) $(GENERATED)
 postlicyd_LIBADD  = $(TC_LIBS)
 
 tst-rbl_SOURCES   = tst-rbl.c
+
+hook_tokens.h hook_tokens.c: $(FILTERS)
+param_tokens.c param_tokens.h: $(FILTERS) config.c
 
 include ../mk/common.mk
