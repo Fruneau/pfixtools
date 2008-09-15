@@ -38,13 +38,15 @@
 
 #include "common.h"
 #include "filter_tokens.h"
+#include "hook_tokens.h"
 #include "query.h"
 #include "array.h"
 
 typedef filter_token filter_type_t;
+typedef hook_token   filter_result_t;
 
 typedef struct filter_hook_t {
-    char *name;
+    filter_result_t type;
     char *value;
 
     bool postfix;
@@ -70,16 +72,24 @@ typedef struct filter_t {
 ARRAY(filter_t)
 
 #define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, NULL, ARRAY_INIT }
+#define CHECK_FILTER(Filter)                                                   \
+    assert(Filter != FTK_UNKNOWN && Filter != FTK_count                        \
+           && "Unknown filter type")
+#define CHECK_HOOK(Hook)                                                       \
+    assert(Hook != HTK_UNKNOWN && Hook != HTK_count                            \
+           && "Unknown hook")
 
-typedef const char *filter_result_t;
 typedef filter_result_t (*filter_runner_t)(const filter_t *filter,
                                            const query_t *query);
 typedef bool (*filter_constructor_t)(filter_t *filter);
 typedef void (*filter_destructor_t)(filter_t *filter);
 
 __attribute__((nonnull(1,4)))
-void filter_register(const char *type, filter_constructor_t constructor,
-                     filter_destructor_t destructor, filter_runner_t runner);
+filter_type_t filter_register(const char *type, filter_constructor_t constructor,
+                              filter_destructor_t destructor, filter_runner_t runner);
+
+__attribute__((nonnull(2)))
+filter_result_t filter_hook_register(filter_type_t filter, const char *name);
 
 __attribute__((nonnull(1)))
 static inline void filter_init(filter_t *filter)
@@ -132,7 +142,6 @@ bool filter_update_references(filter_t *filter, A(filter_t) *array);
 __attribute__((nonnull(1)))
 static inline void filter_hook_wipe(filter_hook_t *hook)
 {
-    p_delete(&hook->name);
     p_delete(&hook->value);
 }
 

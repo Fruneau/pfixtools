@@ -355,7 +355,7 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
     if (parse_ipv4(query->client_address, &end, &ip) != 0) {
         syslog(LOG_WARNING, "invalid client address: %s, expected ipv4",
                query->client_address);
-        return "error";
+        return HTK_ERROR;
     }
     for (int i = 0 ; i < data->rbls.len ; ++i) {
         const rbldb_t *rbl = array_elt(data->rbls, i);
@@ -365,18 +365,22 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
         }
     }
     if (sum > data->hard_threshold) {
-        return "hard_match";
+        return HTK_HARD_MATCH;
     } else if (sum > data->soft_threshold) {
-        return "soft_match";
+        return HTK_SOFT_MATCH;
     } else {
-        return "fail";
+        return HTK_FAIL;
     }
 }
 
 static int rbl_init(void)
 {
-    filter_register("rbl", rbl_filter_constructor, rbl_filter_destructor,
-                    rbl_filter);
+    filter_type_t type =  filter_register("rbl", rbl_filter_constructor,
+                                          rbl_filter_destructor, rbl_filter);
+    (void)filter_hook_register(type, "error");
+    (void)filter_hook_register(type, "fail");
+    (void)filter_hook_register(type, "hard_match");
+    (void)filter_hook_register(type, "soft_match");
     return 0;
 }
 module_init(rbl_init);

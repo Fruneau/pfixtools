@@ -32,7 +32,9 @@
 include ../mk/tc.mk
 
 PROGRAMS  = postlicyd
-GENERATED = policy_tokens.h policy_tokens.c filter_tokens.h filter_tokens.c
+GENERATED = policy_tokens.h policy_tokens.c \
+						filter_tokens.h filter_tokens.c \
+						hook_tokens.h hook_tokens.c
 TESTS     = test-rbl
 
 postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c greylist.c rbl.c $(GENERATED)

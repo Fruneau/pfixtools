@@ -40,18 +40,34 @@
 static filter_runner_t      runners[FTK_count];
 static filter_constructor_t constructors[FTK_count];
 static filter_destructor_t  destructors[FTK_count];
+static bool                 hooks[FTK_count][HTK_count];
 
-void filter_register(const char *type, filter_constructor_t constructor,
-                     filter_destructor_t destructor, filter_runner_t runner)
+filter_type_t filter_register(const char *type, filter_constructor_t constructor,
+                              filter_destructor_t destructor, filter_runner_t runner)
 {
     filter_token tok = filter_tokenize(type, m_strlen(type));
-    assert(tok != FTK_UNKNOWN && "Unknown filter type");
+    CHECK_FILTER(tok);
 
     syslog(LOG_INFO, "filter type %s registered", type);
 
     runners[tok] = runner;
     constructors[tok] = constructor;
     destructors[tok] = destructor;
+    return tok;
+}
+
+filter_result_t filter_hook_register(filter_type_t filter,
+                                     const char *name)
+{
+    filter_result_t tok = hook_tokenize(name, m_strlen(name));
+    CHECK_FILTER(filter);
+    CHECK_HOOK(tok);
+
+    syslog(LOG_INFO, "hook %s registered for filter type %s", name,
+           ftokens[filter]);
+
+    hooks[filter][tok] = true;
+    return tok;
 }
 
 bool filter_build(filter_t *filter)
@@ -64,7 +80,7 @@ bool filter_build(filter_t *filter)
 #       define QSORT_TYPE filter_hook_t
 #       define QSORT_BASE filter->hooks.data
 #       define QSORT_NELT filter->hooks.len
-#       define QSORT_LT(a,b) strcmp(a->name, b->name) < 0
+#       define QSORT_LT(a,b) a->type < b->type
 #       include "qsort.c"
     }
     filter_constructor_t constructor = constructors[filter->type];
@@ -82,7 +98,7 @@ bool filter_update_references(filter_t *filter, A(filter_t) *filter_list)
             hook->filter_id = filter_find_with_name(filter_list, hook->value);
             if (hook->filter_id == -1) {
                 syslog(LOG_ERR, "invalid filter name %s for hook %s",
-                       hook->value, hook->name);
+                       hook->value, htokens[hook->type]);
                 return false;
             }
             p_delete(&hook->value);
@@ -134,7 +150,16 @@ bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
                      const char *value, ssize_t value_len)
 {
     filter_hook_t hook;
-    hook.name  = m_strdup(name);
+    hook.type  = hook_tokenize(name, name_len);
+    if (hook.type == HTK_UNKNOWN) {
+        syslog(LOG_ERR, "unknown hook type %.*s", name_len, name);
+        return false;
+    }
+    if (!hooks[filter->type][hook.type]) {
+        syslog(LOG_ERR, "hook %s is valid for filter %s",
+               htokens[hook.type], ftokens[filter->type]);
+        return false;
+    }
     hook.postfix = (strncmp(value, "postfix:", 8) == 0);
     hook.value = m_strdup(hook.postfix ? value + 8 : value);
     hook.filter_id = -1;
