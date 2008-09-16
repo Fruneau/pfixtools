@@ -349,6 +349,11 @@ static filter_result_t greylist_filter(const filter_t *filter,
                                        const query_t *query)
 {
     const greylist_config_t *config = filter->data;
+    if (query->state != SMTP_RCPT) {
+        syslog(LOG_WARNING, "greylisting only works as smtpd_recipient_restrictions");
+        return HTK_ABORT;
+    }
+
     return try_greylist(config, query->sender, query->client_address,
                         query->client_name, query->recipient) ?
            HTK_WHITELIST : HTK_GREYLIST;
@@ -361,6 +366,7 @@ static int greylist_init(void)
                                           greylist_filter);
     /* Hooks.
      */
+    (void)filter_hook_register(type, "abort");
     (void)filter_hook_register(type, "error");
     (void)filter_hook_register(type, "greylist");
     (void)filter_hook_register(type, "whitelist");

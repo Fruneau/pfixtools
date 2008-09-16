@@ -167,24 +167,23 @@ static void policy_answer(server_t *pcy, const char *fmt, ...)
     epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
 }
 
-static void policy_process(server_t *pcy, config_t *config)
+static bool policy_process(server_t *pcy, const config_t *config)
 {
     const query_t* query = pcy->data;
-    filter_t *filter;
+    const filter_t *filter;
     if (config->entry_points[query->state] == -1) {
         syslog(LOG_WARNING, "no filter defined for current protocol_state (%d)", query->state);
-        policy_answer(pcy, "DUNNO");
-        return;
+        return false;
     }
     filter = array_ptr(config->filters, config->entry_points[query->state]);
     while (true) {
-        filter_hook_t *hook = filter_run(filter, query);
+        const filter_hook_t *hook = filter_run(filter, query);
         if (hook == NULL) {
-            policy_answer(pcy, "DUNNO");
-            return;
+            syslog(LOG_WARNING, "request aborted");
+            return false;
         } else if (hook->postfix) {
             policy_answer(pcy, "%s", hook->value);
-            return;
+            return true;
         } else {
             filter = array_ptr(config->filters, hook->filter_id);
         }
@@ -197,7 +196,7 @@ static int policy_run(server_t *pcy, void* vconfig)
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
     const char *eoq;
     query_t  *query  = pcy->data;
-    config_t *config = vconfig;
+    const config_t *config = vconfig;
 
     if (nb < 0) {
         if (errno == EAGAIN || errno == EINTR)
@@ -218,8 +217,7 @@ static int policy_run(server_t *pcy, void* vconfig)
         return -1;
     query->eoq = eoq + strlen("\n\n");
     epoll_modify(pcy->fd, 0, pcy);
-    policy_process(pcy, config);
-    return 0;
+    return policy_process(pcy, config) ? 0 : -1;
 }
 
 int start_listener(int port)

@@ -43,6 +43,13 @@ static filter_destructor_t  destructors[FTK_count];
 static bool                 hooks[FTK_count][HTK_count];
 static bool                 params[FTK_count][ATK_count];
 
+static const filter_hook_t default_hook = {
+    .type      = 0,
+    .value     = (char*)"DUNNO",
+    .postfix   = true,
+    .filter_id = 0
+};
+
 filter_type_t filter_register(const char *type, filter_constructor_t constructor,
                               filter_destructor_t destructor, filter_runner_t runner)
 {
@@ -133,13 +140,17 @@ void filter_wipe(filter_t *filter)
     p_delete(&filter->name);
 }
 
-filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
+const filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
 {
     int start = 0;
     int end   = filter->hooks.len;
     //syslog(LOG_DEBUG, "running filter %s (%s)",
     //       filter->name, ftokens[filter->type]);
     filter_result_t res = runners[filter->type](filter, query);
+
+    if (res == HTK_ABORT) {
+        return NULL;
+    }
     //syslog(LOG_DEBUG, "filter run, result is %s", htokens[res]);
 
     while (start < end) {
@@ -157,7 +168,7 @@ filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
     }
     syslog(LOG_WARNING, "missing hook %s for filter %s", 
            htokens[res], filter->name);
-    return NULL;
+    return &default_hook;
 }
 
 void filter_set_name(filter_t *filter, const char *name, ssize_t len)
@@ -201,7 +212,7 @@ bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
         syslog(LOG_ERR, "unknown hook type %.*s", name_len, name);
         return false;
     }
-    if (!hooks[filter->type][hook.type]) {
+    if (!hooks[filter->type][hook.type] || hook.type == HTK_ABORT) {
         syslog(LOG_ERR, "hook %s not is valid for filter %s",
                htokens[hook.type], ftokens[filter->type]);
         return false;

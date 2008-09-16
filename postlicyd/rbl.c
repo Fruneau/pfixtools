@@ -383,6 +383,7 @@ static int rbl_init(void)
                                           rbl_filter_destructor, rbl_filter);
     /* Hooks.
      */
+    (void)filter_hook_register(type, "abort");
     (void)filter_hook_register(type, "error");
     (void)filter_hook_register(type, "fail");
     (void)filter_hook_register(type, "hard_match");
