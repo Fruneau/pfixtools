@@ -67,6 +67,7 @@ static int postfix_parsejob(query_t *query, char *p)
     } while (0)
 
     p_clear(query, 1);
+    query->state = SMTP_UNKNOWN;
     while (*p != '\n') {
         char *k, *v;
         int klen, vlen, vtk;
@@ -87,7 +88,7 @@ static int postfix_parsejob(query_t *query, char *p)
 
         vtk = policy_tokenize(v, vlen);
         switch (policy_tokenize(k, klen)) {
-#define CASE(up, low)  case PTK_##up: query->low = v; v[vlen] = '\0'; break;
+#define CASE(up, low)  case PTK_##up: query->low = v; v[vlen] = '\0'; syslog(LOG_DEBUG, "%s = %s", ptokens[PTK_##up], query->low); break;
             CASE(HELO_NAME,           helo_name);
             CASE(QUEUE_ID,            queue_id);
             CASE(SENDER,              sender);
@@ -169,7 +170,13 @@ static void policy_answer(server_t *pcy, const char *fmt, ...)
 static void policy_process(server_t *pcy, config_t *config)
 {
     const query_t* query = pcy->data;
-    filter_t *filter = array_ptr(config->filters, config->entry_point);
+    filter_t *filter;
+    if (config->entry_points[query->state] == -1) {
+        syslog(LOG_WARNING, "no filter defined for current protocol_state (%d)", query->state);
+        policy_answer(pcy, "DUNNO");
+        return;
+    }
+    filter = array_ptr(config->filters, config->entry_points[query->state]);
     while (true) {
         filter_hook_t *hook = filter_run(filter, query);
         if (hook == NULL) {

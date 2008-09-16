@@ -51,7 +51,7 @@ typedef struct greylist_config_t {
 
 #define GREYLIST_INIT { .lookup_by_host = false,       \
                         .delay = 300,                  \
-                        .retry_window = 2 * 24 * 2600, \
+                        .retry_window = 2 * 24 * 3600, \
                         .client_awl = 5,               \
                         .awl_db = NULL,                \
                         .obj_db = NULL }
@@ -216,7 +216,7 @@ static bool try_greylist(const greylist_config_t *config,
 
             /* OK.
              */
-            syslog(LOG_INFO, "client whitelisted");
+            //syslog(LOG_INFO, "client whitelisted");
             return true;
         }
     }
@@ -260,13 +260,13 @@ static bool try_greylist(const greylist_config_t *config,
 
         /* OK
          */
-        syslog(LOG_INFO, "client whitelisted");
+        //syslog(LOG_INFO, "client whitelisted");
         return true;
     }
 
     /* DUNNO
      */
-    syslog(LOG_INFO, "client greylisted");
+    //syslog(LOG_INFO, "client greylisted");
     return false;
 }
 
@@ -351,7 +351,7 @@ static filter_result_t greylist_filter(const filter_t *filter,
     const greylist_config_t *config = filter->data;
     return try_greylist(config, query->sender, query->client_address,
                         query->client_name, query->recipient) ?
-           HTK_MATCH : HTK_FAIL;
+           HTK_WHITELIST : HTK_GREYLIST;
 }
 
 static int greylist_init(void)
@@ -362,8 +362,8 @@ static int greylist_init(void)
     /* Hooks.
      */
     (void)filter_hook_register(type, "error");
-    (void)filter_hook_register(type, "fail");
-    (void)filter_hook_register(type, "match");
+    (void)filter_hook_register(type, "greylist");
+    (void)filter_hook_register(type, "whitelist");
 
     /* Parameters.
      */

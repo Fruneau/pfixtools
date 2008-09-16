@@ -39,12 +39,45 @@
 
 #define config_param_register(Param)
 
-config_param_register("first_filter");
+/* Filter to execute on "CONNECT"
+ */
+config_param_register("client_filter");
+
+/* Filter to execute on "MAIL FROM"
+ */
+config_param_register("sender_filter");
+
+/* Filter to execute on "RCPT TO"
+ */
+config_param_register("recipient_filter");
+
+/* Filter to execute on "DATA"
+ */
+config_param_register("data_filter");
+
+/* Filter to execute on "END-OF-DATA"
+ */
+config_param_register("end_of_data_filter");
+
+/* Filter to execute on "ETRN"
+ */
+config_param_register("etrn_filter");
+
+/* Filter to execute on "HELO"
+ */
+config_param_register("helo_filter");
+config_param_register("ehlo_filter");
+
+/* Filter to execute on "VRFY"
+ */
+config_param_register("verify_filter");
 
 static inline config_t *config_new(void)
 {
     config_t *config = p_new(config_t, 1);
-    config->entry_point = -1;
+    for (int i = 0 ; i < SMTP_count ; ++i) {
+        config->entry_points[i] = -1;
+    }
     return config;
 }
 
@@ -75,21 +108,35 @@ static bool config_second_pass(config_t *config)
             break;
         }
     }}
+    if (!ok) {
+        return false;
+    }
 
-    config->entry_point = -1;
+    ok = false;
     foreach (filter_param_t *param, config->params) {
         switch (param->type) {
-          case ATK_FIRST_FILTER:
-            config->entry_point = filter_find_with_name(&config->filters,
-                                                        param->value);
-            break;
+#define   CASE(Param, State)                                                   \
+            case ATK_ ## Param ## _FILTER:                                     \
+              ok = true;                                                       \
+              config->entry_points[SMTP_ ## State]                             \
+                  = filter_find_with_name(&config->filters, param->value);     \
+              break;
+          CASE(CLIENT,      CONNECT)
+          CASE(EHLO,        EHLO)
+          CASE(HELO,        HELO)
+          CASE(SENDER,      MAIL)
+          CASE(RECIPIENT,   RCPT)
+          CASE(DATA,        DATA)
+          CASE(END_OF_DATA, END_OF_MESSAGE)
+          CASE(VERIFY,      VRFY)
+          CASE(ETRN,        ETRN)
+#undef    CASE
           default: break;
         }
     }}
     array_deep_wipe(config->params, filter_params_wipe);
 
-    if (config->entry_point == -1) {
-        ok = false;
+    if (!ok) {
         syslog(LOG_ERR, "no entry point defined");
     }
 
@@ -307,7 +354,9 @@ badeof:
     syslog(LOG_ERR, "Unexpected end of file");
 
 error:
-    filter_wipe(&filter);
+    if (filter.name) {
+        filter_wipe(&filter);
+    }
     config_delete(&config);
     file_map_close(&map);
     return NULL;

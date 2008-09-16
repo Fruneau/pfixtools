@@ -43,7 +43,7 @@ typedef struct config_t config_t;
 struct config_t {
     A(filter_t)        filters;
     A(filter_param_t)  params;
-    int entry_point;
+    int entry_points[SMTP_count];
 };
 
 __attribute__((nonnull(1)))

@@ -137,17 +137,17 @@ filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
 {
     int start = 0;
     int end   = filter->hooks.len;
-    syslog(LOG_DEBUG, "running filter %s (%s)",
-           filter->name, ftokens[filter->type]);
+    //syslog(LOG_DEBUG, "running filter %s (%s)",
+    //       filter->name, ftokens[filter->type]);
     filter_result_t res = runners[filter->type](filter, query);
-    syslog(LOG_DEBUG, "filter run, result is %s", htokens[res]);
+    //syslog(LOG_DEBUG, "filter run, result is %s", htokens[res]);
 
     while (start < end) {
         int mid = (start + end) / 2;
         filter_hook_t *hook = array_ptr(filter->hooks, mid);
         if (hook->type == res) {
-            syslog(LOG_DEBUG, "return hook of type %s, value %s",
-                   htokens[hook->type], hook->value);
+            //syslog(LOG_DEBUG, "return hook of type %s, value %s",
+            //       htokens[hook->type], hook->value);
             return hook;
         } else if (res < hook->type) {
             end = mid;

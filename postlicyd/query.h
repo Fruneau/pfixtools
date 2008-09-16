@@ -40,7 +40,6 @@
 #include "mem.h"
 
 enum smtp_state {
-    SMTP_UNKNOWN,
     SMTP_CONNECT,
     SMTP_EHLO,
     SMTP_HELO = SMTP_EHLO,
@@ -50,6 +49,8 @@ enum smtp_state {
     SMTP_END_OF_MESSAGE,
     SMTP_VRFY,
     SMTP_ETRN,
+    SMTP_count,
+    SMTP_UNKNOWN,
 };
 
 /* \see http://www.postfix.org/SMTPD_POLICY_README.html */
