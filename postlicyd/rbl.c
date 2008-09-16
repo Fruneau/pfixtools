@@ -373,7 +373,7 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
 
 static int rbl_init(void)
 {
-    filter_type_t type =  filter_register("rbl", rbl_filter_constructor,
+    filter_type_t type =  filter_register("iplist", rbl_filter_constructor,
                                           rbl_filter_destructor, rbl_filter);
     /* Hooks.
      */
