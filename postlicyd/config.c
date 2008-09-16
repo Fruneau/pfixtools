@@ -264,6 +264,9 @@ config_t *config_read(const char *file)
             if (escaped) {                                                     \
                 ADD_IN_BUFFER(Buffer, Len, '\\');                              \
             }                                                                  \
+            while ((Len) > 0 && isspace((Buffer)[(Len) - 1])) {                \
+                (Buffer)[--(Len)] = '\0';                                      \
+            }                                                                  \
         }                                                                      \
         READ_NEXT(OnEOF);                                                      \
     } while(0)
