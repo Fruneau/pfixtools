@@ -39,6 +39,7 @@
 #include "common.h"
 
 typedef struct trie_t trie_t;
+PARRAY(trie_t)
 
 trie_t *trie_new(void);
 void trie_delete(trie_t **trie);

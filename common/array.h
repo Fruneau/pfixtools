@@ -46,9 +46,24 @@
         ssize_t len;                                                           \
         ssize_t size;                                                          \
     }
+
+#define PARRAY(Type)                                                           \
+    typedef PRIV_ARRAY(Type*) Type ## _ptr_array_t;                            \
+    static inline Type ## _ptr_array_t *Type ## _ptr_array_new(void)           \
+    {                                                                          \
+        return p_new(Type ## _ptr_array_t, 1);                                 \
+    }                                                                          \
+                                                                               \
+    static inline void Type ## _ptr_array_delete(Type ## _ptr_array_t **array) \
+    {                                                                          \
+        if (*array) {                                                          \
+            array_wipe(**array);                                               \
+            p_delete(array);                                                   \
+        }                                                                      \
+    }
+
 #define ARRAY(Type)                                                            \
     typedef PRIV_ARRAY(Type) Type ## _array_t;                                 \
-    typedef PRIV_ARRAY(Type*) Type ## _ptr_array_t;                            \
                                                                                \
     static inline Type ## _array_t *Type ## _array_new(void)                   \
     {                                                                          \
@@ -63,18 +78,8 @@
         }                                                                      \
     }                                                                          \
                                                                                \
-    static inline Type ## _ptr_array_t *Type ## _ptr_array_new(void)           \
-    {                                                                          \
-        return p_new(Type ## _ptr_array_t, 1);                                 \
-    }                                                                          \
-                                                                               \
-    static inline void Type ## _ptr_array_delete(Type ## _ptr_array_t **array) \
-    {                                                                          \
-        if (*array) {                                                          \
-            array_wipe(**array);                                               \
-            p_delete(array);                                                   \
-        }                                                                      \
-    }
+    PARRAY(Type)
+
 #define A(Type) Type ## _array_t
 #define PA(Type) Type ## _ptr_array_t
 
@@ -145,6 +150,7 @@
 
 ARRAY(char)
 ARRAY(int)
+ARRAY(bool)
 ARRAY(uint32_t)
 
 #endif
