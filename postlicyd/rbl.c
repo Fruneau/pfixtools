@@ -252,6 +252,8 @@ static bool rbl_filter_constructor(filter_t *filter)
         return false;                                                          \
     }
 
+    data->hard_threshold = 1;
+    data->soft_threshold = 1;
     foreach (filter_param_t *param, filter->params) {
         switch (param->type) {
           /* file parameter is:
@@ -309,28 +311,20 @@ static bool rbl_filter_constructor(filter_t *filter)
           } break;
 
           /* hard_threshold parameter is an integer.
-           *  If the matching score is greater than this threshold,
+           *  If the matching score is greater or equal than this threshold,
            *  the hook "hard_match" is called.
-           * hard_threshold = 0 means, that all matches are hard matches.
-           * default is 0;
+           * hard_threshold = 1 means, that all matches are hard matches.
+           * default is 1;
            */
-          case ATK_HARD_THRESHOLD: {
-            char *next;
-            data->hard_threshold = strtol(param->value, &next, 10);
-            PARSE_CHECK(!*next, "invalid threshold value %s", param->value);
-          } break;
+          FILTER_PARAM_PARSE_INT(HARD_THRESHOLD, data->hard_threshold);
 
           /* soft_threshold parameter is an integer.
-           *  if the matching score is greater than this threshold
+           *  if the matching score is greater or equal than this threshold
            *  and smaller or equal than the hard_threshold, the hook "soft_match"
            *  is called.
-           * default is 0;
+           * default is 1;
            */
-          case ATK_SOFT_THRESHOLD: {
-            char *next;
-            data->soft_threshold = strtol(param->value, &next, 10);
-            PARSE_CHECK(!*next, "invalid threshold value %s", param->value);
-          } break;
+          FILTER_PARAM_PARSE_INT(SOFT_THRESHOLD, data->soft_threshold);
 
           default: break;
         }
@@ -368,9 +362,9 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
             sum += weight;
         }
     }
-    if (sum > data->hard_threshold) {
+    if (sum >= data->hard_threshold) {
         return HTK_HARD_MATCH;
-    } else if (sum > data->soft_threshold) {
+    } else if (sum >= data->soft_threshold) {
         return HTK_SOFT_MATCH;
     } else {
         return HTK_FAIL;

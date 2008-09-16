@@ -166,4 +166,43 @@ __attribute__((nonnull(1,2)))
 const filter_hook_t *filter_run(const filter_t *filter, const query_t *query);
 
 
+/* Helpers
+ */
+
+#define FILTER_PARAM_PARSE_STRING(Param, Dest)                                 \
+    case ATK_ ## Param: {                                                      \
+        (Dest) = param->value;                                                 \
+    } break
+
+#define FILTER_PARAM_PARSE_INT(Param, Dest)                                    \
+    case ATK_ ## Param: {                                                      \
+        char *next;                                                            \
+        (Dest) = strtol(param->value, &next, 10);                              \
+        PARSE_CHECK(!*next, "invalid %s value %s", atokens[ATK_ ## Param],     \
+                    param->value);                                             \
+     } break
+
+#define FILTER_PARAM_PARSE_BOOLEAN(Param, Dest)                                \
+    case ATK_ ## Param: {                                                      \
+        if (param->value[0] == '1' && param->value[1] == '\0') {               \
+            (Dest) = true;                                                     \
+        } else if (param->value[0] == '0' && param->value[1] == '\0') {        \
+            (Dest) = false;                                                    \
+        } else if (ascii_tolower(param->value[0]) == 't') {                    \
+            (Dest) = ascii_tolower(param->value[1]) == 'r'                     \
+                  && ascii_tolower(param->value[2]) == 'u'                     \
+                  && ascii_tolower(param->value[3]) == 'e'                     \
+                  && !param->value[4];                                         \
+        } else if (ascii_tolower(param->value[0]) == 'f') {                    \
+            (Dest) = ascii_tolower(param->value[1]) == 'a'                     \
+                  && ascii_tolower(param->value[2]) == 'l'                     \
+                  && ascii_tolower(param->value[3]) == 's'                     \
+                  && ascii_tolower(param->value[4]) == 'e'                     \
+                  && !param->value[5];                                         \
+        } else {                                                               \
+            PARSE_CHECK(false, "invalid %s value %s", atokens[ATK_ ## Param],  \
+                        param->value);                                         \
+        }                                                                      \
+    } break
+
 #endif

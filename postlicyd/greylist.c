@@ -306,25 +306,11 @@ static bool greylist_filter_constructor(filter_t *filter)
 
     foreach (filter_param_t *param, filter->params) {
         switch (param->type) {
-          case ATK_PATH:
-            path = param->value;
-            break;
-
-          case ATK_PREFIX:
-            prefix = param->value;
-            break;
-
-          case ATK_LOOKUP_BY_HOST:
-            config->lookup_by_host = (atoi(param->value) != 0);
-            break;
-
-          case ATK_RETRY_WINDOW:
-            config->retry_window = atoi(param->value);
-            break;
-
-          case ATK_CLIENT_AWL:
-            config->client_awl = atoi(param->value);
-            break;
+          FILTER_PARAM_PARSE_STRING(PATH,   path);
+          FILTER_PARAM_PARSE_STRING(PREFIX, prefix);
+          FILTER_PARAM_PARSE_BOOLEAN(LOOKUP_BY_HOST, config->lookup_by_host);
+          FILTER_PARAM_PARSE_INT(RETRY_WINDOW, config->retry_window);
+          FILTER_PARAM_PARSE_INT(CLIENT_AWL,   config->client_awl);
 
           default: break;
         }
