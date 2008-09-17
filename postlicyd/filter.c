@@ -56,8 +56,6 @@ filter_type_t filter_register(const char *type, filter_constructor_t constructor
     filter_token tok = filter_tokenize(type, m_strlen(type));
     CHECK_FILTER(tok);
 
-    syslog(LOG_DEBUG, "filter type %s registered", type);
-
     runners[tok] = runner;
     constructors[tok] = constructor;
     destructors[tok] = destructor;
@@ -71,9 +69,6 @@ filter_result_t filter_hook_register(filter_type_t filter,
     CHECK_FILTER(filter);
     CHECK_HOOK(tok);
 
-    syslog(LOG_DEBUG, "hook %s registered for filter type %s", name,
-           ftokens[filter]);
-
     hooks[filter][tok] = true;
     return tok;
 }
@@ -84,9 +79,6 @@ filter_param_id_t filter_param_register(filter_type_t filter,
     filter_param_id_t tok = param_tokenize(name, m_strlen(name));
     CHECK_FILTER(filter);
     CHECK_PARAM(tok);
-
-    syslog(LOG_INFO, "param %s registered for filter type %s", name,
-           ftokens[filter]);
 
     params[filter][tok] = true;
     return tok;
@@ -129,35 +121,30 @@ bool filter_update_references(filter_t *filter, A(filter_t) *filter_list)
     return true;
 }
 
-static inline bool filter_check_loop(filter_t *filter, A(filter_t) *array, bool cleanup)
+static inline bool filter_check_loop(filter_t *filter, A(filter_t) *array, int level)
 {
-    if (cleanup) {
-        foreach (filter_t *filter2, *array) {
-            filter2->seen = false;
-        }}
-    } else if (filter->seen) {
-        return false;
-    }
-    if (filter->safe) {
+    if (filter->last_seen == level) {
         return true;
     }
-    filter->seen = true;
+    filter->last_seen = level;
     foreach (filter_hook_t *hook, filter->hooks) {
         if (hook->postfix) {
             continue;
         }
-        if (!filter_check_loop(array_ptr(*array, hook->filter_id), array, false)) {
+        if (hook->filter_id == level) {
+            return false;
+        }
+        if (!filter_check_loop(array_ptr(*array, hook->filter_id), array, level)) {
             return false;
         }
     }}
-    filter->safe = true;
     return true;
 }
 
 bool filter_check_safety(A(filter_t) *array)
 {
     foreach (filter_t *filter, *array) {
-        if (!filter_check_loop(filter, array, true)) {
+        if (!filter_check_loop(filter, array, __Ai)) {
             syslog(LOG_ERR, "the filter tree contains a loop");
             return false;
         }

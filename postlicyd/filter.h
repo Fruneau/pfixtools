@@ -72,14 +72,13 @@ typedef struct filter_t {
 
     A(filter_param_t) params;
 
-    /* Internal: to check the filter tree structure.
+    /* Loop checking flags.
      */
-    unsigned safe   :1;
-    unsigned seen   :1;
+    int last_seen;
 } filter_t;
 ARRAY(filter_t)
 
-#define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, NULL, ARRAY_INIT, false, false }
+#define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, NULL, ARRAY_INIT, -1 }
 #define CHECK_FILTER(Filter)                                                   \
     assert(Filter != FTK_UNKNOWN && Filter != FTK_count                        \
            && "Unknown filter type")
