@@ -129,6 +129,42 @@ bool filter_update_references(filter_t *filter, A(filter_t) *filter_list)
     return true;
 }
 
+static inline bool filter_check_loop(filter_t *filter, A(filter_t) *array, bool cleanup)
+{
+    if (cleanup) {
+        foreach (filter_t *filter2, *array) {
+            filter2->seen = false;
+        }}
+    } else if (filter->seen) {
+        return false;
+    }
+    if (filter->safe) {
+        return true;
+    }
+    filter->seen = true;
+    foreach (filter_hook_t *hook, filter->hooks) {
+        if (hook->postfix) {
+            continue;
+        }
+        if (!filter_check_loop(array_ptr(*array, hook->filter_id), array, false)) {
+            return false;
+        }
+    }}
+    filter->safe = true;
+    return true;
+}
+
+bool filter_check_safety(A(filter_t) *array)
+{
+    foreach (filter_t *filter, *array) {
+        if (!filter_check_loop(filter, array, true)) {
+            syslog(LOG_ERR, "the filter tree contains a loop");
+            return false;
+        }
+    }}
+    return true;
+}
+
 void filter_wipe(filter_t *filter)
 {
     filter_destructor_t destructor = destructors[filter->type];

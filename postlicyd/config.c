@@ -111,6 +111,9 @@ static bool config_second_pass(config_t *config)
     if (!ok) {
         return false;
     }
+    if (!filter_check_safety(&config->filters)) {
+        return false;
+    }
 
     ok = false;
     foreach (filter_param_t *param, config->params) {

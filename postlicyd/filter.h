@@ -70,10 +70,15 @@ typedef struct filter_t {
     void *data;
 
     A(filter_param_t) params;
+
+    /* Internal: to check the filter tree structure.
+     */
+    unsigned safe   :1;
+    unsigned seen   :1;
 } filter_t;
 ARRAY(filter_t)
 
-#define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, NULL, ARRAY_INIT }
+#define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, NULL, ARRAY_INIT, false, false }
 #define CHECK_FILTER(Filter)                                                   \
     assert(Filter != FTK_UNKNOWN && Filter != FTK_count                        \
            && "Unknown filter type")
@@ -146,6 +151,9 @@ static inline int filter_find_with_name(A(filter_t) *array, const char *name)
 
 __attribute__((nonnull(1,2)))
 bool filter_update_references(filter_t *filter, A(filter_t) *array);
+
+__attribute__((nonnull(1)))
+bool filter_check_safety(A(filter_t) *array);
 
 __attribute__((nonnull(1)))
 static inline void filter_hook_wipe(filter_hook_t *hook)
