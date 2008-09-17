@@ -153,4 +153,6 @@ ARRAY(int)
 ARRAY(bool)
 ARRAY(uint32_t)
 
+PARRAY(void)
+
 #endif
