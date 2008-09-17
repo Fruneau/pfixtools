@@ -209,9 +209,7 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
 
 void filter_set_name(filter_t *filter, const char *name, ssize_t len)
 {
-    filter->name = p_new(char, len + 1);
-    memcpy(filter->name, name, len);
-    filter->name[len] = '\0';
+    filter->name = p_dupstr(name, len);
 }
 
 bool filter_set_type(filter_t *filter, const char *type, ssize_t len)
@@ -234,7 +232,8 @@ bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
                atokens[param.type], ftokens[filter->type]);
         return false;
     }
-    param.value = m_strdup(value);
+    param.value     = p_dupstr(value, value_len);
+    param.value_len = value_len;
     array_add(filter->params, param);
     return true;
 }

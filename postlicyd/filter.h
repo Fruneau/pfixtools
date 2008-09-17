@@ -58,7 +58,8 @@ ARRAY(filter_hook_t)
 
 typedef struct filter_param_t {
     filter_param_id_t type;
-    char *value;
+    char    *value;
+    ssize_t value_len;
 } filter_param_t;
 ARRAY(filter_param_t)
 
@@ -186,30 +187,30 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query);
     case ATK_ ## Param: {                                                      \
         char *next;                                                            \
         (Dest) = strtol(param->value, &next, 10);                              \
-        PARSE_CHECK(!*next, "invalid %s value %s", atokens[ATK_ ## Param],     \
-                    param->value);                                             \
+        PARSE_CHECK(!*next, "invalid %s value %.*s", atokens[ATK_ ## Param],   \
+                    param->value_len, param->value);                           \
      } break
 
 #define FILTER_PARAM_PARSE_BOOLEAN(Param, Dest)                                \
     case ATK_ ## Param: {                                                      \
-        if (param->value[0] == '1' && param->value[1] == '\0') {               \
+        if (param->value_len == 1 && param->value[0] == '1') {                 \
             (Dest) = true;                                                     \
-        } else if (param->value[0] == '0' && param->value[1] == '\0') {        \
+        } else if (param->value_len == 1 && param->value[0] == '0') {          \
             (Dest) = false;                                                    \
-        } else if (ascii_tolower(param->value[0]) == 't') {                    \
+        } else if (param->value_len == 4                                       \
+                   && ascii_tolower(param->value[0]) == 't') {                 \
             (Dest) = ascii_tolower(param->value[1]) == 'r'                     \
                   && ascii_tolower(param->value[2]) == 'u'                     \
-                  && ascii_tolower(param->value[3]) == 'e'                     \
-                  && !param->value[4];                                         \
-        } else if (ascii_tolower(param->value[0]) == 'f') {                    \
+                  && ascii_tolower(param->value[3]) == 'e';                    \
+        } else if (param->value_len == 5                                       \
+                   && ascii_tolower(param->value[0]) == 'f') {                 \
             (Dest) = ascii_tolower(param->value[1]) == 'a'                     \
                   && ascii_tolower(param->value[2]) == 'l'                     \
                   && ascii_tolower(param->value[3]) == 's'                     \
-                  && ascii_tolower(param->value[4]) == 'e'                     \
-                  && !param->value[5];                                         \
+                  && ascii_tolower(param->value[4]) == 'e';                    \
         } else {                                                               \
-            PARSE_CHECK(false, "invalid %s value %s", atokens[ATK_ ## Param],  \
-                        param->value);                                         \
+            PARSE_CHECK(false, "invalid %s value %.*s", atokens[ATK_ ## Param],\
+                        param->value_len, param->value);                       \
         }                                                                      \
     } break
 

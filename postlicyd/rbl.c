@@ -305,8 +305,10 @@ static bool rbl_filter_constructor(filter_t *filter)
                     array_add(data->weights, weight);
                     break;
                 }
-                current = p + 1;
-                p = m_strchrnul(current, ':');
+                if (i != 2) {
+                    current = p + 1;
+                    p = m_strchrnul(current, ':');
+                }
             }
           } break;
 

@@ -219,13 +219,16 @@ static bool strlist_filter_constructor(filter_t *filter)
                     trie = strlist_create(current, reverse, lock);
                     PARSE_CHECK(trie != NULL,
                                 "cannot load string list from %s", current);
+                    trie_inspect(trie, false);
                     array_add(config->tries, trie);
                     array_add(config->weights, weight);
                     array_add(config->reverses, reverse);
                     break;
                 }
-                current = p + 1;
-                p = m_strchrnul(current, ':');
+                if (i != 3) {
+                    current = p + 1;
+                    p = m_strchrnul(current, ':');
+                }
             }
           } break;
 

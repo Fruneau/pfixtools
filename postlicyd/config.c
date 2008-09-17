@@ -304,7 +304,8 @@ read_param_value:
         filter_param_t param;
         param.type  = param_tokenize(key, key_len);
         if (param.type != ATK_UNKNOWN) {
-            param.value = m_strdup(value);
+            param.value     = p_dupstr(value, value_len);
+            param.value_len = value_len;
             array_add(config->params, param);
         }
     }
