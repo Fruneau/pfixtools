@@ -320,7 +320,7 @@ void trie_unlock(trie_t *trie)
         return;
     }
     array_unlock(trie->entries);
-    array_unlock(trie->entries);
+    array_unlock(trie->c);
     trie->locked = false;
 }
 

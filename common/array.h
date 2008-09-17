@@ -144,7 +144,7 @@
     } while (0)
 
 #define array_lock(array)                                                      \
-    !(mlock((array).data, (array).len * sizeof(*(array).data)) != 0)
+    (mlock((array).data, (array).len * sizeof(*(array).data)) == 0)
 #define array_unlock(array)                                                    \
     (void)munlock((array).data, (array).len * sizeof(*(array).data))
 
