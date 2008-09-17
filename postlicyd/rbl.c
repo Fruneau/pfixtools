@@ -62,7 +62,6 @@ enum {
 
 struct rbldb_t {
     A(uint32_t) ips;
-    bool        locked;
 };
 ARRAY(rbldb_t)
 
@@ -156,8 +155,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     /* Lookup may perform serveral I/O, so avoid swap.
      */
     array_adjust(db->ips);
-    db->locked = lock && array_lock(db->ips);
-    if (lock && !db->locked) {
+    if (lock && !array_lock(db->ips)) {
         UNIXERR("mlock");
     }
 
@@ -175,9 +173,6 @@ rbldb_t *rbldb_create(const char *file, bool lock)
 
 static void rbldb_wipe(rbldb_t *db)
 {
-    if (db->locked) {
-      array_unlock(db->ips);
-    }
     array_wipe(db->ips);
 }
 
@@ -357,7 +352,7 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
                query->client_address);
         return HTK_ERROR;
     }
-    for (int i = 0 ; i < data->rbls.len ; ++i) {
+    for (uint32_t i = 0 ; i < data->rbls.len ; ++i) {
         const rbldb_t *rbl = array_elt(data->rbls, i);
         int weight   = array_elt(data->weights, i);
         if (rbldb_ipv4_lookup(rbl, ip)) {

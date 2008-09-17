@@ -43,8 +43,9 @@
 #define PRIV_ARRAY(Type)                                                       \
     struct {                                                                   \
         Type    *data;                                                         \
-        ssize_t len;                                                           \
-        ssize_t size;                                                          \
+        uint32_t len;                                                          \
+        uint32_t size;                                                         \
+        unsigned locked : 1;                                                   \
     }
 
 #define PARRAY(Type)                                                           \
@@ -57,6 +58,9 @@
     static inline void Type ## _ptr_array_delete(Type ## _ptr_array_t **array) \
     {                                                                          \
         if (*array) {                                                          \
+            if ((*array)->locked) {                                            \
+                array_unlock(**array);                                         \
+            }                                                                  \
             array_wipe(**array);                                               \
             p_delete(array);                                                   \
         }                                                                      \
@@ -73,6 +77,9 @@
     static inline void Type ## _array_delete(Type ## _array_t **array)         \
     {                                                                          \
         if (*array) {                                                          \
+            if ((*array)->locked) {                                            \
+                array_unlock(**array);                                         \
+            }                                                                  \
             array_wipe(**array);                                               \
             p_delete(array);                                                   \
         }                                                                      \
@@ -83,11 +90,18 @@
 #define A(Type) Type ## _array_t
 #define PA(Type) Type ## _ptr_array_t
 
-#define ARRAY_INIT { NULL, 0, 0 }
+#define ARRAY_INIT { NULL, 0, 0, false }
 
 #define array_init(array) (array) = ARRAY_INIT
+
+#define array_can_edit(array) (!(array).locked)
+
+#define array_ensure_can_edit(array)                                           \
+    assert(array_can_edit(array) && "Trying to edit array while it is locked")
+
 #define array_wipe(array)                                                      \
     do {                                                                       \
+        array_ensure_can_edit(array);                                          \
         p_delete(&(array).data);                                               \
         (array).len  = 0;                                                      \
         (array).size = 0;                                                      \
@@ -99,7 +113,7 @@
     } while (0)
 #define array_append(array, objs, len)                                         \
     do {                                                                       \
-        const ssize_t __len = (len);                                           \
+        const typeof((array).len) __len = (len);                               \
         array_ensure_capacity_delta(array, __len);                             \
         memcpy((array).data + (array).len, objs,                               \
                __len * sizeof(*(array).data));                                 \
@@ -107,9 +121,10 @@
     } while (0)
 #define array_ensure_capacity(array, goal)                                     \
     do {                                                                       \
+        array_ensure_can_edit(array);                                          \
         if ((array).size < (goal)) {                                           \
-            const ssize_t required_size = (goal);                              \
-            ssize_t next_size = (array).size;                                  \
+            const typeof((array).size) required_size = (goal);                 \
+            typeof((array).size) next_size = (array).size;                     \
             do {                                                               \
                 next_size = p_alloc_nr(next_size);                             \
             } while (next_size < required_size);                               \
@@ -120,21 +135,23 @@
     array_ensure_capacity(array, (array).len + (delta))
 #define array_ensure_exact_capacity(array, goal)                               \
     if (array_size(array) < (goal)) {                                          \
+        array_ensure_can_edit(array);                                          \
         p_allocgrow(&(array).data, (goal), &(array).size);                     \
     }
 #define array_adjust(array)                                                    \
     do {                                                                       \
+        array_ensure_can_edit(array);                                          \
         p_shrink(&(array).data, (array).len, &(array).size);                   \
     } while (0)
 #define array_elt(array, n) (array).data[(n)]
 #define array_ptr(array, n) (array).data + (n)
 
 #define foreach(var, array)                                                    \
-    for (int __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                         \
+    for (uint32_t __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                    \
         var = array_ptr(array, __Ai);
 
 #define array_foreach(array, action)                                           \
-    for (int __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                         \
+    for (uint32_t __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                    \
         action(array_ptr(array, __Ai));                                        \
     }
 #define array_deep_wipe(array, wipe)                                           \
@@ -144,9 +161,14 @@
     } while (0)
 
 #define array_lock(array)                                                      \
-    (mlock((array).data, (array).len * sizeof(*(array).data)) == 0)
+    ((array).locked ||                                                         \
+        (mlock((array).data, (array).len * sizeof(*(array).data)) == 0         \
+         && ((array).locked = true)))
 #define array_unlock(array)                                                    \
-    (void)munlock((array).data, (array).len * sizeof(*(array).data))
+    if ((array).locked) {                                                      \
+        (void)munlock((array).data, (array).len * sizeof(*(array).data));      \
+        (array).locked = false;                                                \
+    }
 
 ARRAY(char)
 ARRAY(int)

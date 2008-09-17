@@ -319,18 +319,18 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
         return HTK_ABORT;
     }
 #define LOOKUP(Flag, Field)                                                    \
-    if (config->match_ ## Flag) {                                          \
-        const int len = m_strlen(query->Field);                            \
-        strlist_copy(normal, query->Field, len, false);                    \
-        strlist_copy(reverse, query->Field, len, true);                    \
-        for (int i = 0 ; i < config->tries.len ; ++i) {                    \
-            const int weight   = array_elt(config->weights, i);            \
-            const trie_t *trie = array_elt(config->tries, i);              \
-            const bool rev = array_elt(config->reverses, i);               \
-            if (trie_lookup(trie, rev ? reverse : normal)) {               \
-                sum += weight;                                             \
-            }                                                              \
-        }                                                                  \
+    if (config->match_ ## Flag) {                                              \
+        const int len = m_strlen(query->Field);                                \
+        strlist_copy(normal, query->Field, len, false);                        \
+        strlist_copy(reverse, query->Field, len, true);                        \
+        for (uint32_t i = 0 ; i < config->tries.len ; ++i) {                   \
+            const int weight   = array_elt(config->weights, i);                \
+            const trie_t *trie = array_elt(config->tries, i);                  \
+            const bool rev = array_elt(config->reverses, i);                   \
+            if (trie_lookup(trie, rev ? reverse : normal)) {                   \
+                sum += weight;                                                 \
+            }                                                                  \
+        }                                                                      \
     }
     if (config->is_email) {
         LOOKUP(sender, sender);

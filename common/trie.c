@@ -334,17 +334,12 @@ void trie_lock(trie_t *trie)
     }
     if (!array_lock(trie->entries)) {
         UNIXERR("mlock");
-        return;
     }
     if (!array_lock(trie->c)) {
         UNIXERR("mlock");
-        array_unlock(trie->entries);
-        return;
     }
     if (mlock(trie, sizeof(trie_t)) != 0) {
         UNIXERR("mlock");
-        array_unlock(trie->entries);
-        array_unlock(trie->c);
         return;
     }
     trie->locked = true;
