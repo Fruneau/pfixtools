@@ -108,6 +108,12 @@ static inline bool trie_entry_match(const trie_t *trie,
     return !!(strcmp(array_ptr(trie->c, entry->c_offset), key) == 0);
 }
 
+static inline bool trie_entry_prefix(const trie_t *trie,
+                                     const trie_entry_t *entry, const char *key)
+{
+    return !!(strncmp(array_ptr(trie->c, entry->c_offset), key, entry->c_len) == 0);
+}
+
 static inline bool trie_entry_is_leaf(const trie_entry_t *entry)
 {
     return entry->children_len == 0;
@@ -297,6 +303,30 @@ bool trie_lookup(const trie_t *trie, const char *key)
     }
 }
 
+bool trie_prefix(const trie_t *trie, const char *key)
+{
+    assert(trie->keys.len == 0L && "Can't lookup: trie not compiled");
+    if (trie->entries.len == 0) {
+        return false;
+    } else {
+        trie_entry_t *current = array_ptr(trie->entries, 0);
+        while (true) {
+            int pos = 0;
+            if (trie_entry_is_leaf(current)) {
+                return trie_entry_prefix(trie, current, key);
+            } else if (trie_entry_c_match(trie, current, key, &pos)) {
+                key += pos;
+                current = trie_entry_child(trie, current, key);
+                if (current == NULL) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+    }
+}
+
 void trie_lock(trie_t *trie)
 {
     if (trie->locked) {
@@ -311,6 +341,12 @@ void trie_lock(trie_t *trie)
         array_unlock(trie->entries);
         return;
     }
+    if (mlock(trie, sizeof(trie_t)) != 0) {
+        UNIXERR("mlock");
+        array_unlock(trie->entries);
+        array_unlock(trie->c);
+        return;
+    }
     trie->locked = true;
 }
 
@@ -321,6 +357,7 @@ void trie_unlock(trie_t *trie)
     }
     array_unlock(trie->entries);
     array_unlock(trie->c);
+    munlock(trie, sizeof(trie_t));
     trie->locked = false;
 }
 

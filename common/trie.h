@@ -44,21 +44,56 @@ PARRAY(trie_t)
 trie_t *trie_new(void);
 void trie_delete(trie_t **trie);
 
+/** Add a string in the trie.
+ * \ref trie_compile.
+ */
 __attribute__((nonnull(1,2)))
-void trie_insert(trie_t *trie, const char* key);
+void trie_insert(trie_t *trie, const char *key);
 
+/** Compile the trie.
+ * A trie must be compiled before lookup is possible. Compiling the trie
+ * consists in building the tree.
+ *
+ * \param memlock if true, the trie is locked into the RAM (mlock).
+ *
+ * Usage of a trie:
+ *   trie_insert(trie, ...);
+ *   trie_insert(trie, ...);
+ *   ...
+ *   trie_insert(trie, ...);
+ *
+ *   trie_compile(trie, lock);
+ *
+ *   trie_lookup(trie, ...);
+ *   trie_lookup(trie, ...);
+ */
 __attribute__((nonnull(1)))
 void trie_compile(trie_t *trie, bool memlock);
 
+/** Lock the trie into memory.
+ * \ref trie_unlock
+ */
 __attribute__((nonnull(1)))
 void trie_lock(trie_t *trie);
 
+/** Unlock the trie.
+ * \ref trie_lock
+ */
 __attribute__((nonnull(1)))
 void trie_unlock(trie_t *trie);
 
+/** Check if the trie contains \p key.
+ */
 __attribute__((nonnull(1,2)))
-bool trie_lookup(const trie_t *trie, const char* key);
+bool trie_lookup(const trie_t *trie, const char *key);
 
+/** Check if the trie contains a prefix of \p key.
+ */
+__attribute__((nonnull(1,2)))
+bool trie_prefix(const trie_t *trie, const char *key);
+
+/** Show the content of the trie and computes statistics.
+ */
 __attribute__((nonnull(1)))
 void trie_inspect(const trie_t *trie, bool show_content);
 
