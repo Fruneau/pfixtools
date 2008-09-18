@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
     }
     {
         int res = server_loop(query_starter, (delete_client_t)query_delete,
-                              policy_run, config);
+                              policy_run, NULL, config);
         config_delete(&config);
         return res;
     }

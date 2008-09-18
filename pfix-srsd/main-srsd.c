@@ -321,5 +321,5 @@ int main(int argc, char *argv[])
         || start_listener(port_dec, true) < 0) {
         return EXIT_FAILURE;
     }
-    return server_loop(srsd_starter, NULL, process_srs, &config);
+    return server_loop(srsd_starter, NULL, process_srs, NULL, &config);
 }

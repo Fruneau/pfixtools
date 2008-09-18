@@ -44,6 +44,7 @@ typedef void *(*start_listener_t)(void);
 typedef void  (*delete_client_t)(void*);
 typedef void *(*start_client_t)(server_t*);
 typedef int   (*run_client_t)(server_t*, void*);
+typedef bool	(*refresh_t)(void*);
 
 struct server_t {
     unsigned listener : 1;
@@ -57,6 +58,6 @@ struct server_t {
 int start_server(int port, start_listener_t starter, delete_client_t deleter);
 
 int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, void* config);
+                run_client_t runner, refresh_t refresh, void* config);
 
 #endif

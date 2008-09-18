@@ -135,10 +135,17 @@ static int start_client(server_t *server, start_client_t starter,
 }
 
 int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, void* config) {
+                run_client_t runner, refresh_t refresh, void* config) {
     while (!sigint) {
         struct epoll_event evts[1024];
         int n;
+
+        if (sighup && refresh) {
+            if (!refresh(config)) {
+                syslog(LOG_ERR, "error while refreshing configuration");
+                return EXIT_FAILURE;
+            }
+        }
 
         n = epoll_select(evts, countof(evts), -1);
         if (n < 0) {

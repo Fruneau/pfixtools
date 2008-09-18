@@ -229,11 +229,20 @@ int drop_privileges(const char *user, const char *group)
 
 int pidfile_open(const char *name)
 {
+		struct flock lock;
+		p_clear(&lock, 1);
+		lock.l_type = F_WRLCK;
     if (name) {
         pidfile = fopen(name, "w");
         if (!pidfile)
             return -1;
-        fprintf(pidfile, "%d\n", getpid());
+				if (fcntl(fileno(pidfile), F_SETLK, &lock) == -1) {
+						syslog(LOG_ERR, "program already started");
+						fclose(pidfile);
+						pidfile = NULL;
+						return -1;
+				}
+				fprintf(pidfile, "%d\n", getpid());
         return fflush(pidfile);
     }
     return 0;
@@ -252,10 +261,14 @@ int pidfile_refresh(void)
 
 static void pidfile_close(void)
 {
+		struct flock lock;
+		p_clear(&lock, 1);
+		lock.l_type = F_UNLCK;
     if (pidfile) {
         rewind(pidfile);
         ftruncate(fileno(pidfile), 0);
-        fclose(pidfile);
+        fcntl(fileno(pidfile), F_SETLK, &lock);
+				fclose(pidfile);
         pidfile = NULL;
     }
 }
