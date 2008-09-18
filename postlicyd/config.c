@@ -158,6 +158,8 @@ static bool config_load(config_t *config)
     const char *p;
     int line = 0;
     const char *linep;
+    bool in_section = false;
+    bool end_of_section = false;
 
     char key[BUFSIZ];
     char value[BUFSIZ];
@@ -171,10 +173,12 @@ static bool config_load(config_t *config)
     filter_init(&filter);
     linep = p = map.map;
 
+#define READ_LOG(Lev, Fmt, ...)                                                \
+    syslog(LOG_ ## Lev, "config file %s:%d:%d: " Fmt, config->filename,        \
+           line + 1, p - linep + 1, ##__VA_ARGS__)
 #define READ_ERROR(Fmt, ...)                                                   \
     do {                                                                       \
-        syslog(LOG_ERR, "config file %s:%d:%d: " Fmt, config->filename,        \
-               line + 1, p - linep + 1, ##__VA_ARGS__);                        \
+        READ_LOG(ERR, Fmt, ##__VA_ARGS__);                                     \
         goto error;                                                            \
     } while (0)
 #define ADD_IN_BUFFER(Buffer, Len, Char)                                       \
@@ -185,17 +189,23 @@ static bool config_load(config_t *config)
         (Buffer)[(Len)++] = (Char);                                            \
         (Buffer)[(Len)]   = '\0';                                              \
     } while (0)
-#define READ_NEXT(OnEOF)                                                       \
+#define READ_NEXT                                                              \
     do {                                                                       \
         if (*p == '\n') {                                                      \
             ++line;                                                            \
             linep = p + 1;                                                     \
         }                                                                      \
         if (++p >= map.end) {                                                  \
-            OnEOF;                                                             \
+            if (!end_of_section) {                                             \
+                if (in_section) {                                              \
+                    goto badeof;                                               \
+                } else {                                                       \
+                    goto ok;                                                   \
+                }                                                              \
+            }                                                                  \
         }                                                                      \
     } while (0)
-#define READ_BLANK(OnEOF)                                                      \
+#define READ_BLANK                                                             \
     do {                                                                       \
         bool in_comment = false;                                               \
         while (in_comment || isspace(*p) || *p == '#') {                       \
@@ -204,7 +214,7 @@ static bool config_load(config_t *config)
             } else if (*p == '#') {                                            \
                 in_comment = true;                                             \
             }                                                                  \
-            READ_NEXT(OnEOF);                                                  \
+            READ_NEXT;                                                         \
         }                                                                      \
     } while (0)
 #define READ_TOKEN(Name, Buffer, Len)                                          \
@@ -216,17 +226,17 @@ static bool config_load(config_t *config)
         }                                                                      \
         do {                                                                   \
             ADD_IN_BUFFER(Buffer, Len, *p);                                    \
-            READ_NEXT(goto badeof);                                            \
+            READ_NEXT;                                                         \
         } while (isalnum(*p) || *p == '_');                                    \
     } while (0)
-#define READ_STRING(Name, Buffer, Len, OnEOF)                                  \
+#define READ_STRING(Name, Buffer, Len, Ignore)                                 \
     do {                                                                       \
         (Len) = 0;                                                             \
         (Buffer)[0] = '\0';                                                    \
         if (*p == '"') {                                                       \
             bool escaped = false;                                              \
             while (*p == '"') {                                                \
-                READ_NEXT(goto badeof);                                        \
+                READ_NEXT;                                                     \
                 while (true) {                                                 \
                     if (*p == '\n') {                                          \
                         READ_ERROR("string must not contain EOL");             \
@@ -236,14 +246,14 @@ static bool config_load(config_t *config)
                     } else if (*p == '\\') {                                   \
                         escaped = true;                                        \
                     } else if (*p == '"') {                                    \
-                        READ_NEXT(goto badeof);                                \
+                        READ_NEXT;                                \
                         break;                                                 \
                     } else {                                                   \
                         ADD_IN_BUFFER(Buffer, Len, *p);                        \
                     }                                                          \
-                    READ_NEXT(goto badeof);                                    \
+                    READ_NEXT;                                                 \
                 }                                                              \
-                READ_BLANK(goto badeof);                                       \
+                READ_BLANK;                                                    \
             }                                                                  \
             if (*p != ';') {                                                   \
                 READ_ERROR("%s must end with a ';'", Name);                    \
@@ -253,7 +263,7 @@ static bool config_load(config_t *config)
             while (*p != ';' && isascii(*p) && (isprint(*p) || isspace(*p))) { \
                 if (escaped) {                                                 \
                     if (*p == '\r' || *p == '\n') {                            \
-                        READ_BLANK(goto badeof);                               \
+                        READ_BLANK;                                            \
                     } else {                                                   \
                         ADD_IN_BUFFER(Buffer, Len, '\\');                      \
                     }                                                          \
@@ -266,7 +276,7 @@ static bool config_load(config_t *config)
                 } else {                                                       \
                     ADD_IN_BUFFER(Buffer, Len, *p);                            \
                 }                                                              \
-                READ_NEXT(goto badeof);                                        \
+                READ_NEXT;                                                     \
             }                                                                  \
             if (escaped) {                                                     \
                 ADD_IN_BUFFER(Buffer, Len, '\\');                              \
@@ -275,7 +285,8 @@ static bool config_load(config_t *config)
                 (Buffer)[--(Len)] = '\0';                                      \
             }                                                                  \
         }                                                                      \
-        READ_NEXT(OnEOF);                                                      \
+        end_of_section = Ignore;                                               \
+        READ_NEXT;                                                             \
     } while(0)
 
 
@@ -287,23 +298,25 @@ read_section:
     value[0] = key[0] = '\0';
     value_len = key_len = 0;
 
-    READ_BLANK(goto ok);
+    in_section = end_of_section = false;
+    READ_BLANK;
+    in_section = true;
     READ_TOKEN("section name", key, key_len);
-    READ_BLANK(goto badeof);
+    READ_BLANK;
     switch (*p) {
       case '=':
-        READ_NEXT(goto badeof);
+        READ_NEXT;
         goto read_param_value;
       case '{':
-        READ_NEXT(goto badeof);
+        READ_NEXT;
         goto read_filter;
       default:
         READ_ERROR("invalid character '%c', expected '=' or '{'", *p);
     }
 
 read_param_value:
-    READ_BLANK(goto badeof);
-    READ_STRING("parameter value", value, value_len, ;);
+    READ_BLANK;
+    READ_STRING("parameter value", value, value_len, true);
     {
         filter_param_t param;
         param.type  = param_tokenize(key, key_len);
@@ -311,23 +324,25 @@ read_param_value:
             param.value     = p_dupstr(value, value_len);
             param.value_len = value_len;
             array_add(config->params, param);
+        } else {
+            READ_LOG(INFO, "unknown parameter %.*s", key_len, key);
         }
     }
     goto read_section;
 
 read_filter:
     filter_set_name(&filter, key, key_len);
-    READ_BLANK(goto badeof);
+    READ_BLANK;
     while (*p != '}') {
         READ_TOKEN("filter parameter name", key, key_len);
-        READ_BLANK(goto badeof);
+        READ_BLANK;
         if (*p != '=') {
             READ_ERROR("invalid character '%c', expected '='", *p);
         }
-        READ_NEXT(goto badeof);
-        READ_BLANK(goto badeof);
-        READ_STRING("filter parameter value", value, value_len, goto badeof);
-        READ_BLANK(goto badeof);
+        READ_NEXT;
+        READ_BLANK;
+        READ_STRING("filter parameter value", value, value_len, false);
+        READ_BLANK;
         if (strcmp(key, "type") == 0) {
             if (!filter_set_type(&filter, value, value_len)) {
                 READ_ERROR("unknow filter type (%s) for filter %s",
@@ -346,7 +361,8 @@ read_filter:
             (void)filter_add_param(&filter, key, key_len, value, value_len);
         }
     }
-    READ_NEXT(;);
+    end_of_section = true;
+    READ_NEXT;
     if (!filter_build(&filter)) {
         READ_ERROR("invalid filter %s", filter.name);
     }
