@@ -75,17 +75,22 @@ config_param_register("verify_filter");
 static inline config_t *config_new(void)
 {
     config_t *config = p_new(config_t, 1);
+    return config;
+}
+
+static void config_close(config_t *config)
+{
     for (int i = 0 ; i < SMTP_count ; ++i) {
         config->entry_points[i] = -1;
     }
-    return config;
+    array_deep_wipe(config->filters, filter_wipe);
+    array_deep_wipe(config->params, filter_params_wipe);
 }
 
 void config_delete(config_t **config)
 {
     if (*config) {
-        array_deep_wipe((*config)->filters, filter_wipe);
-        array_deep_wipe((*config)->params, filter_params_wipe);
+        config_close(*config);
         p_delete(config);
     }
 }
@@ -146,9 +151,8 @@ static bool config_second_pass(config_t *config)
     return ok;
 }
 
-config_t *config_read(const char *file)
+static bool config_load(config_t *config)
 {
-    config_t *config;
     filter_t filter;
     file_map_t map;
     const char *p;
@@ -159,18 +163,18 @@ config_t *config_read(const char *file)
     char value[BUFSIZ];
     ssize_t key_len, value_len;
 
-    if (!file_map_open(&map, file, false)) {
+    if (!file_map_open(&map, config->filename, false)) {
         return false;
     }
 
-    config = config_new();
+    config_close(config);
     filter_init(&filter);
     linep = p = map.map;
 
 #define READ_ERROR(Fmt, ...)                                                   \
     do {                                                                       \
-        syslog(LOG_ERR, "config file %s:%d:%d: " Fmt, file, line + 1,          \
-               p - linep + 1, ##__VA_ARGS__);                                  \
+        syslog(LOG_ERR, "config file %s:%d:%d: " Fmt, config->filename,        \
+               line + 1, p - linep + 1, ##__VA_ARGS__);                        \
         goto error;                                                            \
     } while (0)
 #define ADD_IN_BUFFER(Buffer, Len, Char)                                       \
@@ -355,7 +359,7 @@ ok:
         goto error;
     }
     file_map_close(&map);
-    return config;
+    return true;
 
 badeof:
     syslog(LOG_ERR, "Unexpected end of file");
@@ -364,7 +368,22 @@ error:
     if (filter.name) {
         filter_wipe(&filter);
     }
-    config_delete(&config);
     file_map_close(&map);
-    return NULL;
+    return false;
+}
+
+bool config_reload(config_t *config)
+{
+    return config_load(config);
+}
+
+config_t *config_read(const char *file)
+{
+    config_t *config = config_new();
+    config->filename = file;
+    if (!config_reload(config)) {
+        p_delete(&config);
+        return NULL;
+    }
+    return config;
 }

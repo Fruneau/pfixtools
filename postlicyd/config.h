@@ -41,13 +41,37 @@
 typedef struct config_t config_t;
 
 struct config_t {
-    A(filter_t)        filters;
+    /* SOURCE */
+    /* Root configuration file.
+     */
+    const char *filename;
+
+    /* Parameters.
+     */
     A(filter_param_t)  params;
+
+
+    /* INTERPRETED */
+    /* Filters.
+     */
+    A(filter_t) filters;
+
+    /* Entry point of the filters.
+     * (one per smtp state)
+     */
     int entry_points[SMTP_count];
+
+    /* Port on which the program have to bind to.
+     * The parameter from CLI override the parameter from configuration file.
+     */
+    uint16_t port;
 };
 
 __attribute__((nonnull(1)))
 config_t *config_read(const char *file);
+
+__attribute__((nonnull(1)))
+bool config_reload(config_t *config);
 
 void config_delete(config_t **config);
 

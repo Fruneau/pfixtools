@@ -56,6 +56,11 @@ static void *query_starter(server_t* server)
     return query_new();
 }
 
+static bool config_refresh(void *config)
+{
+    return config_reload(config);
+}
+
 static int postfix_parsejob(query_t *query, char *p)
 {
 #define PARSE_CHECK(expr, error, ...)                                        \
@@ -246,6 +251,7 @@ int main(int argc, char *argv[])
     const char *pidfile = NULL;
     bool daemonize = true;
     int port = DEFAULT_PORT;
+    bool port_from_cli = false;
 
     for (int c = 0; (c = getopt(argc, argv, "hf" "l:p:")) >= 0; ) {
         switch (c) {
@@ -257,6 +263,7 @@ int main(int argc, char *argv[])
             break;
           case 'l':
             port = atoi(optarg);
+            port_from_cli = true;
             break;
           case 'f':
             daemonize = false;
@@ -276,15 +283,19 @@ int main(int argc, char *argv[])
     if (config == NULL) {
         return EXIT_FAILURE;
     }
+    if (port_from_cli || config->port == 0) {
+        config->port = port;
+    }
 
     if (common_setup(pidfile, false, RUNAS_USER, RUNAS_GROUP,
                      daemonize) != EXIT_SUCCESS
-        || start_listener(port) < 0) {
+        || start_listener(config->port) < 0) {
+        config_delete(&config);
         return EXIT_FAILURE;
     }
     {
         int res = server_loop(query_starter, (delete_client_t)query_delete,
-                              policy_run, NULL, config);
+                              policy_run, config_refresh, config);
         config_delete(&config);
         return res;
     }
