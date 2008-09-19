@@ -72,6 +72,11 @@ config_param_register("ehlo_filter");
  */
 config_param_register("verify_filter");
 
+
+/* Where to bind the server.
+ */
+config_param_register("port");
+
 static inline config_t *config_new(void)
 {
     config_t *config = p_new(config_t, 1);
@@ -121,6 +126,11 @@ static bool config_second_pass(config_t *config)
     }
 
     ok = false;
+#define PARSE_CHECK(Expr, Fmt, ...)                                            \
+    if (!(Expr)) {                                                             \
+        syslog(LOG_ERR, Fmt, ##__VA_ARGS__);                                   \
+        return false;                                                          \
+    }
     foreach (filter_param_t *param, config->params) {
         switch (param->type) {
 #define   CASE(Param, State)                                                   \
@@ -128,6 +138,8 @@ static bool config_second_pass(config_t *config)
               ok = true;                                                       \
               config->entry_points[SMTP_ ## State]                             \
                   = filter_find_with_name(&config->filters, param->value);     \
+              PARSE_CHECK(config->entry_points[SMTP_ ## State] >= 0,           \
+                          "invalid filter name %s", param->value);             \
               break;
           CASE(CLIENT,      CONNECT)
           CASE(EHLO,        EHLO)
@@ -139,6 +151,7 @@ static bool config_second_pass(config_t *config)
           CASE(VERIFY,      VRFY)
           CASE(ETRN,        ETRN)
 #undef    CASE
+          FILTER_PARAM_PARSE_INT(PORT, config->port);
           default: break;
         }
     }}
