@@ -37,6 +37,7 @@
 #define PFIXTOOLS_TRIE_H
 
 #include "common.h"
+#include "array.h"
 
 typedef struct trie_t trie_t;
 PARRAY(trie_t)

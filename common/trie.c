@@ -40,11 +40,11 @@
 typedef struct trie_entry_t trie_entry_t;
 
 struct trie_entry_t {
-    int32_t  c_offset;
-    int32_t  c_len;
+    uint32_t c_offset;
+    uint32_t children_offset;
 
-    int32_t children_offset;
-    int32_t children_len;
+    uint16_t c_len;
+    uint16_t children_len;
 };
 #define TRIE_ENTRY_INIT { 0, 0, 0, 0 }
 ARRAY(trie_entry_t)
@@ -152,14 +152,14 @@ static inline trie_entry_t* trie_entry_child(const trie_t *trie,
     return NULL;
 }
 
-static inline int trie_entry_new(trie_t *trie)
+static inline uint32_t trie_entry_new(trie_t *trie)
 {
     const trie_entry_t e = TRIE_ENTRY_INIT;
     array_add(trie->entries, e);
     return trie->entries.len - 1;
 }
 
-static inline int trie_add_leaf(trie_t *trie, const char *key)
+static inline uint32_t trie_add_leaf(trie_t *trie, const char *key)
 {
     trie_entry_t *entry;
     int len = m_strlen(key) + 1;
@@ -171,7 +171,7 @@ static inline int trie_add_leaf(trie_t *trie, const char *key)
 }
 
 static inline void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry,
-                                           int pchild)
+                                           uint32_t pchild)
 {
     if (entry->children_len == 0) {
         entry->children_offset = pchild;
@@ -186,7 +186,7 @@ static inline void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry,
     }
 }
 
-static inline void trie_entry_split(trie_t *trie, trie_entry_t *entry, int pos)
+static inline void trie_entry_split(trie_t *trie, trie_entry_t *entry, uint16_t pos)
 {
     trie_entry_t *child;
     child    = array_ptr(trie->entries, trie_entry_new(trie));
@@ -216,17 +216,17 @@ void trie_insert(trie_t *trie, const char* key)
 }
 
 
-static inline void trie_compile_aux(trie_t *trie, int id,
-                                    int first_key, int last_key, int offset,
-                                    int initial_diff)
+static inline void trie_compile_aux(trie_t *trie, uint32_t id,
+                                    uint32_t first_key, uint32_t last_key,
+                                    int offset, int initial_diff)
 {
-    int forks[256];
-    int fork_pos = 0;
+    uint32_t forks[256];
+    uint32_t fork_pos = 0;
     char current = '\0';
 
     for (int off_diff = initial_diff ; fork_pos == 0 ; ++off_diff, ++offset) {
         current = array_elt(trie->keys, array_elt(trie->keys_offset, first_key) + offset);
-        for (int i = first_key + 1 ; i < last_key ; ++i) {
+        for (uint32_t i = first_key + 1 ; i < last_key ; ++i) {
             const char *str = array_ptr(trie->keys, array_elt(trie->keys_offset, i));
             const char c = str[offset];
             if (c != current) {
@@ -246,8 +246,8 @@ static inline void trie_compile_aux(trie_t *trie, int id,
     }
     forks[fork_pos] = last_key;
 
-    const int children_len = array_elt(trie->entries, id).children_len;
-    for (int i = 0 ; i < children_len ; ++i) {
+    const uint8_t children_len = array_elt(trie->entries, id).children_len;
+    for (uint16_t i = 0 ; i < children_len ; ++i) {
         int child = array_elt(trie->entries, id).children_offset + i;
         if (forks[i] - 1 > first_key) {
             trie_compile_aux(trie, child, first_key, forks[i], offset, 1);
@@ -392,7 +392,7 @@ static inline void trie_entry_inspect(const trie_t *trie, bool show_content,
         }
         fputs("\n", stdout);
     }
-    for (int i = entry->children_offset ;
+    for (uint32_t i = entry->children_offset ;
           i < entry->children_offset + entry->children_len ; ++i) {
         trie_entry_inspect(trie, show_content, array_ptr(trie->entries, i), level + 1);
     }
