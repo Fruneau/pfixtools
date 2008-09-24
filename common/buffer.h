@@ -63,8 +63,9 @@ static inline char *buffer_unwrap(buffer_t **buf) {
     return res;
 }
 
+#define buffer_resize(buffer, newsize)                                         \
+  array_ensure_exact_capacity(*(buffer), (newsize) + 1)
 
-void buffer_resize(buffer_t *, ssize_t newsize);
 static inline void buffer_ensure(buffer_t *buf, ssize_t extra) {
     assert (extra >= 0);
     if (buf->len + extra >= buf->size) {

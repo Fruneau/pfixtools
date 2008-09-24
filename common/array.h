@@ -134,7 +134,7 @@
 #define array_ensure_capacity_delta(array, delta)                              \
     array_ensure_capacity(array, (array).len + (delta))
 #define array_ensure_exact_capacity(array, goal)                               \
-    if (array_size(array) < (goal)) {                                          \
+    if ((array).size < (goal)) {                                               \
         array_ensure_can_edit(array);                                          \
         p_allocgrow(&(array).data, (goal), &(array).size);                     \
     }

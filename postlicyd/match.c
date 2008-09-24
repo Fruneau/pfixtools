@@ -115,18 +115,17 @@ static bool match_filter_constructor(filter_t *filter)
 #define     IS_OP_END(N)                                                          \
               ((N) == '=' || (N) == 'i')
             match_condition_t condition = CONDITION_INIT;
-            const char *p = m_strnextsp(param->value);
+            const char *p = skipspaces(param->value);
             const char *n = p + 1;
             PARSE_CHECK(isalnum(*p), "invalid field name");
             for (n = p + 1 ; *n && (isalnum(*n) || *n == '_') ; ++n);
-            PARSE_CHECK(*n &&
-                        (isspace(*n) || IS_OP_START(*n)),
+            PARSE_CHECK(*n && (isspace(*n) || IS_OP_START(*n)),
                         "invalid condition, expected operator after field name");
             condition.field = policy_tokenize(p, n - p);
             PARSE_CHECK(condition.field >= PTK_HELO_NAME
                         && condition.field < PTK_SMTPD_ACCESS_POLICY,
                         "invalid field name %.*s", n - p, p);
-            p = m_strnextsp(n);
+            p = skipspaces(n);
             n = p + 1;
             PARSE_CHECK(IS_OP_START(*p) && IS_OP_END(*n),
                         "invalid operator %2s", p);
@@ -254,15 +253,15 @@ static filter_result_t match_filter(const filter_t *filter, const query_t *query
     foreach (const match_condition_t *condition, config->conditions) {
         bool r = match_condition(condition, query);
         if (!r && config->match_all) {
-            return HTK_FALSE;
+            return HTK_FAIL;
         } else if (r && !(config->match_all)) {
-            return HTK_TRUE;
+            return HTK_MATCH;
         }
     }}
     if (config->match_all) {
-        return HTK_TRUE;
+        return HTK_MATCH;
     } else {
-        return HTK_FALSE;
+        return HTK_FAIL;
     }
 }
 
@@ -274,8 +273,8 @@ static int match_init(void)
      */
     (void)filter_hook_register(type, "abort");
     (void)filter_hook_register(type, "error");
-    (void)filter_hook_register(type, "true");
-    (void)filter_hook_register(type, "false");
+    (void)filter_hook_register(type, "match");
+    (void)filter_hook_register(type, "fail");
 
     /* Parameters.
      */

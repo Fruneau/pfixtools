@@ -40,13 +40,6 @@
 #include "mem.h"
 #include "buffer.h"
 
-#define BUFSIZ_INCREMENT  256
-
-void buffer_resize(buffer_t *buf, ssize_t newsize)
-{
-    p_allocgrow(&buf->data, newsize + 1, &buf->size);
-}
-
 ssize_t buffer_addvf(buffer_t *buf, const char *fmt, va_list ap)
 {
     ssize_t len, avail = buf->size - buf->len;
@@ -71,7 +64,7 @@ void buffer_consume(buffer_t *buf, ssize_t len)
     if (len <= 0)
         return;
 
-    if (len >= buf->len) {
+    if (len >= (ssize_t)buf->len) {
         buffer_reset(buf);
         return;
     }
