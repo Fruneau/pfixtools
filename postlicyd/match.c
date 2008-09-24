@@ -141,7 +141,7 @@ static bool match_filter_constructor(filter_t *filter)
               CASE_OP('!', DIFFER);
               CASE_OP('>', CONTAINS);
               CASE_OP('<', CONTAINED);
-              CASE_OP('1', EMPTY);
+              CASE_OP('#', EMPTY);
 #undef        CASE_OP
             }
             PARSE_CHECK(condition.condition != MATCH_UNKNOWN,
@@ -174,7 +174,79 @@ static void match_filter_destructor(filter_t *filter)
 
 static inline bool match_condition(const match_condition_t *cond, const query_t *query)
 {
-//    const char *field = NULL;
+    const char *field = NULL;
+    switch (cond->field) {
+#define CASE(Up, Low)                                                          \
+      case PTK_ ## Up: field = query->Low; break;
+      CASE(HELO_NAME, helo_name)
+      CASE(QUEUE_ID, queue_id)
+      CASE(SENDER, sender)
+      CASE(RECIPIENT, recipient)
+      CASE(RECIPIENT_COUNT, recipient_count)
+      CASE(CLIENT_ADDRESS, client_address)
+      CASE(CLIENT_NAME, client_name)
+      CASE(REVERSE_CLIENT_NAME, reverse_client_name)
+      CASE(INSTANCE, instance)
+      CASE(SASL_METHOD, sasl_method)
+      CASE(SASL_USERNAME, sasl_username)
+      CASE(SASL_SENDER, sasl_sender)
+      CASE(SIZE, size)
+      CASE(CCERT_SUBJECT, ccert_subject)
+      CASE(CCERT_ISSUER, ccert_issuer)
+      CASE(CCERT_FINGERPRINT, ccert_fingerprint)
+      CASE(ENCRYPTION_PROTOCOL, encryption_protocol)
+      CASE(ENCRYPTION_CIPHER, encryption_cipher)
+      CASE(ENCRYPTION_KEYSIZE, encryption_keysize)
+      CASE(ETRN_DOMAIN, etrn_domain)
+      CASE(STRESS, stress)
+#undef CASE
+      default: return false;
+    }
+    switch (cond->condition) {
+      case MATCH_EQUAL:
+      case MATCH_DIFFER:
+        if (field == NULL) {
+            return cond->condition != MATCH_DIFFER;
+        }
+        if (cond->case_sensitive) {
+            return !!((strcmp(field, cond->value) == 0)
+                      ^ (cond->condition == MATCH_DIFFER));
+        } else {
+            return !!((strcasecmp(field, cond->value) == 0)
+                      ^ (cond->condition == MATCH_DIFFER));
+        }
+        break;
+
+      case MATCH_CONTAINS:
+        if (field == NULL) {
+            return false;
+        }
+        if (cond->case_sensitive) {
+            return strstr(field, cond->value);
+        } else {
+            /* XXX: GNU Sources */
+            return strcasestr(field, cond->value);
+        }
+        break;
+
+      case MATCH_CONTAINED:
+        if (field == NULL) {
+            return false;
+        }
+        if (cond->case_sensitive) {
+            return strstr(cond->value, field);
+        } else {
+            /* XXX: GNU Sources */
+            return strcasestr(cond->value, field);
+        }
+        break;
+
+      case MATCH_EMPTY:
+        return !!(!!(field == NULL || *field == '\0')) ^ (!!cond->case_sensitive);
+
+      default:
+        assert(false && "invalid condition type");
+    }
     return true;
 }
 
