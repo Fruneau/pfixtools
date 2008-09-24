@@ -212,7 +212,7 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return !!((strcmp(field, cond->value) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         } else {
-            return !!((strcasecmp(field, cond->value) == 0)
+            return !!((ascii_strcasecmp(field, cond->value) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         }
         break;
@@ -224,8 +224,7 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
         if (cond->case_sensitive) {
             return strstr(field, cond->value);
         } else {
-            /* XXX: GNU Sources */
-            return strcasestr(field, cond->value);
+            return m_stristrn(field, cond->value, cond->value_len);
         }
         break;
 
@@ -236,8 +235,7 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
         if (cond->case_sensitive) {
             return strstr(cond->value, field);
         } else {
-            /* XXX: GNU Sources */
-            return strcasestr(cond->value, field);
+            return m_stristr(cond->value, field);
         }
         break;
 
