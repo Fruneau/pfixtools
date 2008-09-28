@@ -40,7 +40,7 @@ TESTS     = test-rbl
 
 FILTERS		= rbl.c greylist.c strlist.c match.c
 
-postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c $(FILTERS) $(GENERATED)
+postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c $(FILTERS) $(GENERATED)
 postlicyd_LIBADD  = $(TC_LIBS)
 
 tst-rbl_SOURCES   = tst-rbl.c

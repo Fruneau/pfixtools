@@ -194,6 +194,11 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
     return &default_hook;
 }
 
+bool filter_test(const filter_t *filter, const query_t *query, filter_result_t result)
+{
+    return !!(runners[filter->type](filter, query) == result);
+}
+
 void filter_set_name(filter_t *filter, const char *name, ssize_t len)
 {
     filter->name = p_dupstr(name, len);

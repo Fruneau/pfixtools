@@ -38,6 +38,7 @@
 #define PFIXTOOLS_QUERY_H
 
 #include "mem.h"
+#include "common.h"
 
 enum smtp_state {
     SMTP_CONNECT,
@@ -100,5 +101,13 @@ static inline void query_delete(query_t **query)
         p_delete(query);
     }
 }
+
+/** Parse the content of the text to fill the query.
+ * The text pointed by \p p is segmented (and modified to add
+ * a \0 at the end of each segment) and used to fill the query
+ * object.
+ */
+__attribute__((nonnull(1,2)))
+bool query_parse(query_t *query, char *p);
 
 #endif
