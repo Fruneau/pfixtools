@@ -3,6 +3,7 @@
 /common/tst-trie
 /postlicyd/postlicyd
 /postlicyd/tst-rbl
+/postlicyd/tst-filters
 /pfix-srsd/pfix-srsd
 
 *.[ao]

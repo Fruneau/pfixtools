@@ -129,7 +129,7 @@ __attribute__((nonnull(1)))
 bool filter_build(filter_t *filter);
 
 __attribute__((nonnull(1,2)))
-static inline int filter_find_with_name(A(filter_t) *array, const char *name)
+static inline int filter_find_with_name(const A(filter_t) *array, const char *name)
 {
     int start = 0;
     int end   = array->len;

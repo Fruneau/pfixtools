@@ -239,7 +239,7 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
         break;
 
       case MATCH_EMPTY:
-        return !!(!!(field == NULL || *field == '\0')) ^ (!!cond->case_sensitive);
+        return !!((field == NULL || *field == '\0') ^ (!cond->case_sensitive));
 
       default:
         assert(false && "invalid condition type");
