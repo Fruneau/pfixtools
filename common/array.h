@@ -163,7 +163,7 @@
 #define array_len(array) (array).len
 #define array_size(array) (array).size
 #define array_elt_len(array) sizeof(*(array).data)
-#define array_byte_len(array) (array).len * array_elt_len(array)
+#define array_byte_len(array) ((array).len * array_elt_len(array))
 
 #define array_lock(array)                                                      \
     ((array).locked                                                            \
