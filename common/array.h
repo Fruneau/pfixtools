@@ -160,13 +160,20 @@
         array_wipe(array);                                                     \
     } while (0)
 
+#define array_byte_len(array) (array).len * sizeof(*(array).data)
+
 #define array_lock(array)                                                      \
-    ((array).locked ||                                                         \
-        (mlock((array).data, (array).len * sizeof(*(array).data)) == 0         \
-         && ((array).locked = true)))
+    ((array).locked                                                            \
+     || (mprotect((array).data, array_byte_len(array), PROT_READ) == 0         \
+         && mlock((array).data, array_byte_len(array)) == 0                    \
+         && ((array).locked = true))                                           \
+     || (mprotect((array).data, array_byte_len(array),                         \
+                  PROT_READ | PROT_WRITE) > 0))
 #define array_unlock(array)                                                    \
     if ((array).locked) {                                                      \
-        (void)munlock((array).data, (array).len * sizeof(*(array).data));      \
+        (void)munlock((array).data, array_byte_len(array));                    \
+        (void)mprotect((array).data, array_byte_len(array),                    \
+                       PROT_READ | PROT_WRITE);                                \
         (array).locked = false;                                                \
     }
 
