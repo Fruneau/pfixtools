@@ -29,3 +29,4 @@ hostnames1=soft_match
 hostnames2=hard_match
 emails1=soft_match
 emails2=hard_match
+ips1=hard_match

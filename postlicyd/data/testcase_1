@@ -29,3 +29,4 @@ hostnames1=fail
 hostnames2=fail
 emails1=fail
 emails2=fail
+ips1=hard_match
