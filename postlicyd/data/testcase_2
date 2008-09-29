@@ -24,6 +24,7 @@ etrn_domain=
 stress=yes
 
 match1=fail
+match2=match
 hostnames1=soft_match
 hostnames2=hard_match
 emails1=soft_match

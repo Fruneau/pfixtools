@@ -146,7 +146,7 @@ static bool match_filter_constructor(filter_t *filter)
             PARSE_CHECK(condition.condition != MATCH_UNKNOWN,
                         "invalid operator");
             if (condition.condition != MATCH_EMPTY) {
-                p = m_strnextsp(n + 1);
+                p = skipspaces(n + 1);
                 PARSE_CHECK(*p, "no value defined to check the condition");
                 condition.value_len = param->value_len - (p - param->value);
                 condition.value     = p_dupstr(p, condition.value_len);
