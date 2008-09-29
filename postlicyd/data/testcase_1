@@ -24,3 +24,7 @@ etrn_domain=
 stress=
 
 filter1=match
+filter2=fail
+filter3=fail
+filter4=fail
+filter5=fail
