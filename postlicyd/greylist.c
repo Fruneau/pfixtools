@@ -209,7 +209,7 @@ static bool try_greylist(const greylist_config_t *config,
 
         /* Whitelist if count is enough.
          */
-        if (aent.count > config->client_awl) {
+        if (aent.count >= config->client_awl) {
             if (now < aent.last + 3600) {
                 INCR_AWL
             }
@@ -311,6 +311,7 @@ static bool greylist_filter_constructor(filter_t *filter)
           FILTER_PARAM_PARSE_BOOLEAN(LOOKUP_BY_HOST, config->lookup_by_host);
           FILTER_PARAM_PARSE_INT(RETRY_WINDOW, config->retry_window);
           FILTER_PARAM_PARSE_INT(CLIENT_AWL,   config->client_awl);
+          FILTER_PARAM_PARSE_INT(DELAY,        config->delay);
 
           default: break;
         }

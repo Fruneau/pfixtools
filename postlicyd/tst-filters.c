@@ -42,33 +42,49 @@
 
 DECLARE_MAIN
 
-static bool run_testcase(const config_t *config, const char *basepath,
-                         const char *filename)
+static char *read_query(const char *basepath, const char *filename,
+                        char *buff, char **end, query_t *q)
 {
-    char buff[BUFSIZ];
     char path[FILENAME_MAX];
-    char *end;
-
     snprintf(path, FILENAME_MAX, "%s%s", basepath, filename);
     {
         file_map_t map;
         if (!file_map_open(&map, path, false)) {
-            return false;
+            UNIXERR("open");
+            return NULL;
         }
         if (map.end - map.map >= BUFSIZ) {
             syslog(LOG_ERR, "File too large for a testcase: %s", path);
-            return false;
+            file_map_close(&map);
+            return NULL;
         }
         memcpy(buff, map.map, map.end - map.map);
-        end = buff + (map.end - map.map);
-        *end = '\0';
+        if (end != NULL) {
+            *end = buff + (map.end - map.map);
+            **end = '\0';
+        }
         file_map_close(&map);
     }
 
+    char *eoq = strstr(buff, "\n\n");
+    if (eoq == NULL) {
+        return NULL;
+    }
+    if (!query_parse(q, buff)) {
+        syslog(LOG_ERR, "Cannot parse query from file %s", filename);
+        return NULL;
+    }
+    return eoq + 2;
+}
+
+static bool run_testcase(const config_t *config, const char *basepath,
+                         const char *filename)
+{
+    char buff[BUFSIZ];
+    char *end;
     query_t query;
-    const char *eol = strstr(buff, "\n\n") + 2;
-    if (!query_parse(&query, buff)) {
-        syslog(LOG_ERR, "Cannot parse query from file %s", path);
+    const char *eol = read_query(basepath, filename, buff, &end, &query);
+    if (eol == NULL) {
         return false;
     }
 
@@ -102,11 +118,63 @@ static bool run_testcase(const config_t *config, const char *basepath,
         }
         filter_t *filter = array_ptr(config->filters, pos);
 
-        bool test = filter_test(filter, &query, result);
-        printf("  filter %s: %s\n", filter->name, test ? "SUCCESS" : "FAILED");
-        ok = ok && test;
+#define TEST(Name, Run)                                                        \
+        do {                                                                   \
+          bool __test = (Run);                                                 \
+          printf("  test %s: %s\n", Name, __test ? "SUCCESS" : "FAILED");      \
+          ok = ok && __test;                                                   \
+        } while (0)
+        TEST(filter->name, filter_test(filter, &query, result));
         eol = neol + 1;
     }
+    return ok;
+}
+
+static bool run_greylisttest(const config_t *config, const char *basepath)
+{
+    char buff_q1[BUFSIZ];
+    char buff_q2[BUFSIZ];
+    char buff_q3[BUFSIZ];
+    query_t q1;
+    query_t q2;
+    query_t q3;
+    bool ok = true;
+
+    filter_t *greylist1;
+//    filter_t *greylist2;
+
+#define QUERY(Q)                                                               \
+    printf("Reading greylist_" STR(Q) "\n");                                   \
+    if (read_query(basepath, "greylist_" STR(Q), buff_##Q, NULL, &Q) == NULL) {    \
+        return false;                                                          \
+    }
+    QUERY(q1);
+    QUERY(q2);
+    QUERY(q3);
+#undef QUERY
+
+#define FILTER(F)                                                              \
+    do {                                                                       \
+      int __p = filter_find_with_name(&config->filters, STR(F));               \
+      if (__p < 0) {                                                           \
+          return false;                                                        \
+      }                                                                        \
+      F = array_ptr(config->filters, __p);                                     \
+    } while (0)
+    FILTER(greylist1);
+//    FILTER(greylist2);
+#undef FILTER
+
+    /* Test greylist */
+    TEST("greylisted", filter_test(greylist1, &q1, HTK_GREYLIST));
+    TEST("greylisted", filter_test(greylist1, &q1, HTK_GREYLIST));
+    sleep(2);
+    TEST("whitelisted", filter_test(greylist1, &q1, HTK_WHITELIST));
+    TEST("other_greylisted", filter_test(greylist1, &q2, HTK_GREYLIST));
+    TEST("auto_whitelisted", filter_test(greylist1, &q1, HTK_WHITELIST));
+    TEST("other_auto_whitelisted", filter_test(greylist1, &q2, HTK_WHITELIST));
+    TEST("greylisted", filter_test(greylist1, &q3, HTK_GREYLIST));
+
     return ok;
 }
 
@@ -122,8 +190,20 @@ int main(int argc, char *argv[])
     } else {
         ++p;
     }
-
     snprintf(basepath, FILENAME_MAX, "%.*sdata/", p - argv[0], argv[0]);
+
+    /* Cleanup */
+    {
+#define RM(File)                                                               \
+      snprintf(path, FILENAME_MAX, "%s/%s", basepath, File);                   \
+      unlink(path);
+      RM("test1_greylist.db");
+      RM("test1_whitelist.db");
+      RM("test2_greylist.db");
+      RM("test2_whitelist.db");
+#undef RM
+    }
+
     snprintf(path, FILENAME_MAX, "%s/test.conf", basepath);
 
     config_t *config = config_read(path);
@@ -131,21 +211,31 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+
+#define RUN(Name, Test, ...)                                                   \
+    printf("Running %s:\n", Name);                                             \
+    printf("%s\n", run_##Test(config, basepath, ##__VA_ARGS__) ? "SUCCESS"     \
+                                                               : "FAILED");
+
+    /* Test stateless filters */
     DIR *dir = opendir(basepath);
     if (dir == NULL) {
         UNIXERR("opendir");
         return 1;
     }
-
     struct dirent *ent;
     while ((ent = readdir(dir)) != NULL) {
         if (strncmp("testcase_", ent->d_name, 9) == 0) {
-            printf("Running %s:\n", ent->d_name);
-            printf("%s\n",
-                   run_testcase(config, basepath, ent->d_name) ? "SUCCESS" : "FAILED");
+            RUN(ent->d_name, testcase, ent->d_name);
         }
     }
     closedir(dir);
 
+    /* Test greylist */
+    RUN("greylist", greylisttest);
+
+
+#undef RUN
+    config_delete(&config);
     return 0;
 }
