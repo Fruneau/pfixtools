@@ -175,6 +175,8 @@ static bool run_greylisttest(const config_t *config, const char *basepath)
     TEST("auto_whitelisted", filter_test(greylist1, &q1, HTK_WHITELIST));
     TEST("other_auto_whitelisted", filter_test(greylist1, &q2, HTK_WHITELIST));
     TEST("greylisted", filter_test(greylist1, &q3, HTK_GREYLIST));
+    sleep(10);
+    TEST("cleanup", filter_test(greylist1, &q1, HTK_GREYLIST));
 
     return ok;
 }
