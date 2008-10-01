@@ -200,8 +200,8 @@ int main(int argc, char *argv[])
 #define RM(File)                                                               \
       snprintf(path, FILENAME_MAX, "%s/%s", basepath, File);                   \
       unlink(path);
-      RM("test1_greylist.db");
-      RM("test1_whitelist.db");
+//      RM("test1_greylist.db");
+//      RM("test1_whitelist.db");
       RM("test2_greylist.db");
       RM("test2_whitelist.db");
 #undef RM

@@ -104,9 +104,10 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
         awl_db = tcbdbnew();
         if (tcbdbopen(awl_db, path, BDBOREADER)) {
             tmp_db = tcbdbnew();
-            if (tcbdbopen(tmp_db, tmppath, BDBOWRITER | BDBOTRUNC)) {
+            if (tcbdbopen(tmp_db, tmppath, BDBOWRITER | BDBOCREAT | BDBOTRUNC)) {
                 BDBCUR *cur = tcbdbcurnew(awl_db);
                 TCXSTR *key, *value;
+
                 key = tcxstrnew();
                 value = tcxstrnew();
                 if (tcbdbcurfirst(cur)) {
@@ -142,10 +143,9 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
                 UNIXERR("rename");
                 return NULL;
             }
-            syslog(LOG_INFO, "database cleanup stat: before %u entries, after %d entries",
-                   old_count, new_count);
         }
-        syslog(LOG_INFO, "database cleanup finished");
+        syslog(LOG_INFO, "database cleanup stat: before %u entries, after %d entries",
+               old_count, new_count);
     }
 
     /* Effectively open the database.
@@ -166,6 +166,7 @@ static bool greylist_initialize(greylist_config_t *config,
 
     if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
+        syslog(LOG_INFO, "loading auto-whitelist database");
         config->awl_db = greylist_db_get(config, path, true,
                                          sizeof(struct awl_entry),
                                          (db_entry_checker_t)(greylist_check_awlentry));
@@ -175,6 +176,7 @@ static bool greylist_initialize(greylist_config_t *config,
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
+    syslog(LOG_INFO, "loading greylist database");
     config->obj_db = greylist_db_get(config, path, true,
                                      sizeof(struct obj_entry),
                                      (db_entry_checker_t)(greylist_check_object));

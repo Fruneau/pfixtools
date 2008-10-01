@@ -69,7 +69,7 @@ bool query_parse(query_t *query, char *p)
 
         vtk = policy_tokenize(v, vlen);
         switch (policy_tokenize(k, klen)) {
-#define CASE(up, low)  case PTK_##up: query->low = v; v[vlen] = '\0'; syslog(LOG_DEBUG, "%s = %s", ptokens[PTK_##up], query->low); break;
+#define CASE(up, low)  case PTK_##up: query->low = v; v[vlen] = '\0';  break;
             CASE(HELO_NAME,           helo_name);
             CASE(QUEUE_ID,            queue_id);
             CASE(SENDER,              sender);
