@@ -44,6 +44,7 @@ typedef struct greylist_config_t {
     int delay;
     int retry_window;
     int client_awl;
+    int max_age;
 
     TCBDB *awl_db;
     TCBDB *obj_db;
@@ -53,6 +54,7 @@ typedef struct greylist_config_t {
                         .delay = 300,                  \
                         .retry_window = 2 * 24 * 3600, \
                         .client_awl = 5,               \
+                        .max_age = 35 * 3600,          \
                         .awl_db = NULL,                \
                         .obj_db = NULL }
 
@@ -180,6 +182,20 @@ static const char *c_net(const greylist_config_t *config,
     return cnet;
 }
 
+static inline bool greylist_check_awlentry(const greylist_config_t *config,
+                                           struct awl_entry *aent, time_t now)
+{
+    return !(now - aent->last > config->max_age);
+}
+
+static inline bool greylist_check_object(const greylist_config_t *config,
+                                         const struct obj_entry *oent, time_t now)
+{
+    return !(now - oent->last > config->max_age
+             || (oent->last - oent->first < config->delay
+                 && now - oent->last > config->retry_window));
+}
+
 static bool try_greylist(const greylist_config_t *config,
                          const char *sender, const char *c_addr,
                          const char *c_name, const char *rcpt)
@@ -207,6 +223,11 @@ static bool try_greylist(const greylist_config_t *config,
             memcpy(&aent, res, len);
         }
 
+        if (!greylist_check_awlentry(config, &aent, now)) {
+            aent.count = 0;
+            aent.last  = 0;
+        }
+
         /* Whitelist if count is enough.
          */
         if (aent.count >= config->client_awl) {
@@ -231,13 +252,13 @@ static bool try_greylist(const greylist_config_t *config,
     res = tcbdbget3(config->obj_db, key, klen, &len);
     if (res && len == sizeof(oent)) {
         memcpy(&oent, res, len);
+        greylist_check_object(config, &oent, now);
     }
 
     /* Discard stored first-seen if it is the first retrial and
-     * it is beyong the retry window.
+     * it is beyong the retry window and too old entries.
      */
-    if (oent.last - oent.first < config->delay
-        &&  now - oent.first > config->retry_window) {
+    if (!greylist_check_object(config, &oent, now)) {
         oent.first = now;
     }
 
@@ -312,6 +333,7 @@ static bool greylist_filter_constructor(filter_t *filter)
           FILTER_PARAM_PARSE_INT(RETRY_WINDOW, config->retry_window);
           FILTER_PARAM_PARSE_INT(CLIENT_AWL,   config->client_awl);
           FILTER_PARAM_PARSE_INT(DELAY,        config->delay);
+          FILTER_PARAM_PARSE_INT(MAX_AGE,      config->max_age);
 
           default: break;
         }
@@ -364,6 +386,7 @@ static int greylist_init(void)
     (void)filter_param_register(type, "delay");
     (void)filter_param_register(type, "retry_window");
     (void)filter_param_register(type, "client_awl");
+    (void)filter_param_register(type, "max_age");
     (void)filter_param_register(type, "path");
     (void)filter_param_register(type, "prefix");
     return 0;
