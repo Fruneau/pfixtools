@@ -144,7 +144,6 @@ static bool run_greylisttest(const config_t *config, const char *basepath)
 //    filter_t *greylist2;
 
 #define QUERY(Q)                                                               \
-    printf("Reading greylist_" STR(Q) "\n");                                   \
     if (read_query(basepath, "greylist_" STR(Q), buff_##Q, NULL, &Q) == NULL) {    \
         return false;                                                          \
     }
@@ -167,7 +166,9 @@ static bool run_greylisttest(const config_t *config, const char *basepath)
 
     /* Test greylist */
     TEST("greylisted", filter_test(greylist1, &q1, HTK_GREYLIST));
-    TEST("greylisted", filter_test(greylist1, &q1, HTK_GREYLIST));
+    TEST("too_fast", filter_test(greylist1, &q1, HTK_GREYLIST));
+    sleep(5);
+    TEST("too_slow", filter_test(greylist1, &q1, HTK_GREYLIST));
     sleep(2);
     TEST("whitelisted", filter_test(greylist1, &q1, HTK_WHITELIST));
     TEST("other_greylisted", filter_test(greylist1, &q2, HTK_GREYLIST));
