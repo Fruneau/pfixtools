@@ -68,6 +68,96 @@ struct obj_entry {
     time_t last;
 };
 
+static inline bool greylist_check_awlentry(const greylist_config_t *config,
+                                           struct awl_entry *aent, time_t now)
+{
+    return !(config->max_age > 0 && now - aent->last > config->max_age);
+}
+
+static inline bool greylist_check_object(const greylist_config_t *config,
+                                         const struct obj_entry *oent, time_t now)
+{
+    return !((config->max_age > 0 && now - oent->last > config->max_age)
+             || (oent->last - oent->first < config->delay
+                 && now - oent->last > config->retry_window));
+}
+
+typedef bool (*db_entry_checker_t)(const greylist_config_t *, const void *, time_t);
+
+static TCBDB *greylist_db_get(const greylist_config_t *config,
+                              const char *path, bool cleanup,
+                              size_t entry_len, db_entry_checker_t check)
+{
+    TCBDB *awl_db, *tmp_db;
+    time_t now = time(NULL);
+
+    /* Rebuild a new database after removing too old entries.
+     */
+    if (cleanup && config->max_age > 0) {
+        uint32_t old_count = 0;
+        uint32_t new_count = 0;
+        bool replace = false;
+        char tmppath[PATH_MAX];
+        snprintf(tmppath, PATH_MAX, "%s.tmp", path);
+
+        syslog(LOG_INFO, "database cleanup started");
+        awl_db = tcbdbnew();
+        if (tcbdbopen(awl_db, path, BDBOREADER)) {
+            tmp_db = tcbdbnew();
+            if (tcbdbopen(tmp_db, tmppath, BDBOWRITER | BDBOTRUNC)) {
+                BDBCUR *cur = tcbdbcurnew(awl_db);
+                TCXSTR *key, *value;
+                key = tcxstrnew();
+                value = tcxstrnew();
+                if (tcbdbcurfirst(cur)) {
+                    replace = true;
+                    do {
+                        tcxstrclear(key);
+                        tcxstrclear(value);
+                        (void)tcbdbcurrec(cur, key, value);
+
+                        if ((size_t)tcxstrsize(value) == entry_len
+                            && check(config, tcxstrptr(value), now)) {
+                            tcbdbput(tmp_db, tcxstrptr(key), tcxstrsize(key),
+                                     tcxstrptr(value), entry_len);
+                            ++new_count;
+                        }
+                        ++old_count;
+                    } while (tcbdbcurnext(cur));
+                }
+                tcxstrdel(key);
+                tcxstrdel(value);
+                tcbdbcurdel(cur);
+                tcbdbsync(tmp_db);
+            }
+            tcbdbdel(tmp_db);
+        }
+        tcbdbdel(awl_db);
+
+        /** Cleanup successful, replace the old database with the new one.
+         */
+        if (replace) {
+            unlink(path);
+            if (rename(tmppath, path) != 0) {
+                UNIXERR("rename");
+                return NULL;
+            }
+            syslog(LOG_INFO, "database cleanup stat: before %u entries, after %d entries",
+                   old_count, new_count);
+        }
+        syslog(LOG_INFO, "database cleanup finished");
+    }
+
+    /* Effectively open the database.
+     */
+    awl_db = tcbdbnew();
+    if (!tcbdbopen(awl_db, path, BDBOWRITER | BDBOCREAT)) {
+        tcbdbdel(awl_db);
+        return NULL;
+    }
+    return awl_db;
+}
+
 
 static bool greylist_initialize(greylist_config_t *config,
                                 const char *directory, const char *prefix)
@@ -76,19 +166,19 @@ static bool greylist_initialize(greylist_config_t *config,
 
     if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        config->awl_db = tcbdbnew();
-        if (!tcbdbopen(config->awl_db, path, BDBOWRITER | BDBOCREAT)) {
-            tcbdbdel(config->awl_db);
-            config->awl_db = NULL;
+        config->awl_db = greylist_db_get(config, path, true,
+                                         sizeof(struct awl_entry),
+                                         (db_entry_checker_t)(greylist_check_awlentry));
+        if (config->awl_db == NULL) {
             return false;
         }
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    config->obj_db = tcbdbnew();
-    if (!tcbdbopen(config->obj_db, path, BDBOWRITER | BDBOCREAT)) {
-        tcbdbdel(config->obj_db);
-        config->obj_db = NULL;
+    config->obj_db = greylist_db_get(config, path, true,
+                                     sizeof(struct obj_entry),
+                                     (db_entry_checker_t)(greylist_check_object));
+    if (config->obj_db == NULL) {
         if (config->awl_db) {
             tcbdbdel(config->awl_db);
             config->awl_db = NULL;
@@ -182,19 +272,6 @@ static const char *c_net(const greylist_config_t *config,
     return cnet;
 }
 
-static inline bool greylist_check_awlentry(const greylist_config_t *config,
-                                           struct awl_entry *aent, time_t now)
-{
-    return !(now - aent->last > config->max_age);
-}
-
-static inline bool greylist_check_object(const greylist_config_t *config,
-                                         const struct obj_entry *oent, time_t now)
-{
-    return !(now - oent->last > config->max_age
-             || (oent->last - oent->first < config->delay
-                 && now - oent->last > config->retry_window));
-}
 
 static bool try_greylist(const greylist_config_t *config,
                          const char *sender, const char *c_addr,
