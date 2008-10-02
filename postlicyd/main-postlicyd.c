@@ -183,6 +183,11 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    if (drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
+        syslog(LOG_CRIT, "unable to drop privileges");
+        return EXIT_FAILURE;
+    }
+
     config_t *config = config_read(argv[optind]);
     if (config == NULL) {
         return EXIT_FAILURE;
@@ -191,13 +196,11 @@ int main(int argc, char *argv[])
         config->port = port;
     }
 
-    if (common_setup(pidfile, false, RUNAS_USER, RUNAS_GROUP,
-                     daemonize) != EXIT_SUCCESS
+    if (common_setup(pidfile, true, NULL, NULL, daemonize) != EXIT_SUCCESS
         || start_listener(config->port) < 0) {
         config_delete(&config);
         return EXIT_FAILURE;
-    }
-    {
+    } else {
         int res = server_loop(query_starter, (delete_client_t)query_delete,
                               policy_run, config_refresh, config);
         config_delete(&config);

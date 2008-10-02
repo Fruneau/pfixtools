@@ -44,6 +44,8 @@
 sig_atomic_t sigint  = false;
 sig_atomic_t sighup  = false;
 
+bool daemon_process  = true;
+
 static FILE *pidfile = NULL;
 
 void common_sighandler(int sig)
@@ -193,10 +195,13 @@ int daemon_detach(void)
     open("/dev/null", O_RDWR);
 
     pid = fork();
-    if (pid < 0)
+    if (pid < 0) {
         return -1;
-    if (pid)
+		}
+    if (pid) {
+				daemon_process = false;
         exit(0);
+		}
 
     setsid();
     return 0;
@@ -276,11 +281,6 @@ static void pidfile_close(void)
 int common_setup(const char* pidfilename, bool unsafe, const char* runas_user,
                  const char* runas_group, bool daemonize)
 {
-    if (pidfile_open(pidfilename) < 0) {
-        syslog(LOG_CRIT, "unable to write pidfile %s", pidfilename);
-        return EXIT_FAILURE;
-    }
-
     if (!unsafe && drop_privileges(runas_user, runas_group) < 0) {
         syslog(LOG_CRIT, "unable to drop privileges");
         return EXIT_FAILURE;
@@ -288,6 +288,11 @@ int common_setup(const char* pidfilename, bool unsafe, const char* runas_user,
 
     if (daemonize && daemon_detach() < 0) {
         syslog(LOG_CRIT, "unable to fork");
+        return EXIT_FAILURE;
+    }
+
+		if (pidfile_open(pidfilename) < 0) {
+        syslog(LOG_CRIT, "unable to write pidfile %s", pidfilename);
         return EXIT_FAILURE;
     }
 
@@ -300,9 +305,10 @@ extern exitcall_t __madexit[];
 
 static void common_shutdown(void)
 {
-    syslog(LOG_INFO, "Stopping...");
-    pidfile_close();
-
+		if (daemon_process) {
+				syslog(LOG_INFO, "Stopping...");
+		}
+		pidfile_close();
     for (int i = -1; __madexit[i]; i--) {
         (*__madexit[i])();
     }

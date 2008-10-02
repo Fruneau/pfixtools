@@ -66,6 +66,7 @@ $(INSTALL_TARGETS): install-%: % install-dir
 install-dir:
 	install -d $(DESTDIR)$(prefix)/sbin
 	install -d $(DESTDIR)/etc/pfixtools
+	install example/postlicyd.conf $(DESTDIR)/etc/pfixtools/postlicyd.example.conf
 
 .PHONY: clean distclean install install-dir $(SUBDIRS) $(CLEAN_TARGETS) \
 				$(DISTCLEAN_TARGETS) $(INSTALL_TARGETS)
