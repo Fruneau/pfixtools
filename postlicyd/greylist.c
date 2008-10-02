@@ -97,6 +97,7 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
         uint32_t old_count = 0;
         uint32_t new_count = 0;
         bool replace = false;
+        bool trashable = false;
         char tmppath[PATH_MAX];
         snprintf(tmppath, PATH_MAX, "%s.tmp", path);
 
@@ -130,28 +131,41 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
                 tcxstrdel(value);
                 tcbdbcurdel(cur);
                 tcbdbsync(tmp_db);
+            } else {
+                syslog(LOG_ERR, "cannot run database cleanup: can't open destination database: %s",
+                       tcbdberrmsg(tcbdbecode(awl_db)));
             }
             tcbdbdel(tmp_db);
+        } else {
+            int ecode = tcbdbecode(awl_db);
+            syslog(LOG_ERR, "can not open database: %s", tcbdberrmsg(ecode));
+            trashable = ecode != TCENOPERM && ecode != TCEOPEN && ecode != TCENOFILE && ecode != TCESUCCESS;
         }
         tcbdbdel(awl_db);
 
         /** Cleanup successful, replace the old database with the new one.
          */
-        if (replace) {
+        if (trashable) {
+            syslog(LOG_INFO, "database cleanup finished: database was corrupted, create a new one");
+            unlink(path);
+        } else if (replace) {
+            syslog(LOG_INFO, "database cleanup finished: before %u entries, after %d entries",
+                   old_count, new_count);
             unlink(path);
             if (rename(tmppath, path) != 0) {
                 UNIXERR("rename");
                 return NULL;
             }
+        } else {
+            syslog(LOG_INFO, "database cleanup finished: nothing to do, %u entries", new_count);
         }
-        syslog(LOG_INFO, "database cleanup stat: before %u entries, after %d entries",
-               old_count, new_count);
     }
 
     /* Effectively open the database.
      */
     awl_db = tcbdbnew();
     if (!tcbdbopen(awl_db, path, BDBOWRITER | BDBOCREAT)) {
+        syslog(LOG_ERR, "can not open database: %s", tcbdberrmsg(tcbdbecode(awl_db)));
         tcbdbdel(awl_db);
         return NULL;
     }
