@@ -62,6 +62,8 @@ static char *read_query(const char *basepath, const char *filename,
         if (end != NULL) {
             *end = buff + (map.end - map.map);
             **end = '\0';
+        } else {
+          buff[map.end - map.map] = '\0';
         }
         file_map_close(&map);
     }
