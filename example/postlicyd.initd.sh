@@ -13,15 +13,25 @@ CONF=/etc/pfixtools/postlicyd.conf
 
 case "$1" in
   start)
-    $POSTLICYD -p "$PIDFILE" "$CONF"
+    mkdir -p `dirname "$PIDFILE"` || die "Can't create $PIDFILE"
+    echo "Starting postlicyd..."
+    flock -x -n "$PIDFILE" -c "true" || die "Already started"
+    $POSTLICYD -p "$PIDFILE" "$CONF" || die "Failed"
+    echo "Started"
     ;;
 
   stop)
-    kill `cat $PIDFILE`
+    echo "Stopping postlicyd..."
+    ( flock -x -n "$PIDFILE" -c "true" && die "Not started" ) \
+      || ( kill `cat $PIDFILE` && echo "Stopped" ) \
+      || die "Failed"
     ;;
 
   reload)
-    kill -HUP `cat $PIDFILE`
+    echo "Reloading postlicyd..."
+    ( flock -x -n "$PIDFILE" -c "true" && die "Not started" ) \
+      || ( kill -HUP `cat $PIDFILE` && ( sleep 3; echo "Done" ) ) \
+      || die "Failed"
     ;;
 
   *)
