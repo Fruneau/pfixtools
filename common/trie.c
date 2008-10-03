@@ -111,7 +111,11 @@ static inline bool trie_entry_match(const trie_t *trie,
 static inline bool trie_entry_prefix(const trie_t *trie,
                                      const trie_entry_t *entry, const char *key)
 {
-    return !!(strncmp(array_ptr(trie->c, entry->c_offset), key, entry->c_len) == 0);
+    int len = entry->c_len;
+    if (len > 0 && array_elt(trie->c, entry->c_offset + len - 1) == '\0') {
+        --len;
+    }
+    return !!(strncmp(array_ptr(trie->c, entry->c_offset), key, len) == 0);
 }
 
 static inline bool trie_entry_is_leaf(const trie_entry_t *entry)
@@ -366,6 +370,11 @@ static inline void trie_entry_inspect(const trie_t *trie, bool show_content,
     static int leaves    = 0;
     static int depth_sum = 0;
 
+    if (entry == array_ptr(trie->entries, 0)) {
+      max_depth = 0;
+      leaves    = 0;
+      depth_sum = 0;
+    }
     if (trie_entry_is_leaf(entry)) {
         if (level > max_depth) {
             max_depth = level;

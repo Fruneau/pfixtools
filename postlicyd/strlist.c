@@ -43,6 +43,7 @@ typedef struct strlist_config_t {
     PA(trie_t) tries;
     A(int)     weights;
     A(bool)    reverses;
+    A(bool)    partiales;
 
     int soft_threshold;
     int hard_threshold;
@@ -69,6 +70,7 @@ static void strlist_config_delete(strlist_config_t **config)
         array_deep_wipe((*config)->tries, trie_delete);
         array_wipe((*config)->weights);
         array_wipe((*config)->reverses);
+        array_wipe((*config)->partiales);
         p_delete(config);
     }
 }
@@ -177,6 +179,7 @@ static bool strlist_filter_constructor(filter_t *filter)
             bool lock = false;
             int  weight = 0;
             bool reverse = false;
+            bool partial = false;
             trie_t *trie = NULL;
             const char *current = param->value;
             const char *p = m_strchrnul(param->value, ':');
@@ -198,6 +201,11 @@ static bool strlist_filter_constructor(filter_t *filter)
                     break;
 
                   case 1:
+                    if (p - current > (ssize_t)strlen("partial-") 
+                        && strncmp(current, "partial-", strlen("partial-")) == 0) {
+                        partial = true;
+                        current += strlen("partial-");
+                    }
                     if ((p - current) == 6 && strncmp(current, "suffix", 6) == 0) {
                         reverse = true;
                     } else if ((p - current) == 6 && strncmp(current, "prefix", 6) == 0) {
@@ -222,6 +230,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                     array_add(config->tries, trie);
                     array_add(config->weights, weight);
                     array_add(config->reverses, reverse);
+                    array_add(config->partiales, partial);
                     break;
                 }
                 if (i != 3) {
@@ -326,8 +335,10 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
         for (uint32_t i = 0 ; i < config->tries.len ; ++i) {                   \
             const int weight   = array_elt(config->weights, i);                \
             const trie_t *trie = array_elt(config->tries, i);                  \
-            const bool rev = array_elt(config->reverses, i);                   \
-            if (trie_lookup(trie, rev ? reverse : normal)) {                   \
+            const bool rev     = array_elt(config->reverses, i);               \
+            const bool part    = array_elt(config->partiales, i);              \
+            if ((!part && trie_lookup(trie, rev ? reverse : normal))           \
+                || (part && trie_prefix(trie, rev ? reverse : normal))) {      \
                 sum += weight;                                                 \
             }                                                                  \
         }                                                                      \
