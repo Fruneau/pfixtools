@@ -88,9 +88,18 @@ static bool policy_process(server_t *pcy, const config_t *config)
     while (true) {
         const filter_hook_t *hook = filter_run(filter, query);
         if (hook == NULL) {
-            syslog(LOG_WARNING, "request aborted");
+            syslog(LOG_WARNING, "request client=%s, from=<%s>, to=<%s>: aborted",
+                   query->client_name,
+                   query->sender == NULL ? "undefined" : query->sender,
+                   query->recipient == NULL ? "undefined" : query->recipient);
             return false;
         } else if (hook->postfix) {
+            syslog(LOG_INFO, "request client=%s, from=<%s>, to=<%s>: "
+                  "awswer %s from filter %s",
+                   query->client_name,
+                   query->sender == NULL ? "undefined" : query->sender,
+                   query->recipient == NULL ? "undefined" : query->recipient,
+                   htokens[hook->type], filter->name);
             policy_answer(pcy, "%s", hook->value);
             return true;
         } else {
