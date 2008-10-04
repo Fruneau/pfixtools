@@ -36,14 +36,14 @@ GENERATED = policy_tokens.h policy_tokens.c \
 						filter_tokens.h filter_tokens.c \
 						hook_tokens.h hook_tokens.c \
 						param_tokens.h param_tokens.c
-TESTS     = test-rbl tst-filters
+TESTS     = tst-rbl tst-filters
 
 FILTERS		= rbl.c greylist.c strlist.c match.c
 
 postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c $(FILTERS) $(GENERATED)
 postlicyd_LIBADD  = $(TC_LIBS)
 
-tst-rbl_SOURCES   = tst-rbl.c
+tst-rbl_SOURCES   = tst-rbl.c ../common/lib.a filter.c config.c query.c rbl.c $(GENERATED)
 tst-filters_SOURCES = tst-filters.c ../common/lib.a config.c filter.c query.c $(FILTERS) $(GENERATED)
 tst-filters_LIBADD  = $(TC_LIBS)
 

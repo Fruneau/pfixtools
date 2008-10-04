@@ -38,7 +38,7 @@
             __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 
 #include "common.h"
-#include "rbl.c"
+#include "rbl.h"
 
 int main(int argc, char *argv[])
 {
@@ -46,6 +46,12 @@ int main(int argc, char *argv[])
         rbldb_t *db = rbldb_create(argv[1], false);
         printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
                rbldb_stats(db) * 4);
+
+        time_t now = time(NULL);
+        for (uint32_t i = 0 ; i < 100000000 ; ++i) {
+            rbldb_ipv4_lookup(db, (88 << 24) | (170 << 16) | (239 << 8) | (132));
+        }
+        printf("%ld request per second\n", 100000000 / (time(NULL) - now));
         rbldb_delete(&db);
     }
     return 0;
