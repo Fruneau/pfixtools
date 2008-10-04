@@ -204,6 +204,11 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    if (pidfile_open(pidfile) < 0) {
+        crit("unable to write pidfile %s", pidfile);
+        return EXIT_FAILURE;
+    }
+
     if (drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
         crit("unable to drop privileges");
         return EXIT_FAILURE;
@@ -217,8 +222,14 @@ int main(int argc, char *argv[])
         config->port = port;
     }
 
-    if (common_setup(pidfile, true, NULL, NULL, daemonize) != EXIT_SUCCESS
-        || start_listener(config->port) < 0) {
+    if (daemonize && daemon_detach() < 0) {
+        crit("unable to fork");
+        return EXIT_FAILURE;
+    }
+
+    pidfile_refresh();
+
+    if (start_listener(config->port) < 0) {
         return EXIT_FAILURE;
     } else {
         return server_loop(query_starter, (delete_client_t)query_delete,

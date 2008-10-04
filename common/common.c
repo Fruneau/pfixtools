@@ -236,19 +236,10 @@ int drop_privileges(const char *user, const char *group)
 
 int pidfile_open(const char *name)
 {
-		struct flock lock;
-		p_clear(&lock, 1);
-		lock.l_type = F_WRLCK;
     if (name) {
         pidfile = fopen(name, "w");
         if (!pidfile)
             return -1;
-				if (fcntl(fileno(pidfile), F_SETLK, &lock) == -1) {
-						crit("program already started");
-						fclose(pidfile);
-						pidfile = NULL;
-						return -1;
-				}
 				fprintf(pidfile, "%d\n", getpid());
         return fflush(pidfile);
     }
@@ -268,13 +259,9 @@ int pidfile_refresh(void)
 
 static void pidfile_close(void)
 {
-		struct flock lock;
-		p_clear(&lock, 1);
-		lock.l_type = F_UNLCK;
     if (pidfile) {
         rewind(pidfile);
         ftruncate(fileno(pidfile), 0);
-        fcntl(fileno(pidfile), F_SETLK, &lock);
 				fclose(pidfile);
         pidfile = NULL;
     }
@@ -309,8 +296,8 @@ static void common_shutdown(void)
 {
 		if (daemon_process) {
 				info("stopping...");
+		    pidfile_close();
 		}
-		pidfile_close();
     for (int i = -1; __madexit[i]; i--) {
         (*__madexit[i])();
     }
