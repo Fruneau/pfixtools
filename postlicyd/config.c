@@ -77,9 +77,13 @@ config_param_register("verify_filter");
  */
 config_param_register("port");
 
+
+static config_t *global_config = NULL;
+
 static inline config_t *config_new(void)
 {
     config_t *config = p_new(config_t, 1);
+    global_config = config;
     return config;
 }
 
@@ -97,9 +101,17 @@ void config_delete(config_t **config)
     if (*config) {
         config_close(*config);
         p_delete(config);
+        global_config = NULL;
     }
 }
 
+static void config_exit()
+{
+    if (global_config) {
+        config_delete(&global_config);
+    }
+}
+module_exit(config_exit);
 
 static bool config_second_pass(config_t *config)
 {
