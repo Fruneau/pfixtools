@@ -216,6 +216,9 @@ bool rbldb_ipv4_lookup(const rbldb_t *db, uint32_t ip)
 typedef struct rbl_filter_t {
     PA(rbldb_t) rbls;
     A(int)      weights;
+    A(char)     hosts;
+    A(int)      host_offsets;
+    A(int)      host_weights;
 
     int32_t     hard_threshold;
     int32_t     soft_threshold;
@@ -231,6 +234,9 @@ static void rbl_filter_delete(rbl_filter_t **rbl)
     if (*rbl) {
         array_deep_wipe((*rbl)->rbls, rbldb_delete);
         array_wipe((*rbl)->weights);
+        array_wipe((*rbl)->hosts);
+        array_wipe((*rbl)->host_offsets);
+        array_wipe((*rbl)->host_weights);
         p_delete(rbl);
     }
 }
@@ -307,6 +313,39 @@ static bool rbl_filter_constructor(filter_t *filter)
             }
           } break;
 
+          /* host parameter.
+           *  weight:hostname.
+           * define a RBL to use through DNS resolution.
+           */
+          case ATK_HOST: {
+            int  weight = 0;
+            const char *current = param->value;
+            const char *p = m_strchrnul(param->value, ':');
+            char *next = NULL;
+            for (int i = 0 ; i < 2 ; ++i) {
+                PARSE_CHECK(i == 1 || *p,
+                            "host parameter must contains a weight option");
+                switch (i) {
+                  case 0:
+                    weight = strtol(current, &next, 10);
+                    PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
+                                "illegal weight value %.*s",
+                                (p - current), current);
+                    break;
+
+                  case 1:
+                    array_add(data->host_offsets, array_len(data->hosts));
+                    array_append(data->hosts, current, strlen(current) + 1);
+                    array_add(data->host_weights, weight);
+                    break;
+                }
+                if (i != 1) {
+                    current = p + 1;
+                    p = m_strchrnul(current, ':');
+                }
+            }
+          } break;
+
           /* hard_threshold parameter is an integer.
            *  If the matching score is greater or equal than this threshold,
            *  the hook "hard_match" is called.
@@ -357,6 +396,9 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
         int weight   = array_elt(data->weights, i);
         if (rbldb_ipv4_lookup(rbl, ip)) {
             sum += weight;
+            if (sum >= data->hard_threshold) {
+                return HTK_HARD_MATCH;
+            }
         }
     }
     if (sum >= data->hard_threshold) {
@@ -383,6 +425,7 @@ static int rbl_init(void)
     /* Parameters.
      */
     (void)filter_param_register(type, "file");
+    (void)filter_param_register(type, "host");
     (void)filter_param_register(type, "hard_threshold");
     (void)filter_param_register(type, "soft_threshold");
     return 0;

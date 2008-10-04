@@ -339,6 +339,9 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
             if ((!part && trie_lookup(trie, rev ? reverse : normal))           \
                 || (part && trie_prefix(trie, rev ? reverse : normal))) {      \
                 sum += weight;                                                 \
+                if (sum >= config->hard_threshold) {                           \
+                    return HTK_HARD_MATCH;                                     \
+                }                                                              \
             }                                                                  \
         }                                                                      \
     }
