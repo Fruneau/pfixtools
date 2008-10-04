@@ -195,7 +195,6 @@ uint32_t rbldb_stats(const rbldb_t *rbl)
     for (int i = 0 ; i < 1 << 16 ; ++i) {
         ips += array_len(rbl->ips[i]);
     }
-    printf("memory overhead of rbldb: %u\n", sizeof(rbldb_t));
     return ips;
 }
 

@@ -48,10 +48,10 @@ int main(int argc, char *argv[])
                rbldb_stats(db) * 4);
 
         time_t now = time(NULL);
-        for (uint32_t i = 0 ; i < 100000000 ; ++i) {
+        for (uint32_t i = 0 ; i < 1000000000 ; ++i) {
             rbldb_ipv4_lookup(db, (88 << 24) | (170 << 16) | (239 << 8) | (132));
         }
-        printf("%ld request per second\n", 100000000 / (time(NULL) - now));
+        printf("%ld request per second\n", 1000000000 / (time(NULL) - now));
         rbldb_delete(&db);
     }
     return 0;
