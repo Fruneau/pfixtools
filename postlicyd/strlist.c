@@ -49,10 +49,11 @@ typedef struct strlist_config_t {
     int hard_threshold;
 
     unsigned is_email         :1;
+    unsigned is_hostname      :1;
+
     unsigned match_sender     :1;
     unsigned match_recipient  :1;
 
-    unsigned is_hostname      :1;
     unsigned match_helo       :1;
     unsigned match_client     :1;
     unsigned match_reverse    :1;
@@ -276,6 +277,8 @@ static bool strlist_filter_constructor(filter_t *filter)
                   CASE(HELO_NAME, helo, hostname);
                   CASE(CLIENT_NAME, client, hostname);
                   CASE(REVERSE_CLIENT_NAME, reverse, hostname);
+                  CASE(SENDER_DOMAIN, sender, hostname);
+                  CASE(RECIPIENT_DOMAIN, recipient, hostname);
                   CASE(SENDER, sender, email);
                   CASE(RECIPIENT, recipient, email);
 #undef CASE
@@ -339,6 +342,9 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
             if ((!part && trie_lookup(trie, rev ? reverse : normal))           \
                 || (part && trie_prefix(trie, rev ? reverse : normal))) {      \
                 sum += weight;                                                 \
+                if (sum >= config->hard_threshold) {                           \
+                    return HTK_HARD_MATCH;                                     \
+                }                                                              \
             }                                                                  \
         }                                                                      \
     }
@@ -349,6 +355,8 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
         LOOKUP(helo, helo_name);
         LOOKUP(client, client_name);
         LOOKUP(reverse, reverse_client_name);
+        LOOKUP(recipient, recipient_domain);
+        LOOKUP(sender, sender_domain);
     }
 #undef  LOOKUP
     if (sum >= config->hard_threshold) {

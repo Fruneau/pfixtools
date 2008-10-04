@@ -137,6 +137,10 @@ exit 0
 ## reverse_client_name
 ## instance
 #
+# helpers
+## sender_domain
+## recipient_domain
+#
 # postfix 2.2+
 ## sasl_method
 ## sasl_username
