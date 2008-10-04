@@ -5,6 +5,7 @@
 /postlicyd/tst-rbl
 /postlicyd/tst-filters
 /pfix-srsd/pfix-srsd
+/postlicyd/data/*.db
 
 *.[ao]
 .tags
