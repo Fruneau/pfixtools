@@ -69,6 +69,10 @@ typedef struct query_t {
     const char *reverse_client_name;
     const char *instance;
 
+    /* useful data extracted from previous ones */
+    const char *sender_domain;
+    const char *recipient_domain;
+
     /* postfix 2.2+ */
     const char *sasl_method;
     const char *sasl_username;
