@@ -72,8 +72,6 @@ bool query_parse(query_t *query, char *p)
 #define CASE(up, low)  case PTK_##up: query->low = v; v[vlen] = '\0';  break;
             CASE(HELO_NAME,           helo_name);
             CASE(QUEUE_ID,            queue_id);
-            CASE(SENDER,              sender);
-            CASE(RECIPIENT,           recipient);
             CASE(RECIPIENT_COUNT,     recipient_count);
             CASE(CLIENT_ADDRESS,      client_address);
             CASE(CLIENT_NAME,         client_name);
@@ -92,6 +90,24 @@ bool query_parse(query_t *query, char *p)
             CASE(ETRN_DOMAIN,         etrn_domain);
             CASE(STRESS,              stress);
 #undef CASE
+
+          case PTK_SENDER:
+            query->sender = v;
+            v[vlen] = '\0';
+            query->sender_domain = memchr(query->sender, '@', vlen);
+            if (query->sender_domain != NULL) {
+                ++query->sender_domain;
+            }
+            break;
+
+          case PTK_RECIPIENT:
+            query->recipient = v;
+            v[vlen] = '\0';
+            query->recipient_domain = memchr(query->recipient, '@', vlen);
+            if (query->recipient_domain != NULL) {
+                ++query->recipient_domain;
+            }
+            break;
 
           case PTK_REQUEST:
             PARSE_CHECK(vtk == PTK_SMTPD_ACCESS_POLICY,
