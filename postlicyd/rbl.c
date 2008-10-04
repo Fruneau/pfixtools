@@ -61,7 +61,7 @@ enum {
 };
 
 struct rbldb_t {
-    A(uint32_t) ips;
+    A(uint16_t) ips[1 << 16];
 };
 ARRAY(rbldb_t)
 
@@ -122,6 +122,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     rbldb_t *db;
     file_map_t map;
     const char *p, *end;
+    uint32_t ips = 0;
 
     if (!file_map_open(&map, file, false)) {
         return NULL;
@@ -147,33 +148,37 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         if (parse_ipv4(p, &p, &ip) < 0) {
             p = (char *)memchr(p, '\n', end - p) + 1;
         } else {
-            array_add(db->ips, ip);
+            array_add(db->ips[ip >> 16], ip & 0xffff);
+            ++ips;
         }
     }
     file_map_close(&map);
 
     /* Lookup may perform serveral I/O, so avoid swap.
      */
-    array_adjust(db->ips);
-    if (lock && !array_lock(db->ips)) {
-        UNIXERR("mlock");
-    }
-
-    if (db->ips.len) {
-#       define QSORT_TYPE uint32_t
-#       define QSORT_BASE db->ips.data
-#       define QSORT_NELT db->ips.len
+    for (int i = 0 ; i < 1 << 16 ; ++i) {
+        array_adjust(db->ips[i]);
+        if (lock && !array_lock(db->ips[i])) {
+            UNIXERR("mlock");
+        }
+        if (db->ips[i].len) {
+#       define QSORT_TYPE uint16_t
+#       define QSORT_BASE db->ips[i].data
+#       define QSORT_NELT db->ips[i].len
 #       define QSORT_LT(a,b) *a < *b
 #       include "qsort.c"
+        }
     }
 
-    info("rbl %s loaded, %d IPs", file, db->ips.len);
+    info("rbl %s loaded, %d IPs", file, ips);
     return db;
 }
 
 static void rbldb_wipe(rbldb_t *db)
 {
-    array_wipe(db->ips);
+    for (int i = 0 ; i < 1 << 16 ; ++i) {
+        array_wipe(db->ips[i]);
+    }
 }
 
 void rbldb_delete(rbldb_t **db)
@@ -186,20 +191,27 @@ void rbldb_delete(rbldb_t **db)
 
 uint32_t rbldb_stats(const rbldb_t *rbl)
 {
-    return rbl->ips.len;
+    uint32_t ips = 0;
+    for (int i = 0 ; i < 1 << 16 ; ++i) {
+        ips += array_len(rbl->ips[i]);
+    }
+    printf("memory overhead of rbldb: %u\n", sizeof(rbldb_t));
+    return ips;
 }
 
 bool rbldb_ipv4_lookup(const rbldb_t *db, uint32_t ip)
 {
-    int l = 0, r = db->ips.len;
+    const uint16_t hip = ip >> 16;
+    const uint16_t lip = ip & 0xffff;
+    int l = 0, r = db->ips[hip].len;
 
     while (l < r) {
         int i = (r + l) / 2;
 
-        if (array_elt(db->ips, i) == ip)
+        if (array_elt(db->ips[hip], i) == lip)
             return true;
 
-        if (ip < array_elt(db->ips, i)) {
+        if (lip < array_elt(db->ips[hip], i)) {
             r = i;
         } else {
             l = i + 1;

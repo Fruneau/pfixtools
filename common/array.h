@@ -178,6 +178,7 @@
 ARRAY(char)
 ARRAY(int)
 ARRAY(bool)
+ARRAY(uint16_t)
 ARRAY(uint32_t)
 
 PARRAY(void)
