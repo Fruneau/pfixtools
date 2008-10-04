@@ -38,7 +38,7 @@ GENERATED = policy_tokens.h policy_tokens.c \
 						param_tokens.h param_tokens.c
 TESTS     = test-rbl tst-filters
 
-FILTERS		= rbl.c greylist.c strlist.c match.c
+FILTERS		= iplist.c greylist.c strlist.c match.c
 
 postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c $(FILTERS) $(GENERATED)
 postlicyd_LIBADD  = $(TC_LIBS)

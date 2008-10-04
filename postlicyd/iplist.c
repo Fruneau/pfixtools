@@ -39,10 +39,11 @@
 #include <sys/mman.h>
 
 #include "common.h"
-#include "rbl.h"
+#include "iplist.h"
 #include "str.h"
 #include "file.h"
 #include "array.h"
+#include "rbl.h"
 
 #define IPv4_BITS        5
 #define IPv4_PREFIX(ip)  ((uint32_t)(ip) >> IPv4_BITS)
@@ -385,6 +386,7 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
     int32_t sum = 0;
     const char *end = NULL;
     const rbl_filter_t *data = filter->data;
+    bool  error = true;
 
     if (parse_ipv4(query->client_address, &end, &ip) != 0) {
         warn("invalid client address: %s, expected ipv4",
@@ -400,6 +402,30 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
                 return HTK_HARD_MATCH;
             }
         }
+        error = false;
+    }
+    for (uint32_t i = 0 ; i < data->host_offsets.len ; ++i) {
+        const char *rbl = array_ptr(data->hosts, array_elt(data->host_offsets, i));
+        int weight      = array_elt(data->host_weights, i);
+        switch (rbl_check(rbl, ip)) {
+          case RBL_FOUND:
+            error = false;
+            sum += weight;
+            if (sum >= data->hard_threshold) {
+                return HTK_HARD_MATCH;
+            }
+            break;
+          case RBL_NOTFOUND:
+            error = false;
+            break;
+          case RBL_ERROR:
+            warn("rbl %s unavailable", rbl);
+            break;
+        }
+    }
+    if (error) {
+        err("filter %s: all the rbl returned an error", filter->name);
+        return HTK_ERROR;
     }
     if (sum >= data->hard_threshold) {
         return HTK_HARD_MATCH;

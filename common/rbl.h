@@ -30,23 +30,28 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2007 Pierre Habouzit
+ * Copyright © 2008 Florent Bruneau
  */
 
-#define DEBUG(fmt, ...) \
-    fprintf(stderr, "%s:%d:%s: "fmt"\n", \
-            __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+#ifndef PFIXTOOLS_RBL_H
+#define PFIXTOOLS_RBL_H
 
 #include "common.h"
-#include "iplist.c"
 
-int main(int argc, char *argv[])
-{
-    if (argc > 1) {
-        rbldb_t *db = rbldb_create(argv[1], false);
-        printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
-               rbldb_stats(db) * 4);
-        rbldb_delete(&db);
-    }
-    return 0;
-}
+typedef enum {
+  RBL_ERROR,
+  RBL_FOUND,
+  RBL_NOTFOUND,
+} rbl_result_t;
+
+/** Check the presence of the given IP in the given rbl.
+ */
+__attribute__((nonnull(1)))
+rbl_result_t rbl_check(const char *rbl, uint32_t ip);
+
+/** Check the presence of the given hostname in the given rhbl.
+ */
+__attribute__((nonnull(1,2)))
+rbl_result_t rhbl_check(const char *rhbl, const char *hostname);
+
+#endif

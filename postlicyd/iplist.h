@@ -31,22 +31,18 @@
 
 /*
  * Copyright © 2007 Pierre Habouzit
+ * Copyright © 2008 Florent Bruneau
  */
 
-#define DEBUG(fmt, ...) \
-    fprintf(stderr, "%s:%d:%s: "fmt"\n", \
-            __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+#ifndef PFIXTOOLS_IPLIST_H
+#define PFIXTOOLS_IPLIST_H
 
-#include "common.h"
-#include "iplist.c"
+typedef struct rbldb_t rbldb_t;
 
-int main(int argc, char *argv[])
-{
-    if (argc > 1) {
-        rbldb_t *db = rbldb_create(argv[1], false);
-        printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
-               rbldb_stats(db) * 4);
-        rbldb_delete(&db);
-    }
-    return 0;
-}
+rbldb_t *rbldb_create(const char *file, bool lock);
+void rbldb_delete(rbldb_t **);
+
+uint32_t rbldb_stats(const rbldb_t *rbl);
+bool rbldb_ipv4_lookup(const rbldb_t *rbl, uint32_t ip);
+
+#endif
