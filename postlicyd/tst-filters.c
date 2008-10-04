@@ -241,6 +241,5 @@ int main(int argc, char *argv[])
 
 
 #undef RUN
-    config_delete(&config);
     return 0;
 }
