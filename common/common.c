@@ -45,12 +45,14 @@ sig_atomic_t sigint  = false;
 sig_atomic_t sighup  = false;
 
 bool daemon_process  = true;
+int  log_level       = LOG_INFO;
 
 static FILE *pidfile = NULL;
 
 void common_sighandler(int sig)
 {
     switch (sig) {
+			case SIGTERM:
       case SIGINT:
         sigint = true;
         return;
@@ -60,7 +62,7 @@ void common_sighandler(int sig)
         return;
 
       default:
-        syslog(LOG_ERR, "Killed (got signal %d)...", sig);
+				err("Killed (got signal %d)...", sig);
         exit(-1);
     }
 }
@@ -242,7 +244,7 @@ int pidfile_open(const char *name)
         if (!pidfile)
             return -1;
 				if (fcntl(fileno(pidfile), F_SETLK, &lock) == -1) {
-						syslog(LOG_ERR, "program already started");
+						crit("program already started");
 						fclose(pidfile);
 						pidfile = NULL;
 						return -1;
@@ -282,17 +284,17 @@ int common_setup(const char* pidfilename, bool unsafe, const char* runas_user,
                  const char* runas_group, bool daemonize)
 {
     if (!unsafe && drop_privileges(runas_user, runas_group) < 0) {
-        syslog(LOG_CRIT, "unable to drop privileges");
+        crit("unable to drop privileges");
         return EXIT_FAILURE;
     }
 
     if (daemonize && daemon_detach() < 0) {
-        syslog(LOG_CRIT, "unable to fork");
+        crit("unable to fork");
         return EXIT_FAILURE;
     }
 
 		if (pidfile_open(pidfilename) < 0) {
-        syslog(LOG_CRIT, "unable to write pidfile %s", pidfilename);
+        crit("unable to write pidfile %s", pidfilename);
         return EXIT_FAILURE;
     }
 
@@ -306,7 +308,7 @@ extern exitcall_t __madexit[];
 static void common_shutdown(void)
 {
 		if (daemon_process) {
-				syslog(LOG_INFO, "Stopping...");
+				info("stopping...");
 		}
 		pidfile_close();
     for (int i = -1; __madexit[i]; i--) {

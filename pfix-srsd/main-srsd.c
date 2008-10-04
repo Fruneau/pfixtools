@@ -122,7 +122,7 @@ int process_srs(server_t *srsd, void* vconfig)
         nl = strchr(srsd->ibuf.data + 4, '\n');
         if (!nl) {
             if (srsd->ibuf.len > BUFSIZ) {
-                syslog(LOG_ERR, "unreasonnable amount of data without a \\n");
+                err("unreasonnable amount of data without a \\n");
                 return -1;
             }
             if (srsd->obuf.len) {
@@ -132,7 +132,7 @@ int process_srs(server_t *srsd, void* vconfig)
         }
 
         if (strncmp("get ", srsd->ibuf.data, 4)) {
-            syslog(LOG_ERR, "bad request, not starting with \"get \"");
+						err("bad request, not starting with \"get \"");
             return -1;
         }
 
@@ -141,7 +141,7 @@ int process_srs(server_t *srsd, void* vconfig)
 
         if (p == q) {
             buffer_addstr(&srsd->obuf, "400 empty request ???\n");
-            syslog(LOG_WARNING, "empty request");
+            warn("empty request");
             goto skip;
         }
 
@@ -234,7 +234,7 @@ static srs_t *srs_read_secrets(const char *sfile)
 
         ++lineno;
         if (n == sizeof(buf) - 1 && buf[n - 1] != '\n') {
-            syslog(LOG_CRIT, "%s:%d: line too long", sfile, lineno);
+            crit("%s:%d: line too long", sfile, lineno);
             goto error;
         }
         m_strrtrim(buf);
@@ -242,7 +242,7 @@ static srs_t *srs_read_secrets(const char *sfile)
     }
 
     if (!lineno) {
-        syslog(LOG_CRIT, "%s: empty file, no secrets", sfile);
+        crit("%s: empty file, no secrets", sfile);
         goto error;
     }
 

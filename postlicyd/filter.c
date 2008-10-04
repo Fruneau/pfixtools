@@ -111,8 +111,8 @@ bool filter_update_references(filter_t *filter, A(filter_t) *filter_list)
         if (!hook->postfix) {
             hook->filter_id = filter_find_with_name(filter_list, hook->value);
             if (hook->filter_id == -1) {
-                syslog(LOG_ERR, "invalid filter name %s for hook %s",
-                       hook->value, htokens[hook->type]);
+                err("invalid filter name %s for hook %s",
+                    hook->value, htokens[hook->type]);
                 return false;
             }
             p_delete(&hook->value);
@@ -145,7 +145,7 @@ bool filter_check_safety(A(filter_t) *array)
 {
     foreach (filter_t *filter, *array) {
         if (!filter_check_loop(filter, array, __Ai)) {
-            syslog(LOG_ERR, "the filter tree contains a loop");
+            err("the filter tree contains a loop");
             return false;
         }
     }}
@@ -167,21 +167,20 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
 {
     int start = 0;
     int end   = filter->hooks.len;
-    //syslog(LOG_DEBUG, "running filter %s (%s)",
-    //       filter->name, ftokens[filter->type]);
+    debug("running filter %s (%s)", filter->name, ftokens[filter->type]);
     filter_result_t res = runners[filter->type](filter, query);
 
     if (res == HTK_ABORT) {
         return NULL;
     }
-    //syslog(LOG_DEBUG, "filter run, result is %s", htokens[res]);
+    debug("filter run, result is %s", htokens[res]);
 
     while (start < end) {
         int mid = (start + end) / 2;
         filter_hook_t *hook = array_ptr(filter->hooks, mid);
         if (hook->type == res) {
-            //syslog(LOG_DEBUG, "return hook of type %s, value %s",
-            //       htokens[hook->type], hook->value);
+            debug("return hook of type %s, value %s",
+                  htokens[hook->type], hook->value);
             return hook;
         } else if (res < hook->type) {
             end = mid;
@@ -189,8 +188,7 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
             start = mid + 1;
         }
     }
-    syslog(LOG_WARNING, "missing hook %s for filter %s", 
-           htokens[res], filter->name);
+    warn("missing hook %s for filter %s", htokens[res], filter->name);
     return &default_hook;
 }
 
@@ -216,12 +214,12 @@ bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
     filter_param_t param;
     param.type = param_tokenize(name, name_len);
     if (param.type == ATK_UNKNOWN) {
-        syslog(LOG_ERR, "unknown parameter %.*s", name_len, name);
+        err("unknown parameter %.*s", name_len, name);
         return false;
     }
     if (!params[filter->type][param.type]) {
-        syslog(LOG_ERR, "hook %s is not valid for filter %s",
-               atokens[param.type], ftokens[filter->type]);
+        err("hook %s is not valid for filter %s",
+            atokens[param.type], ftokens[filter->type]);
         return false;
     }
     param.value     = p_dupstr(value, value_len);
@@ -236,12 +234,12 @@ bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
     filter_hook_t hook;
     hook.type  = hook_tokenize(name, name_len);
     if (hook.type == HTK_UNKNOWN) {
-        syslog(LOG_ERR, "unknown hook type %.*s", name_len, name);
+        err("unknown hook type %.*s", name_len, name);
         return false;
     }
     if (!hooks[filter->type][hook.type] || hook.type == HTK_ABORT) {
-        syslog(LOG_ERR, "hook %s not is valid for filter %s",
-               htokens[hook.type], ftokens[filter->type]);
+        err("hook %s not is valid for filter %s",
+            htokens[hook.type], ftokens[filter->type]);
         return false;
     }
     hook.postfix = (strncmp(value, "postfix:", 8) == 0);

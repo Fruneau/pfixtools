@@ -128,7 +128,7 @@ static bool config_second_pass(config_t *config)
     ok = false;
 #define PARSE_CHECK(Expr, Fmt, ...)                                            \
     if (!(Expr)) {                                                             \
-        syslog(LOG_ERR, Fmt, ##__VA_ARGS__);                                   \
+        err(Fmt, ##__VA_ARGS__);                                               \
         return false;                                                          \
     }
     foreach (filter_param_t *param, config->params) {
@@ -158,7 +158,7 @@ static bool config_second_pass(config_t *config)
     array_deep_wipe(config->params, filter_params_wipe);
 
     if (!ok) {
-        syslog(LOG_ERR, "no entry point defined");
+        err("no entry point defined");
     }
 
     return ok;
@@ -187,7 +187,7 @@ static bool config_load(config_t *config)
     linep = p = map.map;
 
 #define READ_LOG(Lev, Fmt, ...)                                                \
-    syslog(LOG_ ## Lev, "config file %s:%d:%d: " Fmt, config->filename,        \
+    __log(LOG_ ## Lev, "config file %s:%d:%d: " Fmt, config->filename,         \
            line + 1, p - linep + 1, ##__VA_ARGS__)
 #define READ_ERROR(Fmt, ...)                                                   \
     do {                                                                       \
@@ -391,7 +391,7 @@ ok:
     return true;
 
 badeof:
-    syslog(LOG_ERR, "Unexpected end of file");
+    err("Unexpected end of file");
 
 error:
     if (filter.name) {

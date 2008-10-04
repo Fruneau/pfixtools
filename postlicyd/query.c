@@ -42,7 +42,7 @@ bool query_parse(query_t *query, char *p)
 #define PARSE_CHECK(expr, error, ...)                                        \
     do {                                                                     \
         if (!(expr)) {                                                       \
-            syslog(LOG_ERR, error, ##__VA_ARGS__);                           \
+            err(error, ##__VA_ARGS__);                                       \
             return false;                                                    \
         }                                                                    \
     } while (0)
@@ -124,7 +124,7 @@ bool query_parse(query_t *query, char *p)
             break;
 
           default:
-            syslog(LOG_WARNING, "unexpected key, skipped: %.*s", klen, k);
+            warn("unexpected key, skipped: %.*s", klen, k);
             continue;
         }
     }

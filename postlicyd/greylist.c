@@ -101,7 +101,7 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
         char tmppath[PATH_MAX];
         snprintf(tmppath, PATH_MAX, "%s.tmp", path);
 
-        syslog(LOG_INFO, "database cleanup started");
+        info("database cleanup started");
         awl_db = tcbdbnew();
         if (tcbdbopen(awl_db, path, BDBOREADER)) {
             tmp_db = tcbdbnew();
@@ -132,13 +132,13 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
                 tcbdbcurdel(cur);
                 tcbdbsync(tmp_db);
             } else {
-                syslog(LOG_ERR, "cannot run database cleanup: can't open destination database: %s",
-                       tcbdberrmsg(tcbdbecode(awl_db)));
+                warn("cannot run database cleanup: can't open destination database: %s",
+                     tcbdberrmsg(tcbdbecode(awl_db)));
             }
             tcbdbdel(tmp_db);
         } else {
             int ecode = tcbdbecode(awl_db);
-            syslog(LOG_ERR, "can not open database: %s", tcbdberrmsg(ecode));
+            warn("can not open database: %s", tcbdberrmsg(ecode));
             trashable = ecode != TCENOPERM && ecode != TCEOPEN && ecode != TCENOFILE && ecode != TCESUCCESS;
         }
         tcbdbdel(awl_db);
@@ -146,10 +146,10 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
         /** Cleanup successful, replace the old database with the new one.
          */
         if (trashable) {
-            syslog(LOG_INFO, "database cleanup finished: database was corrupted, create a new one");
+            info("database cleanup finished: database was corrupted, create a new one");
             unlink(path);
         } else if (replace) {
-            syslog(LOG_INFO, "database cleanup finished: before %u entries, after %d entries",
+            info("database cleanup finished: before %u entries, after %d entries",
                    old_count, new_count);
             unlink(path);
             if (rename(tmppath, path) != 0) {
@@ -157,7 +157,7 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
                 return NULL;
             }
         } else {
-            syslog(LOG_INFO, "database cleanup finished: nothing to do, %u entries", new_count);
+            info("database cleanup finished: nothing to do, %u entries", new_count);
         }
     }
 
@@ -165,7 +165,7 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
      */
     awl_db = tcbdbnew();
     if (!tcbdbopen(awl_db, path, BDBOWRITER | BDBOCREAT)) {
-        syslog(LOG_ERR, "can not open database: %s", tcbdberrmsg(tcbdbecode(awl_db)));
+        err("can not open database: %s", tcbdberrmsg(tcbdbecode(awl_db)));
         tcbdbdel(awl_db);
         return NULL;
     }
@@ -180,7 +180,7 @@ static bool greylist_initialize(greylist_config_t *config,
 
     if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        syslog(LOG_INFO, "loading auto-whitelist database");
+        info("loading auto-whitelist database");
         config->awl_db = greylist_db_get(config, path, true,
                                          sizeof(struct awl_entry),
                                          (db_entry_checker_t)(greylist_check_awlentry));
@@ -190,7 +190,7 @@ static bool greylist_initialize(greylist_config_t *config,
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    syslog(LOG_INFO, "loading greylist database");
+    info("loading greylist database");
     config->obj_db = greylist_db_get(config, path, true,
                                      sizeof(struct obj_entry),
                                      (db_entry_checker_t)(greylist_check_object));
@@ -296,6 +296,8 @@ static bool try_greylist(const greylist_config_t *config,
 #define INCR_AWL                                              \
     aent.count++;                                             \
     aent.last = now;                                          \
+    debug("whitelist entry for %.*s updated, count %d",       \
+          c_addrlen, c_addr, aent.count);                     \
     tcbdbput(config->awl_db, c_addr, c_addrlen, &aent,        \
              sizeof(aent));
 
@@ -314,23 +316,27 @@ static bool try_greylist(const greylist_config_t *config,
         res = tcbdbget3(config->awl_db, c_addr, c_addrlen, &len);
         if (res && len == sizeof(aent)) {
             memcpy(&aent, res, len);
+            debug("client %.*s has a whitelist entry, count is %d",
+                  c_addrlen, c_addr, aent.count);
         }
 
         if (!greylist_check_awlentry(config, &aent, now)) {
             aent.count = 0;
             aent.last  = 0;
+            debug("client %.*s whitelist entry too old",
+                  c_addrlen, c_addr);
         }
 
         /* Whitelist if count is enough.
          */
         if (aent.count >= config->client_awl) {
+            debug("client %.*s whitelisted", c_addrlen, c_addr);
             if (now < aent.last + 3600) {
                 INCR_AWL
             }
 
             /* OK.
              */
-            //syslog(LOG_INFO, "client whitelisted");
             return true;
         }
     }
@@ -345,7 +351,7 @@ static bool try_greylist(const greylist_config_t *config,
     res = tcbdbget3(config->obj_db, key, klen, &len);
     if (res && len == sizeof(oent)) {
         memcpy(&oent, res, len);
-        greylist_check_object(config, &oent, now);
+        debug("found a greylist entry for %.*s", klen, key);
     }
 
     /* Discard stored first-seen if it is the first retrial and
@@ -353,6 +359,11 @@ static bool try_greylist(const greylist_config_t *config,
      */
     if (!greylist_check_object(config, &oent, now)) {
         oent.first = now;
+        debug("invalid retry for %.*s: %s", klen, key,
+              (config->max_age > 0 && now - oent.last > config->max_age) ?
+                  "too old entry"
+                : (oent.last - oent.first < config->delay ?
+                  "retry too early" : "retry too late" ));
     }
 
     /* Update.
@@ -368,19 +379,18 @@ static bool try_greylist(const greylist_config_t *config,
      *        - client whitelisted already ? -> update last-seen timestamp.
      */
     if (oent.first + config->delay < now) {
+        debug("valid retry for %.*s", klen, key);
         if (config->client_awl) {
             INCR_AWL
         }
 
         /* OK
          */
-        //syslog(LOG_INFO, "client whitelisted");
         return true;
     }
 
     /* DUNNO
      */
-    //syslog(LOG_INFO, "client greylisted");
     return false;
 }
 
@@ -413,7 +423,7 @@ static bool greylist_filter_constructor(filter_t *filter)
 
 #define PARSE_CHECK(Expr, Str, ...)                                            \
     if (!(Expr)) {                                                             \
-        syslog(LOG_ERR, Str, ##__VA_ARGS__);                                   \
+        err(Str, ##__VA_ARGS__);                                               \
         greylist_config_delete(&config);                                       \
         return false;                                                          \
     }
@@ -452,7 +462,7 @@ static filter_result_t greylist_filter(const filter_t *filter,
 {
     const greylist_config_t *config = filter->data;
     if (query->state != SMTP_RCPT) {
-        syslog(LOG_WARNING, "greylisting only works as smtpd_recipient_restrictions");
+        warn("greylisting only works as smtpd_recipient_restrictions");
         return HTK_ABORT;
     }
 

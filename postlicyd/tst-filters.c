@@ -54,7 +54,7 @@ static char *read_query(const char *basepath, const char *filename,
             return NULL;
         }
         if (map.end - map.map >= BUFSIZ) {
-            syslog(LOG_ERR, "File too large for a testcase: %s", path);
+            err("File too large for a testcase: %s", path);
             file_map_close(&map);
             return NULL;
         }
@@ -73,7 +73,7 @@ static char *read_query(const char *basepath, const char *filename,
         return NULL;
     }
     if (!query_parse(q, buff)) {
-        syslog(LOG_ERR, "Cannot parse query from file %s", filename);
+        err("Cannot parse query from file %s", filename);
         return NULL;
     }
     return eoq + 2;
@@ -100,21 +100,21 @@ static bool run_testcase(const config_t *config, const char *basepath,
         char *sep = memchr(eol, '=', neol - eol);
         if (sep == NULL) {
             eol = neol + 1;
-            syslog(LOG_ERR, "missing separator");
+            err("missing separator");
             continue;
         }
         *sep = '\0';
 
         int pos = filter_find_with_name(&config->filters, eol);
         if (pos == -1) {
-            syslog(LOG_ERR, "Unknown filter %s", eol);
+            err("Unknown filter %s", eol);
             eol = neol + 1;
             continue;
         }
         ++sep;
         filter_result_t result = hook_tokenize(sep, neol - sep);
         if (result == HTK_UNKNOWN) {
-            syslog(LOG_ERR, "Unknown filter result %.*s", neol - sep, sep);
+            err("Unknown filter result %.*s", neol - sep, sep);
             eol = neol + 1;
             continue;
         }

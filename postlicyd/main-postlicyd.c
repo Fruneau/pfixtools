@@ -81,28 +81,35 @@ static bool policy_process(server_t *pcy, const config_t *config)
     const query_t* query = pcy->data;
     const filter_t *filter;
     if (config->entry_points[query->state] == -1) {
-        syslog(LOG_WARNING, "no filter defined for current protocol_state (%d)", query->state);
+        warn("no filter defined for current protocol_state (%d)", query->state);
         return false;
     }
     filter = array_ptr(config->filters, config->entry_points[query->state]);
     while (true) {
         const filter_hook_t *hook = filter_run(filter, query);
         if (hook == NULL) {
-            syslog(LOG_WARNING, "request client=%s, from=<%s>, to=<%s>: aborted",
-                   query->client_name,
-                   query->sender == NULL ? "undefined" : query->sender,
-                   query->recipient == NULL ? "undefined" : query->recipient);
+            warn("request client=%s, from=<%s>, to=<%s>: aborted",
+                 query->client_name,
+                 query->sender == NULL ? "undefined" : query->sender,
+                 query->recipient == NULL ? "undefined" : query->recipient);
             return false;
         } else if (hook->postfix) {
-            syslog(LOG_INFO, "request client=%s, from=<%s>, to=<%s>: "
-                  "awswer %s from filter %s",
-                   query->client_name,
-                   query->sender == NULL ? "undefined" : query->sender,
-                   query->recipient == NULL ? "undefined" : query->recipient,
-                   htokens[hook->type], filter->name);
+            info("request client=%s, from=<%s>, to=<%s>: "
+                 "awswer %s from filter %s: \"%s\"",
+                 query->client_name,
+                 query->sender == NULL ? "undefined" : query->sender,
+                 query->recipient == NULL ? "undefined" : query->recipient,
+                 htokens[hook->type], filter->name, hook->value);
             policy_answer(pcy, "%s", hook->value);
             return true;
         } else {
+            notice("request client=%s, from=<%s>, to=<%s>: "
+                   "awswer %s from filter %s: next filter %s",
+                   query->client_name,
+                   query->sender == NULL ? "undefined" : query->sender,
+                   query->recipient == NULL ? "undefined" : query->recipient,
+                   htokens[hook->type], filter->name,
+                   (array_ptr(config->filters, hook->filter_id))->name);
             filter = array_ptr(config->filters, hook->filter_id);
         }
     }
@@ -124,7 +131,7 @@ static int policy_run(server_t *pcy, void* vconfig)
     }
     if (nb == 0) {
         if (pcy->ibuf.len)
-            syslog(LOG_ERR, "unexpected end of data");
+            err("unexpected end of data");
         return -1;
     }
 
@@ -153,6 +160,8 @@ void usage(void)
           "    -l <port>    port to listen to\n"
           "    -p <pidfile> file to write our pid to\n"
           "    -f           stay in foreground\n"
+          "    -d           grow logging level\n"
+          "    -u           unsafe mode (don't drop privileges)\n"
          , stderr);
 }
 
@@ -166,7 +175,7 @@ int main(int argc, char *argv[])
     int port = DEFAULT_PORT;
     bool port_from_cli = false;
 
-    for (int c = 0; (c = getopt(argc, argv, "hf" "l:p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "ufd" "l:p:")) >= 0; ) {
         switch (c) {
           case 'p':
             pidfile = optarg;
@@ -181,6 +190,9 @@ int main(int argc, char *argv[])
           case 'f':
             daemonize = false;
             break;
+          case 'd':
+            ++log_level;
+            break;
           default:
             usage();
             return EXIT_FAILURE;
@@ -193,7 +205,7 @@ int main(int argc, char *argv[])
     }
 
     if (drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
-        syslog(LOG_CRIT, "unable to drop privileges");
+        crit("unable to drop privileges");
         return EXIT_FAILURE;
     }
 

@@ -57,9 +57,6 @@
 
 #include "mem.h"
 
-#define UNIXERR(fun)                                    \
-        syslog(LOG_ERR, "%s:%d:%s: %s: %m",             \
-               __FILE__, __LINE__, __func__, fun)
 
 #define __tostr(x)  #x
 #define STR(x)      __tostr(x)
@@ -73,8 +70,26 @@ typedef void (*exitcall_t)(void);
 #define module_init(fn)  static __init initcall_t __init_##fn = fn;
 #define module_exit(fn)  static __exit exitcall_t __exit_##fn = fn;
 
+#define __log(Level, Fmt, ...)                                    \
+    if (log_level >= Level) {                                     \
+        syslog(Level, Fmt, ##__VA_ARGS__);                        \
+    }
+
+#define debug(Fmt, ...)  __log(LOG_DEBUG,   Fmt, ##__VA_ARGS__)
+#define notice(Fmt, ...) __log(LOG_NOTICE,  Fmt, ##__VA_ARGS__)
+#define info(Fmt, ...)   __log(LOG_INFO,    Fmt, ##__VA_ARGS__)
+#define warn(Fmt, ...)   __log(LOG_WARNING, Fmt, ##__VA_ARGS__)
+#define err(Fmt, ...)    __log(LOG_ERR,     Fmt, ##__VA_ARGS__)
+#define crit(Fmt, ...)   __log(LOG_CRIT,    Fmt, ##__VA_ARGS__)
+#define alert(Fmt, ...)  __log(LOG_ALERT,   Fmt, ##__VA_ARGS__)
+#define emerg(Fmt, ...)  __log(LOG_ALERT,   Fmt, ##__VA_ARGS__)
+
+#define UNIXERR(fun)     err("%s:%d:%s %s: %m",                      \
+                             __FILE__, __LINE__, __func__, fun)
+
 extern sig_atomic_t sigint;
 extern sig_atomic_t sighup;
+extern int          log_level;
 
 void common_sighandler(int sig);
 
@@ -102,7 +117,7 @@ int common_setup(const char* pidfile, bool unsafe, const char* runas_user,
         signal(SIGTERM, &common_sighandler);                      \
         signal(SIGHUP,  &common_sighandler);                      \
         signal(SIGSEGV, &common_sighandler);                      \
-        syslog(LOG_INFO, "Starting...");                          \
+        info("starting...");                                      \
         return 0;                                                 \
     }                                                             \
                                                                   \

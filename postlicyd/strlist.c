@@ -111,8 +111,8 @@ static trie_t *strlist_create(const char *file, bool reverse, bool lock)
         --end;
     }
     if (end != map.end) {
-        syslog(LOG_WARNING, "file %s miss a final \\n, ignoring last line",
-               file);
+        warn("file %s miss a final \\n, ignoring last line",
+             file);
     }
 
     db = trie_new();
@@ -122,7 +122,7 @@ static trie_t *strlist_create(const char *file, bool reverse, bool lock)
             eol = end;
         }
         if (eol - p >= BUFSIZ) {
-            syslog(LOG_ERR, "unreasonnable long line");
+            err("unreasonnable long line");
             file_map_close(&map);
             trie_delete(&db);
             return NULL;
@@ -154,7 +154,7 @@ static bool strlist_filter_constructor(filter_t *filter)
 
 #define PARSE_CHECK(Expr, Str, ...)                                            \
     if (!(Expr)) {                                                             \
-        syslog(LOG_ERR, Str, ##__VA_ARGS__);                                   \
+        err(Str, ##__VA_ARGS__);                                               \
         strlist_config_delete(&config);                                        \
         return false;                                                          \
     }
@@ -319,12 +319,11 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
     if (config->is_email && 
         ((config->match_sender && query->state < SMTP_MAIL)
         || (config->match_recipient && query->state != SMTP_RCPT))) {
-        syslog(LOG_WARNING, "trying to match an email against a field that is not "
-               "available in current protocol state");
+        warn("trying to match an email against a field that is not "
+             "available in current protocol state");
         return HTK_ABORT;
     } else if (config->is_hostname && config->match_helo && query->state < SMTP_HELO) {
-        syslog(LOG_WARNING, "trying to match hostname against helo before helo "
-               "is received");
+        warn("trying to match hostname against helo before helo is received");
         return HTK_ABORT;
     }
 #define LOOKUP(Flag, Field)                                                    \

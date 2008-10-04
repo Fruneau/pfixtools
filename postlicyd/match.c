@@ -54,6 +54,15 @@ typedef struct match_condition_t {
 } match_condition_t;
 ARRAY(match_condition_t)
 
+static const char *condition_names[] = {
+  "unknown",
+  "equals to",
+  "differs from",
+  "contains",
+  "is contained",
+  "is empty"
+};
+
 #define CONDITION_INIT { PTK_UNKNOWN, false, MATCH_UNKNOWN, NULL, 0 }
 
 typedef struct match_config_t {
@@ -86,8 +95,8 @@ static bool match_filter_constructor(filter_t *filter)
 
 #define PARSE_CHECK(Expr, Str, ...)                                            \
     if (!(Expr)) {                                                             \
-        syslog(LOG_ERR, Str, ##__VA_ARGS__);                                   \
-        match_config_delete(&config);                                        \
+        err(Str, ##__VA_ARGS__);                                               \
+        match_config_delete(&config);                                          \
         return false;                                                          \
     }
 
@@ -201,6 +210,10 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
 #undef CASE
       default: return false;
     }
+    debug("running condition: \"%s\" %s %s\"%s\"",
+          field, condition_names[cond->condition],
+          cond->case_sensitive ? "" : "(alternative) ",
+          cond->value ? cond->value : "(none)");
     switch (cond->condition) {
       case MATCH_EQUAL:
       case MATCH_DIFFER:
@@ -253,14 +266,18 @@ static filter_result_t match_filter(const filter_t *filter, const query_t *query
     foreach (const match_condition_t *condition, config->conditions) {
         bool r = match_condition(condition, query);
         if (!r && config->match_all) {
+            debug("condition failed, match_all failed");
             return HTK_FAIL;
         } else if (r && !(config->match_all)) {
+            debug("condition succeed, not-match_all succeed");
             return HTK_MATCH;
         }
     }}
     if (config->match_all) {
+        debug("all conditions matched, match_all succeed");
         return HTK_MATCH;
     } else {
+        debug("no condition matched, not-match_all failed");
         return HTK_FAIL;
     }
 }

@@ -133,8 +133,8 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         --end;
     }
     if (end != map.end) {
-        syslog(LOG_WARNING, "file %s miss a final \\n, ignoring last line",
-               file);
+        warn("file %s miss a final \\n, ignoring last line",
+             file);
     }
 
     db = p_new(rbldb_t, 1);
@@ -167,7 +167,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
 #       include "qsort.c"
     }
 
-    syslog(LOG_INFO, "rbl %s loaded, %d IPs", file, db->ips.len);
+    info("rbl %s loaded, %d IPs", file, db->ips.len);
     return db;
 }
 
@@ -242,7 +242,7 @@ static bool rbl_filter_constructor(filter_t *filter)
 
 #define PARSE_CHECK(Expr, Str, ...)                                            \
     if (!(Expr)) {                                                             \
-        syslog(LOG_ERR, Str, ##__VA_ARGS__);                                   \
+        err(Str, ##__VA_ARGS__);                                               \
         rbl_filter_delete(&data);                                              \
         return false;                                                          \
     }
@@ -348,8 +348,8 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
     const rbl_filter_t *data = filter->data;
 
     if (parse_ipv4(query->client_address, &end, &ip) != 0) {
-        syslog(LOG_WARNING, "invalid client address: %s, expected ipv4",
-               query->client_address);
+        warn("invalid client address: %s, expected ipv4",
+             query->client_address);
         return HTK_ERROR;
     }
     for (uint32_t i = 0 ; i < data->rbls.len ; ++i) {

@@ -142,7 +142,7 @@ int server_loop(start_client_t starter, delete_client_t deleter,
 
         if (sighup && refresh) {
             if (!refresh(config)) {
-                syslog(LOG_ERR, "error while refreshing configuration");
+                crit("error while refreshing configuration");
                 return EXIT_FAILURE;
             }
         }

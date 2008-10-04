@@ -54,8 +54,7 @@ static trie_t *create_trie_from_file(const char *file)
         --end;
     }
     if (end != map.end) {
-        syslog(LOG_WARNING, "file %s miss a final \\n, ignoring last line",
-               file);
+        warn("file %s miss a final \\n, ignoring last line", file);
     }
 
     db = trie_new();
