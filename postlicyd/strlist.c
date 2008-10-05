@@ -148,6 +148,86 @@ static trie_t *strlist_create(const char *file, bool reverse, bool lock)
     return db;
 }
 
+static bool strlist_create_from_rhbl(const char *file, bool lock,
+                                     trie_t **phosts, trie_t **pdomains)
+{
+    trie_t *hosts, *domains;
+    uint32_t host_count, domain_count;
+    file_map_t map;
+    const char *p, *end;
+    char line[BUFSIZ];
+
+    if (!file_map_open(&map, file, false)) {
+        return false;
+    }
+    p   = map.map;
+    end = map.end;
+    while (end > p && end[-1] != '\n') {
+        --end;
+    }
+    if (end != map.end) {
+        warn("file %s miss a final \\n, ignoring last line",
+             file);
+    }
+
+    hosts = trie_new();
+    host_count = 0;
+    domains = trie_new();
+    domain_count = 0;
+    while (p < end && p != NULL) {
+        const char *eol = (char *)memchr(p, '\n', end - p);
+        if (eol == NULL) {
+            eol = end;
+        }
+        if (eol - p >= BUFSIZ) {
+            err("unreasonnable long line");
+            file_map_close(&map);
+            trie_delete(&hosts);
+            trie_delete(&domains);
+            return false;
+        }
+        if (*p != '#') {
+            const char *eos = eol;
+            while (p < eos && isspace(*p)) {
+                ++p;
+            }
+            while (p < eos && isspace(eos[-1])) {
+                --eos;
+            }
+            if (p < eos) {
+                if (isalnum(*p)) {
+                    strlist_copy(line, p, eos - p, true);
+                    trie_insert(hosts, line);
+                    ++host_count;
+                } else if (*p == '*') {
+                    ++p;
+                    strlist_copy(line, p, eos - p, true);
+                    trie_insert(domains, line);
+                    ++domain_count;
+                }
+            }
+        }
+        p = eol + 1;
+    }
+    file_map_close(&map);
+    if (host_count > 0) {
+        trie_compile(hosts, lock);
+        *phosts = hosts;
+    } else {
+        trie_delete(&hosts);
+        *phosts = NULL;
+    }
+    if (domain_count > 0) {
+        trie_compile(domains, lock);
+        *pdomains = domains;
+    } else {
+        trie_delete(&domains);
+        *pdomains = NULL;
+    }
+    return hosts != NULL || domains != NULL;
+
+}
+
 
 static bool strlist_filter_constructor(filter_t *filter)
 {
@@ -165,7 +245,7 @@ static bool strlist_filter_constructor(filter_t *filter)
     foreach (filter_param_t *param, filter->params) {
         switch (param->type) {
           /* file parameter is:
-           *  [no]lock:(prefix|suffix):weight:filename
+           *  [no]lock:(partial-)(prefix|suffix):weight:filename
            *  valid options are:
            *    - lock:   memlock the database in memory.
            *    - nolock: don't memlock the database in memory.
@@ -235,6 +315,72 @@ static bool strlist_filter_constructor(filter_t *filter)
                     break;
                 }
                 if (i != 3) {
+                    current = p + 1;
+                    p = m_strchrnul(current, ':');
+                }
+            }
+          } break;
+
+          /* rbldns parameter is:
+           *  [no]lock::weight:filename
+           *  valid options are:
+           *    - lock:   memlock the database in memory.
+           *    - nolock: don't memlock the database in memory.
+           *    - \d+:    a number describing the weight to give to the match
+           *              the given list [mandatory]
+           *  directly import a file issued from a rhbl in rbldns format.
+           */
+          case ATK_RBLDNS: {
+            bool lock = false;
+            int  weight = 0;
+            trie_t *trie_hosts   = NULL;
+            trie_t *trie_domains = NULL;
+            const char *current = param->value;
+            const char *p = m_strchrnul(param->value, ':');
+            char *next = NULL;
+            for (int i = 0 ; i < 3 ; ++i) {
+                PARSE_CHECK(i == 2 || *p,
+                            "file parameter must contains a locking state "
+                            "and a weight option");
+                switch (i) {
+                  case 0:
+                    if ((p - current) == 4 && strncmp(current, "lock", 4) == 0) {
+                        lock = true;
+                    } else if ((p - current) == 6 && strncmp(current, "nolock", 6) == 0) {
+                        lock = false;
+                    } else {
+                        PARSE_CHECK(false, "illegal locking state %.*s",
+                                    p - current, current);
+                    }
+                    break;
+
+                  case 1:
+                    weight = strtol(current, &next, 10);
+                    PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
+                                "illegal weight value %.*s",
+                                (p - current), current);
+                    break;
+
+                  case 2:
+                    PARSE_CHECK(strlist_create_from_rhbl(current, lock,
+                                                         &trie_hosts, &trie_domains),
+                                "cannot load string list from rhbl %s", current);
+                    if (trie_hosts != NULL) {
+                        array_add(config->tries, trie_hosts);
+                        array_add(config->weights, weight);
+                        array_add(config->reverses, true);
+                        array_add(config->partiales, false);
+                    }
+                    if (trie_domains != NULL) {
+                        array_add(config->tries, trie_domains);
+                        array_add(config->weights, weight);
+                        array_add(config->reverses, true);
+                        array_add(config->partiales, true);
+                    }
+                    config->is_hostname = true;
+                    break;
+                }
+                if (i != 2) {
                     current = p + 1;
                     p = m_strchrnul(current, ':');
                 }
@@ -383,6 +529,7 @@ static int strlist_init(void)
     /* Parameters.
      */
     (void)filter_param_register(type, "file");
+    (void)filter_param_register(type, "rbldns");
     (void)filter_param_register(type, "hard_threshold");
     (void)filter_param_register(type, "soft_threshold");
     (void)filter_param_register(type, "fields");

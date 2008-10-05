@@ -52,7 +52,7 @@ static FILE *pidfile = NULL;
 void common_sighandler(int sig)
 {
     switch (sig) {
-			case SIGTERM:
+      case SIGTERM:
       case SIGINT:
         sigint = true;
         return;
@@ -62,7 +62,7 @@ void common_sighandler(int sig)
         return;
 
       default:
-				err("Killed (got signal %d)...", sig);
+        err("Killed (got signal %d)...", sig);
         exit(-1);
     }
 }
@@ -199,11 +199,11 @@ int daemon_detach(void)
     pid = fork();
     if (pid < 0) {
         return -1;
-		}
+    }
     if (pid) {
-				daemon_process = false;
+        daemon_process = false;
         exit(0);
-		}
+    }
 
     setsid();
     return 0;
@@ -236,20 +236,11 @@ int drop_privileges(const char *user, const char *group)
 
 int pidfile_open(const char *name)
 {
-		struct flock lock;
-		p_clear(&lock, 1);
-		lock.l_type = F_WRLCK;
     if (name) {
         pidfile = fopen(name, "w");
         if (!pidfile)
             return -1;
-				if (fcntl(fileno(pidfile), F_SETLK, &lock) == -1) {
-						crit("program already started");
-						fclose(pidfile);
-						pidfile = NULL;
-						return -1;
-				}
-				fprintf(pidfile, "%d\n", getpid());
+        fprintf(pidfile, "%d\n", getpid());
         return fflush(pidfile);
     }
     return 0;
@@ -268,14 +259,12 @@ int pidfile_refresh(void)
 
 static void pidfile_close(void)
 {
-		struct flock lock;
-		p_clear(&lock, 1);
-		lock.l_type = F_UNLCK;
     if (pidfile) {
-        rewind(pidfile);
-        ftruncate(fileno(pidfile), 0);
-        fcntl(fileno(pidfile), F_SETLK, &lock);
-				fclose(pidfile);
+        if (daemon_process) {
+            rewind(pidfile);
+            ftruncate(fileno(pidfile), 0);
+        }
+        fclose(pidfile);
         pidfile = NULL;
     }
 }
@@ -283,6 +272,11 @@ static void pidfile_close(void)
 int common_setup(const char* pidfilename, bool unsafe, const char* runas_user,
                  const char* runas_group, bool daemonize)
 {
+    if (pidfile_open(pidfilename) < 0) {
+        crit("unable to write pidfile %s", pidfilename);
+        return EXIT_FAILURE;
+    }
+
     if (!unsafe && drop_privileges(runas_user, runas_group) < 0) {
         crit("unable to drop privileges");
         return EXIT_FAILURE;
@@ -290,11 +284,6 @@ int common_setup(const char* pidfilename, bool unsafe, const char* runas_user,
 
     if (daemonize && daemon_detach() < 0) {
         crit("unable to fork");
-        return EXIT_FAILURE;
-    }
-
-		if (pidfile_open(pidfilename) < 0) {
-        crit("unable to write pidfile %s", pidfilename);
         return EXIT_FAILURE;
     }
 
@@ -307,10 +296,10 @@ extern exitcall_t __madexit[];
 
 static void common_shutdown(void)
 {
-		if (daemon_process) {
-				info("stopping...");
-		}
-		pidfile_close();
+    if (daemon_process) {
+        info("stopping...");
+    }
+    pidfile_close();
     for (int i = -1; __madexit[i]; i--) {
         (*__madexit[i])();
     }

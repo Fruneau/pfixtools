@@ -34,4 +34,6 @@ PROGRAMS  = pfix-srsd
 pfix-srsd_SOURCES = main-srsd.c ../common/lib.a
 pfix-srsd_LIBADD  = -lsrs2
 
+all:
+
 include ../mk/common.mk

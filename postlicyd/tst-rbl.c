@@ -38,14 +38,21 @@
             __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 
 #include "common.h"
-#include "iplist.c"
+#include "iplist.h"
+#include "array.h"
 
 int main(int argc, char *argv[])
 {
     if (argc > 1) {
         rbldb_t *db = rbldb_create(argv[1], false);
         printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
-               rbldb_stats(db) * 4);
+               rbldb_stats(db) * 1 + 65536 * sizeof(A(uint16_t)));
+
+        time_t now = time(NULL);
+        for (uint32_t i = 0 ; i < 1000000000 ; ++i) {
+            rbldb_ipv4_lookup(db, (88 << 24) | (170 << 16) | (239 << 8) | (132));
+        }
+        printf("%ld request per second\n", 1000000000 / (time(NULL) - now));
         rbldb_delete(&db);
     }
     return 0;
