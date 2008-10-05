@@ -272,7 +272,7 @@ static bool rbl_filter_constructor(filter_t *filter)
            *  the file pointed by filename MUST be a valid ip list issued from
            *  the rsync (or equivalent) service of a (r)bl.
            */
-          case ATK_FILE: {
+          case ATK_FILE: case ATK_RBLDNS: {
             bool lock = false;
             int  weight = 0;
             rbldb_t *rbl = NULL;
@@ -394,6 +394,7 @@ static int rbl_init(void)
     /* Parameters.
      */
     (void)filter_param_register(type, "file");
+    (void)filter_param_register(type, "rbldns");
     (void)filter_param_register(type, "hard_threshold");
     (void)filter_param_register(type, "soft_threshold");
     return 0;

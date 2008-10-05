@@ -50,4 +50,6 @@ tst-filters_LIBADD  = $(TC_LIBS)
 hook_tokens.h hook_tokens.c: $(FILTERS)
 param_tokens.c param_tokens.h: $(FILTERS) config.c
 
+all:
+
 include ../mk/common.mk
