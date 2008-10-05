@@ -38,13 +38,17 @@
 
 static inline rbl_result_t rbl_dns_check(const char *hostname)
 {
+    debug("looking up for %s", hostname);
     struct hostent *host = gethostbyname(hostname);
     if (host != NULL) {
+        debug("host found");
         return RBL_FOUND;
     } else {
         if (h_errno == HOST_NOT_FOUND) {
+            debug("host not found: %s", hostname);
             return RBL_NOTFOUND;
         }
+        debug("dns error: %m");
         return RBL_ERROR;
     }
 }

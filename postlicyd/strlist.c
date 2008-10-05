@@ -487,7 +487,7 @@ static bool strlist_filter_constructor(filter_t *filter)
 
     PARSE_CHECK(config->is_email != config->is_hostname,
                 "matched field MUST be emails XOR hostnames");
-    PARSE_CHECK(config->tries.len,
+    PARSE_CHECK(config->tries.len || config->host_offsets.len,
                 "no file parameter in the filter %s", filter->name);
     filter->data = config;
     return true;
@@ -543,7 +543,7 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
     if (config->match_ ## Flag) {                                              \
         const int len = m_strlen(query->Field);                                \
         strlist_copy(normal, query->Field, len, false);                        \
-        for (uint32_t i = 0 ; len > 0 && i < config->tries.len ; ++i) {        \
+        for (uint32_t i = 0 ; len > 0 && i < config->host_offsets.len ; ++i) { \
             const char *rbl    = array_ptr(config->hosts,                      \
                                            array_elt(config->host_offsets, i));\
             const int weight   = array_elt(config->host_weights, i);           \

@@ -423,7 +423,7 @@ config_t *config_read(const char *file)
     config_t *config = config_new();
     config->filename = file;
     if (!config_reload(config)) {
-        p_delete(&config);
+        config_delete(&config);
         return NULL;
     }
     return config;

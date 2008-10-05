@@ -378,7 +378,7 @@ static bool rbl_filter_constructor(filter_t *filter)
         }
     }}
 
-    PARSE_CHECK(data->rbls.len, 
+    PARSE_CHECK(data->rbls.len || data->host_offsets.len,
                 "no file parameter in the filter %s", filter->name);
     filter->data = data;
     return true;
