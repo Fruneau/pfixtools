@@ -32,7 +32,7 @@
 LIBS  = lib
 TESTS = tst-trie
 
-lib_SOURCES = str.c buffer.c common.c epoll.c server.c trie.c file.c
+lib_SOURCES = str.c buffer.c common.c epoll.c server.c trie.c file.c rbl.c
 tst-trie_SOURCES = tst-trie.c lib.a
 
 all:

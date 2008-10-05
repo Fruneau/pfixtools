@@ -111,9 +111,9 @@
         array_ensure_capacity_delta(array, 1);                                 \
         (array).data[(array).len++] = (obj);                                   \
     } while (0)
-#define array_append(array, objs, len)                                         \
+#define array_append(array, objs, Len)                                         \
     do {                                                                       \
-        const typeof((array).len) __len = (len);                               \
+        const typeof((array).len) __len = (Len);                               \
         array_ensure_capacity_delta(array, __len);                             \
         memcpy((array).data + (array).len, objs,                               \
                __len * sizeof(*(array).data));                                 \
@@ -143,8 +143,8 @@
         array_ensure_can_edit(array);                                          \
         p_shrink(&(array).data, (array).len, &(array).size);                   \
     } while (0)
-#define array_elt(array, n) (array).data[(n)]
-#define array_ptr(array, n) (array).data + (n)
+#define array_elt(array, n) ((array).data[(n)])
+#define array_ptr(array, n) ((array).data + (n))
 
 #define foreach(var, array)                                                    \
     for (uint32_t __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                    \

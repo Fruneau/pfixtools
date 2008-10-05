@@ -30,19 +30,41 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2007 Pierre Habouzit
  * Copyright © 2008 Florent Bruneau
  */
 
-#ifndef PFIXTOOLS_RBL_H
-#define PFIXTOOLS_RBL_H
+#include <netdb.h>
+#include "rbl.h"
 
-typedef struct rbldb_t rbldb_t;
+static inline rbl_result_t rbl_dns_check(const char *hostname)
+{
+    debug("looking up for %s", hostname);
+    struct hostent *host = gethostbyname(hostname);
+    if (host != NULL) {
+        debug("host found");
+        return RBL_FOUND;
+    } else {
+        if (h_errno == HOST_NOT_FOUND) {
+            debug("host not found: %s", hostname);
+            return RBL_NOTFOUND;
+        }
+        debug("dns error: %m");
+        return RBL_ERROR;
+    }
+}
 
-rbldb_t *rbldb_create(const char *file, bool lock);
-void rbldb_delete(rbldb_t **);
+rbl_result_t rbl_check(const char *rbl, uint32_t ip)
+{
+    char host[257];
+    snprintf(host, 257, "%d.%d.%d.%d.%s",
+             ip & 0xff, (ip >> 8) & 0xff, (ip >> 16) & 0xff, (ip >> 24) & 0xff,
+             rbl);
+    return rbl_dns_check(host);
+}
 
-uint32_t rbldb_stats(const rbldb_t *rbl);
-bool rbldb_ipv4_lookup(const rbldb_t *rbl, uint32_t ip);
-
-#endif
+rbl_result_t rhbl_check(const char *rhbl, const char *hostname)
+{
+    char host[257];
+    snprintf(host, 257, "%s.%s", hostname, rhbl);
+    return rbl_dns_check(host);
+}

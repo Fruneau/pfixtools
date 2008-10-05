@@ -37,6 +37,7 @@
 #include "trie.h"
 #include "file.h"
 #include "str.h"
+#include "rbl.h"
 #include "policy_tokens.h"
 
 typedef struct strlist_config_t {
@@ -44,6 +45,10 @@ typedef struct strlist_config_t {
     A(int)     weights;
     A(bool)    reverses;
     A(bool)    partiales;
+
+    A(char)     hosts;
+    A(int)      host_offsets;
+    A(int)      host_weights;
 
     int soft_threshold;
     int hard_threshold;
@@ -72,6 +77,9 @@ static void strlist_config_delete(strlist_config_t **config)
         array_wipe((*config)->weights);
         array_wipe((*config)->reverses);
         array_wipe((*config)->partiales);
+        array_wipe((*config)->hosts);
+        array_wipe((*config)->host_offsets);
+        array_wipe((*config)->host_weights);
         p_delete(config);
     }
 }
@@ -387,6 +395,39 @@ static bool strlist_filter_constructor(filter_t *filter)
             }
           } break;
 
+          /* dns parameter.
+           *  weight:hostname.
+           * define a RBL to use through DNS resolution.
+           */
+          case ATK_DNS: {
+            int  weight = 0;
+            const char *current = param->value;
+            const char *p = m_strchrnul(param->value, ':');
+            char *next = NULL;
+            for (int i = 0 ; i < 2 ; ++i) {
+                PARSE_CHECK(i == 1 || *p,
+                            "host parameter must contains a weight option");
+                switch (i) {
+                  case 0:
+                    weight = strtol(current, &next, 10);
+                    PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
+                                "illegal weight value %.*s",
+                                (p - current), current);
+                    break;
+
+                  case 1:
+                    array_add(config->host_offsets, array_len(config->hosts));
+                    array_append(config->hosts, current, strlen(current) + 1);
+                    array_add(config->host_weights, weight);
+                    break;
+                }
+                if (i != 1) {
+                    current = p + 1;
+                    p = m_strchrnul(current, ':');
+                }
+            }
+          } break;
+
           /* hard_threshold parameter is an integer.
            *  If the matching score is greater or equal than this threshold,
            *  the hook "hard_match" is called.
@@ -446,7 +487,7 @@ static bool strlist_filter_constructor(filter_t *filter)
 
     PARSE_CHECK(config->is_email != config->is_hostname,
                 "matched field MUST be emails XOR hostnames");
-    PARSE_CHECK(config->tries.len,
+    PARSE_CHECK(config->tries.len || config->host_offsets.len,
                 "no file parameter in the filter %s", filter->name);
     filter->data = config;
     return true;
@@ -465,6 +506,9 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
     char normal[BUFSIZ];
     const strlist_config_t *config = filter->data;
     int sum = 0;
+    bool error = true;
+
+
     if (config->is_email && 
         ((config->match_sender && query->state < SMTP_MAIL)
         || (config->match_recipient && query->state != SMTP_RCPT))) {
@@ -492,19 +536,58 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
                     return HTK_HARD_MATCH;                                     \
                 }                                                              \
             }                                                                  \
+            error = false;                                                     \
         }                                                                      \
     }
+#define DNS(Flag, Field)                                                       \
+    if (config->match_ ## Flag) {                                              \
+        const int len = m_strlen(query->Field);                                \
+        strlist_copy(normal, query->Field, len, false);                        \
+        for (uint32_t i = 0 ; len > 0 && i < config->host_offsets.len ; ++i) { \
+            const char *rbl    = array_ptr(config->hosts,                      \
+                                           array_elt(config->host_offsets, i));\
+            const int weight   = array_elt(config->host_weights, i);           \
+            switch (rhbl_check(normal, rbl)) {                                 \
+              case RBL_FOUND:                                                  \
+                error = false;                                                 \
+                sum += weight;                                                 \
+                if (sum >= config->hard_threshold) {                           \
+                    return HTK_HARD_MATCH;                                     \
+                }                                                              \
+                break;                                                         \
+              case RBL_NOTFOUND:                                               \
+                error = false;                                                 \
+                break;                                                         \
+              case RBL_ERROR:                                                  \
+                warn("rbl %s unavailable", rbl);                               \
+                break;                                                         \
+            }                                                                  \
+        }                                                                      \
+    }
+
     if (config->is_email) {
         LOOKUP(sender, sender);
         LOOKUP(recipient, recipient);
+        DNS(sender, sender);
+        DNS(recipient, recipient);
     } else if (config->is_hostname) {
         LOOKUP(helo, helo_name);
         LOOKUP(client, client_name);
         LOOKUP(reverse, reverse_client_name);
         LOOKUP(recipient, recipient_domain);
         LOOKUP(sender, sender_domain);
+        DNS(helo, helo_name);
+        DNS(client, client_name);
+        DNS(reverse, reverse_client_name);
+        DNS(recipient, recipient_domain);
+        DNS(sender, sender_domain);
     }
+#undef  DNS
 #undef  LOOKUP
+    if (error) {
+        err("filter %s: all the rbls returned an error", filter->name);
+        return HTK_ERROR;
+    }
     if (sum >= config->hard_threshold) {
         return HTK_HARD_MATCH;
     } else if (sum >= config->soft_threshold) {
@@ -530,6 +613,7 @@ static int strlist_init(void)
      */
     (void)filter_param_register(type, "file");
     (void)filter_param_register(type, "rbldns");
+    (void)filter_param_register(type, "dns");
     (void)filter_param_register(type, "hard_threshold");
     (void)filter_param_register(type, "soft_threshold");
     (void)filter_param_register(type, "fields");

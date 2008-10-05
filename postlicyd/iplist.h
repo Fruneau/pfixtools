@@ -31,29 +31,18 @@
 
 /*
  * Copyright © 2007 Pierre Habouzit
+ * Copyright © 2008 Florent Bruneau
  */
 
-#define DEBUG(fmt, ...) \
-    fprintf(stderr, "%s:%d:%s: "fmt"\n", \
-            __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+#ifndef PFIXTOOLS_IPLIST_H
+#define PFIXTOOLS_IPLIST_H
 
-#include "common.h"
-#include "iplist.h"
-#include "array.h"
+typedef struct rbldb_t rbldb_t;
 
-int main(int argc, char *argv[])
-{
-    if (argc > 1) {
-        rbldb_t *db = rbldb_create(argv[1], false);
-        printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
-               rbldb_stats(db) * 1 + 65536 * sizeof(A(uint16_t)));
+rbldb_t *rbldb_create(const char *file, bool lock);
+void rbldb_delete(rbldb_t **);
 
-        time_t now = time(NULL);
-        for (uint32_t i = 0 ; i < 1000000000 ; ++i) {
-            rbldb_ipv4_lookup(db, (88 << 24) | (170 << 16) | (239 << 8) | (132));
-        }
-        printf("%ld request per second\n", 1000000000 / (time(NULL) - now));
-        rbldb_delete(&db);
-    }
-    return 0;
-}
+uint32_t rbldb_stats(const rbldb_t *rbl);
+bool rbldb_ipv4_lookup(const rbldb_t *rbl, uint32_t ip);
+
+#endif
