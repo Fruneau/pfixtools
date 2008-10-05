@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
      */
     if (argc > 1) {
         trie = create_trie_from_file(argv[1]);
-        trie_inspect(trie, true);
+        trie_inspect(trie, false);
         trie_delete(&trie);
     }
     return 0;

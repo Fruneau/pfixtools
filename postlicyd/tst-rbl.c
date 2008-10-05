@@ -39,13 +39,14 @@
 
 #include "common.h"
 #include "rbl.h"
+#include "array.h"
 
 int main(int argc, char *argv[])
 {
     if (argc > 1) {
         rbldb_t *db = rbldb_create(argv[1], false);
         printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
-               rbldb_stats(db) * 4);
+               rbldb_stats(db) * 1 + 65536 * sizeof(A(uint16_t)));
 
         time_t now = time(NULL);
         for (uint32_t i = 0 ; i < 1000000000 ; ++i) {
