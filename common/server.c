@@ -141,6 +141,7 @@ int server_loop(start_client_t starter, delete_client_t deleter,
         int n;
 
         if (sighup && refresh) {
+            sighup = false;
             if (!refresh(config)) {
                 crit("error while refreshing configuration");
                 return EXIT_FAILURE;
