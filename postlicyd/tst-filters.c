@@ -38,10 +38,6 @@
 #include "file.h"
 #include <dirent.h>
 
-#define DAEMON_NAME "tst-filters"
-
-DECLARE_MAIN
-
 static char *read_query(const char *basepath, const char *filename,
                         char *buff, char **end, query_t *q)
 {
@@ -189,6 +185,7 @@ int main(int argc, char *argv[])
     char path[FILENAME_MAX];
     char *p;
 
+    common_startup();
     p = strrchr(argv[0], '/');
     if (p == NULL) {
         p = argv[0];

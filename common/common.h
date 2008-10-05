@@ -72,7 +72,12 @@ typedef void (*exitcall_t)(void);
 
 #define __log(Level, Fmt, ...)                                    \
     if (log_level >= Level) {                                     \
-        syslog(Level, Fmt, ##__VA_ARGS__);                        \
+        if (log_syslog) {                                         \
+            syslog(Level, Fmt, ##__VA_ARGS__);                    \
+        } else {                                                  \
+            fprintf(stderr, "[%d] " Fmt "\n",                     \
+                    Level, ##__VA_ARGS__);                        \
+        }                                                         \
     }
 
 #define debug(Fmt, ...)  __log(LOG_DEBUG,   Fmt, ##__VA_ARGS__)
@@ -90,6 +95,7 @@ typedef void (*exitcall_t)(void);
 extern sig_atomic_t sigint;
 extern sig_atomic_t sighup;
 extern int          log_level;
+extern bool         log_syslog;
 
 void common_sighandler(int sig);
 
@@ -108,16 +114,23 @@ int pidfile_refresh(void);
 int common_setup(const char* pidfile, bool unsafe, const char* runas_user,
                  const char* runas_group, bool daemonize);
 
+static inline void common_startup(void)
+{
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT,  &common_sighandler);
+    signal(SIGTERM, &common_sighandler);
+    signal(SIGHUP,  &common_sighandler);
+    signal(SIGSEGV, &common_sighandler);
+    info("starting");
+}
+
+
 #define DECLARE_MAIN                                              \
     static int main_initialize(void)                              \
     {                                                             \
+        log_syslog = true;                                        \
         openlog(DAEMON_NAME, LOG_PID, LOG_MAIL);                  \
-        signal(SIGPIPE, SIG_IGN);                                 \
-        signal(SIGINT,  &common_sighandler);                      \
-        signal(SIGTERM, &common_sighandler);                      \
-        signal(SIGHUP,  &common_sighandler);                      \
-        signal(SIGSEGV, &common_sighandler);                      \
-        info("starting...");                                      \
+        common_startup();                                         \
         return 0;                                                 \
     }                                                             \
                                                                   \

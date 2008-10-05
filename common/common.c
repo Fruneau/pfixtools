@@ -46,6 +46,7 @@ sig_atomic_t sighup  = false;
 
 bool daemon_process  = true;
 int  log_level       = LOG_INFO;
+bool log_syslog      = false;
 
 static FILE *pidfile = NULL;
 
