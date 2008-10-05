@@ -129,6 +129,13 @@ int main(int argc, char *argv[])
     if (argc > 1) {
         trie = create_trie_from_file(argv[1]);
         trie_inspect(trie, false);
+        if (argc > 2) {
+            time_t now = time(NULL);
+            for (uint32_t i = 0 ; i < 1000000000 ; ++i) {
+                trie_lookup(trie, argv[2]);
+            }
+            printf("%lu lookups per second\n", 1000000000 / (time(NULL) - now));
+        }
         trie_delete(&trie);
     }
     return 0;

@@ -84,20 +84,14 @@ void trie_delete(trie_t **trie)
  */
 static inline bool trie_entry_c_match(const trie_t *trie,
                                       const trie_entry_t *entry,
-                                      const char *key, int *pos)
+                                      const char *key)
 {
     const char *c = array_ptr(trie->c, entry->c_offset);
     int i = 0;
     for (i = 0 ; i < entry->c_len ; ++i) {
         if (key[i] != c[i]) {
-            if (pos) {
-                *pos = i;
-            }
             return false;
         }
-    }
-    if (pos) {
-        *pos = i;
     }
     return true;
 }
@@ -127,30 +121,26 @@ static inline bool trie_entry_is_leaf(const trie_entry_t *entry)
  * Only the first character of the children is taken into account in the
  * lookup. The current entry is assumed to match the key.
  */
-static inline trie_entry_t* trie_entry_child(const trie_t *trie,
-                                             const trie_entry_t* entry,
-                                             const char *key)
+static inline const trie_entry_t* trie_entry_child(const trie_t *trie,
+                                                   const trie_entry_t* entry,
+                                                   const char *key)
 {
-    int start = entry->children_offset;
-    int end   = start + entry->children_len;
+    uint32_t start = entry->children_offset;
+    uint32_t end   = start + entry->children_len;
     const char c = *key;
 
     while (start < end) {
-        int mid = (start + end) / 2;
-        trie_entry_t* child = array_ptr(trie->entries, mid);
+        uint32_t mid = (start + end) >> 1;
+        const trie_entry_t* child = array_ptr(trie->entries, mid);
         const char c2 = array_elt(trie->c, child->c_offset);
 
-        if (child->c_len) {
-            if (c2 == c) {
-                return child;
-            }
-            if (c < c2) {
-                end = mid;
-            } else {
-                start = mid + 1;
-            }
+        if (c2 == c) {
+          return child;
+        }
+        if (c < c2) {
+          end = mid;
         } else {
-            abort();
+          start = mid + 1;
         }
     }
     return NULL;
@@ -289,13 +279,12 @@ bool trie_lookup(const trie_t *trie, const char *key)
     if (trie->entries.len == 0) {
         return false;
     } else {
-        trie_entry_t *current = array_ptr(trie->entries, 0);
+        const trie_entry_t *current = array_ptr(trie->entries, 0);
         while (true) {
-            int pos = 0;
             if (trie_entry_is_leaf(current)) {
                 return trie_entry_match(trie, current, key);
-            } else if (trie_entry_c_match(trie, current, key, &pos)) {
-                key += pos;
+            } else if (trie_entry_c_match(trie, current, key)) {
+                key += current->c_len;
                 current = trie_entry_child(trie, current, key);
                 if (current == NULL) {
                     return false;
@@ -313,13 +302,12 @@ bool trie_prefix(const trie_t *trie, const char *key)
     if (trie->entries.len == 0) {
         return false;
     } else {
-        trie_entry_t *current = array_ptr(trie->entries, 0);
+        const trie_entry_t *current = array_ptr(trie->entries, 0);
         while (true) {
-            int pos = 0;
             if (trie_entry_is_leaf(current)) {
                 return trie_entry_prefix(trie, current, key);
-            } else if (trie_entry_c_match(trie, current, key, &pos)) {
-                key += pos;
+            } else if (trie_entry_c_match(trie, current, key)) {
+                key += current->c_len;
                 current = trie_entry_child(trie, current, key);
                 if (current == NULL) {
                     return false;
