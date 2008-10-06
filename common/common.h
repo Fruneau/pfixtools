@@ -70,6 +70,9 @@ typedef void (*exitcall_t)(void);
 #define module_init(fn)  static __init initcall_t __init_##fn = fn;
 #define module_exit(fn)  static __exit exitcall_t __exit_##fn = fn;
 
+#define likely(expr)    __builtin_expect((expr) != 0, 1)
+#define unlikely(expr)  __builtin_expect((expr) != 0, 0)
+
 #define __log(Level, Fmt, ...)                                    \
     if (log_level >= Level) {                                     \
         if (log_syslog) {                                         \
