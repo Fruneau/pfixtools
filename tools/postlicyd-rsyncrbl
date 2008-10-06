@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Setup and Create temporary path
+init() {
+    export LC_ALL=C
+    export LANC=C
+    export LANGUAGE=C
+
+    tmp=$(mktemp -td postlicyd-rsyncrbl.XXXXXX) || exit 1
+    successfile="$tmp/.success"
+}
+
+# Cleanup and force reload of the postlicyd daemon
+fini() {
+    if [ -f "$successfile" ] && [ -f "$pidfile" ] ; then
+        pid=$(cat "$pidfile")
+        [ -z "$pid" ] || kill -HUP $(cat "$pidfile")
+    fi
+    rm -rf $tmp
+}
+
+# Bye bye beautifyl
+die() {
+    echo "$1"
+    fini
+    exit 1
+}
+
+# Usage
+usage() {
+    echo "usage: $(basename "$0") confile spoolroot pidfile"
+    [ -z "$1" ] || echo "$1"
+    exit 1
+}
+
+file_stats() {
+  if [ -f "$1" ] ; then
+      stat -c="%s-%Y" "$1"
+  else
+      echo "0-0"
+  fi
+}
+
+# Rsync a rbl file
+getfile() {
+    url="$1"
+    out="$2"
+
+    mtime_before=$(file_stats "$out")
+    rsync --no-motd -q -t -T "$tmp" "$url" "$out" || return 1
+    mtime_after=$(file_stats "$out")
+
+    # The file has changed
+    if [ "$mtime_after" != "$mtime_before" ] ; then
+        # Update ownership and permissions
+        chown nobody:nogroup "$out"
+        chmod 600 "$out"
+
+        # Touch the successful file that is used to check if a reload
+        # is needed
+        touch "$successfile"
+    fi
+    return 0
+}
+
+# Check command line arguments
+conf="$1"
+spool="$2"
+pidfile="$3"
+
+[ -z "$pidfile" ] && usage
+[ -f "$conf" ] || usage "configuration file ($conf) does not exists"
+[ -d "$spool" ] || usage "spool directory ($spool) does not exists"
+
+init
+
+cd "$spool" || die "Can't cd to $spool"
+
+for line in $(grep -v "^#" "$conf" | grep '=') ; do
+    url=${line/*=/}
+    out=${line/=*/}
+    getfile $url $out || echo "error downloading file $out from $url"
+done
+
+fini
+exit 0
