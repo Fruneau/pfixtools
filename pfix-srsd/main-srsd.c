@@ -44,6 +44,7 @@
 #include "server.h"
 
 #define DAEMON_NAME             "pfix-srsd"
+#define DAEMON_VERSION          "0.1"
 #define DEFAULT_ENCODER_PORT    10001
 #define DEFAULT_DECODER_PORT    10002
 #define RUNAS_USER              "nobody"
@@ -307,10 +308,16 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (!daemonize) {
+        log_syslog = false;
+    }
+
     if (argc - optind != 2) {
         usage();
         return EXIT_FAILURE;
     }
+
+    info("starting %s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     config.domain = argv[optind];
     config.srs = srs_read_secrets(argv[optind + 1]);
