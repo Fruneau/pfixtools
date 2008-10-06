@@ -45,6 +45,7 @@
 #include "config.h"
 
 #define DAEMON_NAME             "postlicyd"
+#define DAEMON_VERSION          "0.2"
 #define DEFAULT_PORT            10000
 #define RUNAS_USER              "nobody"
 #define RUNAS_GROUP             "nogroup"
@@ -199,10 +200,16 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (!daemonize) {
+        log_syslog = false;
+    }
+
     if (argc - optind != 1) {
         usage();
         return EXIT_FAILURE;
     }
+
+    info("starting %s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     if (pidfile_open(pidfile) < 0) {
         crit("unable to write pidfile %s", pidfile);

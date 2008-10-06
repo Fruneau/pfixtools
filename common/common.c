@@ -297,7 +297,7 @@ extern exitcall_t __madexit[];
 
 static void common_shutdown(void)
 {
-    if (daemon_process) {
+    if (daemon_process && log_syslog) {
         info("stopping...");
     }
     pidfile_close();

@@ -57,7 +57,6 @@
 
 #include "mem.h"
 
-
 #define __tostr(x)  #x
 #define STR(x)      __tostr(x)
 
@@ -73,13 +72,23 @@ typedef void (*exitcall_t)(void);
 #define likely(expr)    __builtin_expect((expr) != 0, 1)
 #define unlikely(expr)  __builtin_expect((expr) != 0, 0)
 
+#define __level_name(L)                                            \
+  ( (L) == LOG_DEBUG   ? "debug "                                  \
+  : (L) == LOG_NOTICE  ? "notice"                                  \
+  : (L) == LOG_INFO    ? "info  "                                  \
+  : (L) == LOG_WARNING ? "warn  "                                  \
+  : (L) == LOG_ERR     ? "error "                                  \
+  : (L) == LOG_CRIT    ? "crit  "                                  \
+  : (L) == LOG_ALERT   ? "alert "                                  \
+  : "???   " )
+
 #define __log(Level, Fmt, ...)                                    \
     if (log_level >= Level) {                                     \
         if (log_syslog) {                                         \
             syslog(Level, Fmt, ##__VA_ARGS__);                    \
         } else {                                                  \
-            fprintf(stderr, "[%d] " Fmt "\n",                     \
-                    Level, ##__VA_ARGS__);                        \
+            fprintf(stderr, "[%s] " Fmt "\n",                     \
+                    __level_name(Level), ##__VA_ARGS__);          \
         }                                                         \
     }
 
@@ -124,7 +133,6 @@ static inline void common_startup(void)
     signal(SIGTERM, &common_sighandler);
     signal(SIGHUP,  &common_sighandler);
     signal(SIGSEGV, &common_sighandler);
-    info("starting");
 }
 
 
