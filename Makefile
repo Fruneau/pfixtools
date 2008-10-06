@@ -63,11 +63,21 @@ $(DISTCLEAN_TARGETS): distclean-%:
 $(INSTALL_TARGETS): install-%: % install-dir
 	make -C $* install
 
+install-postlicyd: install-postlicyd-tools install-postlicyd-conf
 install-dir:
 	install -d $(DESTDIR)$(prefix)/sbin
 	install -d $(DESTDIR)/etc/pfixtools
+
+install-postlicyd-tools:
+	install tools/postlicyd-rsyncrbl $(DESTDIR)$(prefix)/bin/postlicyd-rsyncrbl
+	install tools/postgrey2postlicyd $(DESTDIR)$(prefix)/bin/postgrey2postlicyd
+	install tools/rbldns2postlicyd	 $(DESTDIR)$(prefix)/bin/rbldns2postlicyd
+
+install-postlicyd-conf:
 	install example/postlicyd.conf $(DESTDIR)/etc/pfixtools/postlicyd.example.conf
+	install example/postlicyd-rsyncrbl.conf $(DESTDIR)/etc/pfixtools/postlicyd-rsyncrbl.example.conf
 
 .PHONY: clean distclean install install-dir $(SUBDIRS) $(CLEAN_TARGETS) \
-				$(DISTCLEAN_TARGETS) $(INSTALL_TARGETS)
+				$(DISTCLEAN_TARGETS) $(INSTALL_TARGETS) install-postlicyd-tools \
+				install-postlicyd-conf
 ###########################################################################}}}
