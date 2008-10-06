@@ -117,7 +117,7 @@ static bool policy_process(server_t *pcy, const config_t *config)
 
 static int policy_run(server_t *pcy, void* vconfig)
 {
-    ssize_t search_offs = MAX(0, (ssize_t)(pcy->ibuf.len - 1));
+    int search_offs = MAX(0, (int)(pcy->ibuf.len - 1));
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
     const char *eoq;
     query_t  *query  = pcy->data;

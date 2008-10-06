@@ -285,7 +285,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                         lock = false;
                     } else {
                         PARSE_CHECK(false, "illegal locking state %.*s",
-                                    p - current, current);
+                                    (int)(p - current), current);
                     }
                     break;
 
@@ -301,7 +301,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                         reverse = false;
                     } else {
                         PARSE_CHECK(false, "illegal character order value %.*s",
-                                    p - current, current);
+                                    (int)(p - current), current);
                     }
                     break;
 
@@ -309,7 +309,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                     weight = strtol(current, &next, 10);
                     PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
                                 "illegal weight value %.*s",
-                                (p - current), current);
+                                (int)(p - current), current);
                     break;
 
                   case 3:
@@ -358,7 +358,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                         lock = false;
                     } else {
                         PARSE_CHECK(false, "illegal locking state %.*s",
-                                    p - current, current);
+                                    (int)(p - current), current);
                     }
                     break;
 
@@ -366,7 +366,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                     weight = strtol(current, &next, 10);
                     PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
                                 "illegal weight value %.*s",
-                                (p - current), current);
+                                (int)(p - current), current);
                     break;
 
                   case 2:
@@ -412,7 +412,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                     weight = strtol(current, &next, 10);
                     PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
                                 "illegal weight value %.*s",
-                                (p - current), current);
+                                (int)(p - current), current);
                     break;
 
                   case 1:
@@ -470,7 +470,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                   CASE(RECIPIENT, recipient, email);
 #undef CASE
                   default:
-                    PARSE_CHECK(false, "unknown field %.*s", p - current, current);
+                    PARSE_CHECK(false, "unknown field %.*s", (int)(p - current), current);
                     break;
                 }
                 if (!*p) {

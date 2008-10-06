@@ -133,7 +133,7 @@ static bool match_filter_constructor(filter_t *filter)
             condition.field = policy_tokenize(p, n - p);
             PARSE_CHECK(condition.field >= PTK_HELO_NAME
                         && condition.field < PTK_SMTPD_ACCESS_POLICY,
-                        "invalid field name %.*s", n - p, p);
+                        "invalid field name %.*s", (int)(n - p), p);
             p = skipspaces(n);
             n = p + 1;
             PARSE_CHECK(IS_OP_START(*p) && IS_OP_END(*n),

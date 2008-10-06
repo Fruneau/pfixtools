@@ -299,7 +299,7 @@ static bool rbl_filter_constructor(filter_t *filter)
                         lock = false;
                     } else {
                         PARSE_CHECK(false, "illegal locking state %.*s",
-                                    p - current, current);
+                                    (int)(p - current), current);
                     }
                     break;
 
@@ -307,7 +307,7 @@ static bool rbl_filter_constructor(filter_t *filter)
                     weight = strtol(current, &next, 10);
                     PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
                                 "illegal weight value %.*s",
-                                (p - current), current);
+                                (int)(p - current), current);
                     break;
 
                   case 2:
@@ -342,7 +342,7 @@ static bool rbl_filter_constructor(filter_t *filter)
                     weight = strtol(current, &next, 10);
                     PARSE_CHECK(next == p && weight >= 0 && weight <= 1024,
                                 "illegal weight value %.*s",
-                                (p - current), current);
+                                (int)(p - current), current);
                     break;
 
                   case 1:

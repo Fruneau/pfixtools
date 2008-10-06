@@ -188,7 +188,7 @@ static bool config_load(config_t *config)
 
     char key[BUFSIZ];
     char value[BUFSIZ];
-    ssize_t key_len, value_len;
+    int key_len, value_len;
 
     if (!file_map_open(&map, config->filename, false)) {
         return false;
@@ -200,7 +200,7 @@ static bool config_load(config_t *config)
 
 #define READ_LOG(Lev, Fmt, ...)                                                \
     __log(LOG_ ## Lev, "config file %s:%d:%d: " Fmt, config->filename,         \
-           line + 1, p - linep + 1, ##__VA_ARGS__)
+           line + 1, (int)(p - linep + 1), ##__VA_ARGS__)
 #define READ_ERROR(Fmt, ...)                                                   \
     do {                                                                       \
         READ_LOG(ERR, Fmt, ##__VA_ARGS__);                                     \

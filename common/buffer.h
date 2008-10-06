@@ -66,18 +66,18 @@ static inline char *buffer_unwrap(buffer_t **buf) {
 #define buffer_resize(buffer, newsize)                                         \
   array_ensure_exact_capacity(*(buffer), (newsize) + 1)
 
-static inline void buffer_ensure(buffer_t *buf, ssize_t extra) {
+static inline void buffer_ensure(buffer_t *buf, int extra) {
     assert (extra >= 0);
     if (buf->len + extra >= buf->size) {
         buffer_resize(buf, buf->len + extra);
     }
 }
-static inline void buffer_extend(buffer_t *buf, ssize_t extra) {
+static inline void buffer_extend(buffer_t *buf, int extra) {
     buffer_ensure(buf, extra);
     buf->len += extra;
     buf->data[buf->len] = '\0';
 }
-static inline void buffer_extendch(buffer_t *buf, ssize_t extra, int c) {
+static inline void buffer_extendch(buffer_t *buf, int extra, int c) {
     buffer_ensure(buf, extra);
     memset(buf->data + buf->len, c, extra);
     buf->len += extra;
@@ -85,7 +85,7 @@ static inline void buffer_extendch(buffer_t *buf, ssize_t extra, int c) {
 }
 
 
-static inline void buffer_add(buffer_t *buf, const void *data, ssize_t len) {
+static inline void buffer_add(buffer_t *buf, const void *data, int len) {
     buffer_ensure(buf, len);
     memcpy(buf->data + buf->len, data, len);
     buf->len += len;
@@ -102,12 +102,12 @@ static inline void buffer_addch(buffer_t *buf, int c) {
 }
 
 __attribute__((format(printf,2,0)))
-ssize_t buffer_addvf(buffer_t *, const char *fmt, va_list);
+int buffer_addvf(buffer_t *, const char *fmt, va_list);
 
 static inline __attribute__((format(printf,2,3)))
-ssize_t buffer_addf(buffer_t *buf, const char *fmt, ...)
+int buffer_addf(buffer_t *buf, const char *fmt, ...)
 {
-    ssize_t res;
+    int res;
     va_list args;
     va_start(args, fmt);
     res = buffer_addvf(buf, fmt, args);
@@ -115,9 +115,9 @@ ssize_t buffer_addf(buffer_t *buf, const char *fmt, ...)
     return res;
 }
 
-void buffer_consume(buffer_t *buf, ssize_t len);
+void buffer_consume(buffer_t *buf, int len);
 
-ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count);
-ssize_t buffer_write(buffer_t *buf, int fd);
+int buffer_read(buffer_t *buf, int fd, int count);
+int buffer_write(buffer_t *buf, int fd);
 
 #endif /* PFIXTOOLS_BUFFER_H */

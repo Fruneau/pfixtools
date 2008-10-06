@@ -40,9 +40,9 @@
 #include "mem.h"
 #include "buffer.h"
 
-ssize_t buffer_addvf(buffer_t *buf, const char *fmt, va_list ap)
+int buffer_addvf(buffer_t *buf, const char *fmt, va_list ap)
 {
-    ssize_t len, avail = buf->size - buf->len;
+    int len, avail = buf->size - buf->len;
     va_list ap2;
 
     va_copy(ap2, ap);
@@ -59,12 +59,12 @@ ssize_t buffer_addvf(buffer_t *buf, const char *fmt, va_list ap)
     return len;
 }
 
-void buffer_consume(buffer_t *buf, ssize_t len)
+void buffer_consume(buffer_t *buf, int len)
 {
     if (len <= 0)
         return;
 
-    if (len >= (ssize_t)buf->len) {
+    if (len >= (int)buf->len) {
         buffer_reset(buf);
         return;
     }
@@ -73,9 +73,9 @@ void buffer_consume(buffer_t *buf, ssize_t len)
     buf->len -= len;
 }
 
-ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count)
+int buffer_read(buffer_t *buf, int fd, int count)
 {
-    ssize_t res;
+    int res;
 
     if (count < 0)
         count = BUFSIZ;
@@ -92,9 +92,9 @@ ssize_t buffer_read(buffer_t *buf, int fd, ssize_t count)
     return res;
 }
 
-ssize_t buffer_write(buffer_t *buf, int fd)
+int buffer_write(buffer_t *buf, int fd)
 {
-    ssize_t res = write(fd, buf->data, buf->len);
+    int res = write(fd, buf->data, buf->len);
     if (res < 0) {
         return errno == EINTR || errno == EAGAIN ? 0 : -1;
     }

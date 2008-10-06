@@ -197,19 +197,19 @@ bool filter_test(const filter_t *filter, const query_t *query, filter_result_t r
     return !!(runners[filter->type](filter, query) == result);
 }
 
-void filter_set_name(filter_t *filter, const char *name, ssize_t len)
+void filter_set_name(filter_t *filter, const char *name, int len)
 {
     filter->name = p_dupstr(name, len);
 }
 
-bool filter_set_type(filter_t *filter, const char *type, ssize_t len)
+bool filter_set_type(filter_t *filter, const char *type, int len)
 {
     filter->type = filter_tokenize(type, len);
     return filter->type != FTK_UNKNOWN;
 }
 
-bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
-                      const char *value, ssize_t value_len)
+bool filter_add_param(filter_t *filter, const char *name, int name_len,
+                      const char *value, int value_len)
 {
     filter_param_t param;
     param.type = param_tokenize(name, name_len);
@@ -228,8 +228,8 @@ bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
     return true;
 }
 
-bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
-                     const char *value, ssize_t value_len)
+bool filter_add_hook(filter_t *filter, const char *name, int name_len,
+                     const char *value, int value_len)
 {
     filter_hook_t hook;
     hook.type  = hook_tokenize(name, name_len);

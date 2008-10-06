@@ -399,7 +399,7 @@ static inline void trie_entry_inspect(const trie_t *trie, bool show_content,
         printf("Number of leaves: %d\n", leaves);
         printf("Max depth: %d\n", max_depth);
         printf("Average leaf depth: %d\n", depth_sum / leaves);
-        printf("Memory used: %d\n", (trie->entries.size * sizeof(trie_entry_t))
+        printf("Memory used: %zd\n", (trie->entries.size * sizeof(trie_entry_t))
                                   + (trie->c.size) + sizeof(trie_t));
     }
 }

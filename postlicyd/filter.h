@@ -58,8 +58,8 @@ ARRAY(filter_hook_t)
 
 typedef struct filter_param_t {
     filter_param_id_t type;
-    char    *value;
-    ssize_t value_len;
+    char  *value;
+    int    value_len;
 } filter_param_t;
 ARRAY(filter_param_t)
 
@@ -112,18 +112,18 @@ static inline void filter_init(filter_t *filter)
 }
 
 __attribute__((nonnull(1,2)))
-void filter_set_name(filter_t *filter, const char *name, ssize_t len);
+void filter_set_name(filter_t *filter, const char *name, int len);
 
 __attribute__((nonnull(1,2)))
-bool filter_set_type(filter_t *filter, const char *type, ssize_t len);
+bool filter_set_type(filter_t *filter, const char *type, int len);
 
 __attribute__((nonnull(1,2,4)))
-bool filter_add_param(filter_t *filter, const char *name, ssize_t name_len,
-                      const char *value, ssize_t value_len);
+bool filter_add_param(filter_t *filter, const char *name, int name_len,
+                      const char *value, int value_len);
 
 __attribute__((nonnull(1,2,4)))
-bool filter_add_hook(filter_t *filter, const char *name, ssize_t name_len,
-                     const char *value, ssize_t value_len);
+bool filter_add_hook(filter_t *filter, const char *name, int name_len,
+                     const char *value, int value_len);
 
 __attribute__((nonnull(1)))
 bool filter_build(filter_t *filter);
