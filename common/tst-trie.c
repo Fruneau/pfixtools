@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
         trie = create_trie_from_file(argv[1]);
         trie_inspect(trie, false);
         if (argc > 2) {
-            const uint32_t how_many = 2 * 1000 * 1000;
+            const uint32_t how_many = 8 * 1000 * 1000;
             struct timeval start, end;
             double diff;
 
