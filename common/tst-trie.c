@@ -33,6 +33,8 @@
  * Copyright © 2008 Florent Bruneau
  */
 
+#include <time.h>
+#include <sys/time.h>
 #include "common.h"
 #include "str.h"
 #include "trie.h"
@@ -130,11 +132,17 @@ int main(int argc, char *argv[])
         trie = create_trie_from_file(argv[1]);
         trie_inspect(trie, false);
         if (argc > 2) {
-            time_t now = time(NULL);
-            for (uint32_t i = 0 ; i < 1000000000 ; ++i) {
+            const uint32_t how_many = 2 * 1000 * 1000;
+            struct timeval start, end;
+            double diff;
+
+            gettimeofday(&start, NULL);
+            for (uint32_t i = 0 ; i < how_many ; ++i) {
                 trie_lookup(trie, argv[2]);
             }
-            printf("%lu lookups per second\n", 1000000000 / (time(NULL) - now));
+            gettimeofday(&end, NULL);
+            diff = (end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 10e6;
+            printf("%u lookups per second\n", (int)(how_many / diff));
         }
         trie_delete(&trie);
     }
