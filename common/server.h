@@ -45,19 +45,30 @@ typedef void  (*delete_client_t)(void*);
 typedef void *(*start_client_t)(server_t*);
 typedef int   (*run_client_t)(server_t*, void*);
 typedef bool	(*refresh_t)(void*);
+typedef bool  (*event_handler_t)(void* data, void* config);
 
 struct server_t {
     unsigned listener : 1;
+    unsigned event    : 1;
+
     int fd;
+    int fd2;
+
     buffer_t ibuf;
     buffer_t obuf;
-    void* data;
+
     delete_client_t clear_data;
+    void* data;
 };
+ARRAY(server_t);
 
 int start_server(int port, start_listener_t starter, delete_client_t deleter);
 
+int event_register(void *data);
+bool event_fire(int event);
+
 int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, refresh_t refresh, void* config);
+                run_client_t runner, event_handler_t handler,
+                refresh_t refresh, void *config);
 
 #endif

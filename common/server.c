@@ -35,38 +35,66 @@
 
 #include "server.h"
 #include "epoll.h"
+#include "common.h"
 
-static server_t *listeners[1024];
-static int listener_count = 0;
-
+static PA(server_t) listeners   = ARRAY_INIT;
+static PA(server_t) server_pool = ARRAY_INIT;
 
 static server_t* server_new(void)
 {
     server_t* server = p_new(server_t, 1);
-    server->fd = -1;
+    server->fd  = -1;
+    server->fd2 = -1;
     return server;
+}
+
+static void server_wipe(server_t *server)
+{
+    server->listener = server->event = false;
+    if (server->fd > 0) {
+        close(server->fd);
+        server->fd = -1;
+    }
+    if (server->fd2 > 0) {
+        close(server->fd2);
+        server->fd2 = -1;
+    }
+    if (server->data && server->clear_data) {
+        server->clear_data(&server->data);
+    }
+    array_shrink(server->ibuf, 512);
+    array_shrink(server->obuf, 512);
 }
 
 static void server_delete(server_t **server)
 {
     if (*server) {
-        if ((*server)->fd >= 0) {
-            close((*server)->fd);
-        }
-        if ((*server)->data && (*server)->clear_data) {
-            (*server)->clear_data(&(*server)->data);
-        }
         buffer_wipe(&(*server)->ibuf);
         buffer_wipe(&(*server)->obuf);
+        server_wipe(*server);
         p_delete(server);
     }
 }
 
+static server_t* server_acquire(void)
+{
+    if (server_pool.len != 0) {
+        return array_elt(server_pool, --server_pool.len);
+    } else {
+        return server_new();
+    }
+}
+
+static void server_release(server_t *server)
+{
+    server_wipe(server);
+    array_add(server_pool, server);
+}
+
 static void server_shutdown(void)
 {
-    for (int i = 0 ; i < listener_count ; ++i) {
-        server_delete(&listeners[i]);
-    }
+    array_deep_wipe(listeners, server_delete);
+    array_deep_wipe(server_pool, server_delete);
 }
 
 module_exit(server_shutdown);
@@ -95,13 +123,13 @@ int start_server(int port, start_listener_t starter, delete_client_t deleter)
       }
     }
 
-    tmp             = server_new();
+    tmp             = server_acquire();
     tmp->fd         = sock;
     tmp->listener   = true;
     tmp->data       = data;
     tmp->clear_data = deleter;
     epoll_register(sock, EPOLLIN, tmp);
-    listeners[listener_count++] = tmp;
+    array_add(listeners, tmp);
     return 0;
 }
 
@@ -126,7 +154,7 @@ static int start_client(server_t *server, start_client_t starter,
         }
     }
 
-    tmp             = server_new();
+    tmp             = server_acquire();
     tmp->fd         = sock;
     tmp->data       = data;
     tmp->clear_data = deleter;
@@ -134,8 +162,53 @@ static int start_client(server_t *server, start_client_t starter,
     return 0;
 }
 
+int event_register(void *data)
+{
+    int fds[2];
+    if (pipe(fds) != 0) {
+        UNIXERR("pipe");
+        return -1;
+    }
+    if (setnonblock(fds[0]) != 0) {
+        close(fds[0]);
+        close(fds[1]);
+        return -1;
+    }
+
+    server_t *tmp = server_acquire();
+    tmp->event = true;
+    tmp->fd    = fds[0];
+    tmp->fd2   = fds[1];
+    tmp->data  = data;
+    epoll_register(fds[0], EPOLLIN, tmp);
+    return tmp->fd2;
+}
+
+bool event_fire(int event)
+{
+    static const char *data = "";
+    return write(event, data, 1) == 0;
+}
+
+static bool event_cancel(int event)
+{
+    static char buff[1];
+    while (true) {
+        ssize_t res = read(event, buff, 64);
+        if (res == -1 && errno != EAGAIN && errno != EINTR) {
+            UNIXERR("read");
+            return false;
+        } else if (res == -1 && errno == EINTR) {
+            continue;
+        } else if (res != 1) {
+            return true;
+        }
+    }
+}
+
 int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, refresh_t refresh, void* config) {
+                run_client_t runner, event_handler_t handler,
+                refresh_t refresh, void* config) {
     info("entering processing loop");
     while (!sigint) {
         struct epoll_event evts[1024];
@@ -166,18 +239,29 @@ int server_loop(start_client_t starter, delete_client_t deleter,
             if (d->listener) {
                 (void)start_client(d, starter, deleter);
                 continue;
+            } else if (d->event) {
+                if (!event_cancel(d->fd)) {
+                    server_release(d);
+                    continue;
+                }
+                if (handler) {
+                    if (!handler(d->data, config)) {
+                        server_release(d);
+                    }
+                }
+                continue;
             }
 
             if (evts[n].events & EPOLLIN) {
                 if (runner(d, config) < 0) {
-                    server_delete(&d);
+                    server_release(d);
                     continue;
                 }
             }
 
             if ((evts[n].events & EPOLLOUT) && d->obuf.len) {
                 if (buffer_write(&d->obuf, d->fd) < 0) {
-                    server_delete(&d);
+                    server_release(d);
                     continue;
                 }
                 if (!d->obuf.len) {

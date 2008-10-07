@@ -138,12 +138,19 @@
         array_ensure_can_edit(array);                                          \
         p_allocgrow(&(array).data, (goal), &(array).size);                     \
     }
-#define array_adjust(array)                                                    \
+#define array_shrink(array, cap)                                               \
     do {                                                                       \
         array_ensure_can_edit(array);                                          \
-        p_shrink(&(array).data, (array).len, &(array).size);                   \
+        if ((cap) < (array).size && (array).size != (array).len) {             \
+            p_shrink(&(array).data, MAX((array).len, (cap)), &(array).size);   \
+        }                                                                      \
     } while (0)
+#define array_adjust(array) array_shrink(array, 0)
+
 #define array_elt(array, n) ((array).data[(n)])
+#define array_last(array) array_elt(array, (array).len - 1)
+#define array_pop_last(array) array_elt(array, --((array).len))
+
 #define array_ptr(array, n) ((array).data + (n))
 
 #define foreach(var, array)                                                    \

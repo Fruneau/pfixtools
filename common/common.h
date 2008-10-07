@@ -111,6 +111,7 @@ extern bool         log_syslog;
 
 void common_sighandler(int sig);
 
+int setnonblock(int sock);
 int tcp_bind(const struct sockaddr *addr, socklen_t len);
 int tcp_listen(const struct sockaddr *addr, socklen_t len);
 int tcp_listen_nonblock(const struct sockaddr *addr, socklen_t len);

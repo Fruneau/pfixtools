@@ -68,7 +68,7 @@ void common_sighandler(int sig)
     }
 }
 
-static int setnonblock(int sock)
+int setnonblock(int sock)
 {
     int res = fcntl(sock, F_GETFL);
 

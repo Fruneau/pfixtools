@@ -55,9 +55,9 @@
 
 #  define p_shrink(pp, goalnb, allocnb)           \
     do {                                          \
-        if (*(allocnb) > goalnb) {                \
-            p_realloc(pp, goalnb);                \
-            *(allocnb) = goalnb;                  \
+        if (*(allocnb) > (goalnb)) {              \
+            p_realloc(pp, (goalnb));              \
+            *(allocnb) = (goalnb);                \
         }                                         \
     } while(0)
 

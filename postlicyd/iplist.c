@@ -458,6 +458,7 @@ static int rbl_init(void)
     (void)filter_hook_register(type, "fail");
     (void)filter_hook_register(type, "hard_match");
     (void)filter_hook_register(type, "soft_match");
+    (void)filter_hook_register(type, "async");
 
     /* Parameters.
      */

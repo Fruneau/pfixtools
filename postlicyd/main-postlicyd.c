@@ -240,6 +240,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     } else {
         return server_loop(query_starter, (delete_client_t)query_delete,
-                           policy_run, config_refresh, config);
+                           policy_run, NULL, config_refresh, config);
     }
 }
