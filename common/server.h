@@ -39,6 +39,9 @@
 #include "buffer.h"
 
 typedef struct server_t server_t;
+typedef int event_t;
+
+#define INVALID_EVENT (-1)
 
 typedef void *(*start_listener_t)(void);
 typedef void  (*delete_client_t)(void*);
@@ -64,8 +67,8 @@ ARRAY(server_t);
 
 int start_server(int port, start_listener_t starter, delete_client_t deleter);
 
-int event_register(void *data);
-bool event_fire(int event);
+event_t event_register(void *data);
+bool event_fire(event_t event);
 
 int server_loop(start_client_t starter, delete_client_t deleter,
                 run_client_t runner, event_handler_t handler,

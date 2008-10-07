@@ -162,17 +162,17 @@ static int start_client(server_t *server, start_client_t starter,
     return 0;
 }
 
-int event_register(void *data)
+event_t event_register(void *data)
 {
     int fds[2];
     if (pipe(fds) != 0) {
         UNIXERR("pipe");
-        return -1;
+        return INVALID_EVENT;
     }
     if (setnonblock(fds[0]) != 0) {
         close(fds[0]);
         close(fds[1]);
-        return -1;
+        return INVALID_EVENT;
     }
 
     server_t *tmp = server_acquire();
@@ -184,7 +184,7 @@ int event_register(void *data)
     return tmp->fd2;
 }
 
-bool event_fire(int event)
+bool event_fire(event_t event)
 {
     static const char *data = "";
     return write(event, data, 1) == 0;
@@ -192,15 +192,15 @@ bool event_fire(int event)
 
 static bool event_cancel(int event)
 {
-    static char buff[1];
+    char buff[32];
     while (true) {
-        ssize_t res = read(event, buff, 64);
+        ssize_t res = read(event, buff, 32);
         if (res == -1 && errno != EAGAIN && errno != EINTR) {
             UNIXERR("read");
             return false;
         } else if (res == -1 && errno == EINTR) {
             continue;
-        } else if (res != 1) {
+        } else if (res != 32) {
             return true;
         }
     }
