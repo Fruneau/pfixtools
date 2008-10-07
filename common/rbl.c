@@ -56,15 +56,27 @@ static inline rbl_result_t rbl_dns_check(const char *hostname)
 rbl_result_t rbl_check(const char *rbl, uint32_t ip)
 {
     char host[257];
-    snprintf(host, 257, "%d.%d.%d.%d.%s",
-             ip & 0xff, (ip >> 8) & 0xff, (ip >> 16) & 0xff, (ip >> 24) & 0xff,
-             rbl);
+    int len;
+
+    len = snprintf(host, 257, "%d.%d.%d.%d.%s.",
+                   ip & 0xff, (ip >> 8) & 0xff, (ip >> 16) & 0xff, (ip >> 24) & 0xff,
+                   rbl);
+    if (len >= (int)sizeof(host))
+        return RBL_ERROR;
+    if (host[len - 2] == '.')
+        host[len - 1] = '\0';
     return rbl_dns_check(host);
 }
 
 rbl_result_t rhbl_check(const char *rhbl, const char *hostname)
 {
     char host[257];
-    snprintf(host, 257, "%s.%s", hostname, rhbl);
+    int len;
+
+    len = snprintf(host, 257, "%s.%s.", hostname, rhbl);
+    if (len >= (int)sizeof(host))
+        return RBL_ERROR;
+    if (host[len - 2] == '.')
+        host[len - 1] = '\0';
     return rbl_dns_check(host);
 }
