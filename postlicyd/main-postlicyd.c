@@ -104,7 +104,7 @@ static bool policy_process(server_t *pcy, const config_t *config)
             policy_answer(pcy, "%s", hook->value);
             return true;
         } else {
-            notice("request client=%s, from=<%s>, to=<%s>: "
+            debug("request client=%s, from=<%s>, to=<%s>: "
                    "awswer %s from filter %s: next filter %s",
                    query->client_name,
                    query->sender == NULL ? "undefined" : query->sender,
