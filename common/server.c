@@ -63,8 +63,6 @@ static void server_wipe(server_t *server)
     if (server->data && server->clear_data) {
         server->clear_data(&server->data);
     }
-    array_shrink(server->ibuf, 512);
-    array_shrink(server->obuf, 512);
 }
 
 static void server_delete(server_t **server)
@@ -163,23 +161,25 @@ static int start_client(server_t *server, start_client_t starter,
     return 0;
 }
 
-event_t event_register(void *data)
+event_t event_register(int fd, void *data)
 {
     int fds[2];
-    if (pipe(fds) != 0) {
-        UNIXERR("pipe");
-        return NULL;
-    }
-    if (setnonblock(fds[0]) != 0) {
-        close(fds[0]);
-        close(fds[1]);
-        return NULL;
+    if (fd == -1) {
+        if (pipe(fds) != 0) {
+            UNIXERR("pipe");
+            return NULL;
+        }
+        if (setnonblock(fds[0]) != 0) {
+            close(fds[0]);
+            close(fds[1]);
+            return NULL;
+        }
     }
 
     server_t *tmp = server_acquire();
     tmp->event = true;
-    tmp->fd    = fds[0];
-    tmp->fd2   = fds[1];
+    tmp->fd    = fd == -1 ? fds[0] : fd;
+    tmp->fd2   = fd == -1 ? fds[1] : -1;
     tmp->data  = data;
     epoll_register(fds[0], EPOLLIN, tmp);
     return tmp;
@@ -188,6 +188,9 @@ event_t event_register(void *data)
 bool event_fire(event_t event)
 {
     static const char *data = "";
+    if (event->fd2 == -1) {
+        return false;
+    }
     return write(event->fd2, data, 1) == 0;
 }
 
@@ -209,7 +212,8 @@ static bool event_cancel(event_t event)
 
 int server_loop(start_client_t starter, delete_client_t deleter,
                 run_client_t runner, event_handler_t handler,
-                refresh_t refresh, void* config) {
+                refresh_t refresh, void* config)
+{
     info("entering processing loop");
     while (!sigint) {
         struct epoll_event evts[1024];

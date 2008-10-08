@@ -67,7 +67,7 @@ ARRAY(server_t);
 
 int start_server(int port, start_listener_t starter, delete_client_t deleter);
 
-event_t event_register(void *data);
+event_t event_register(int fd, void *data);
 bool event_fire(event_t event);
 #define event_data(event) ((event)->data)
 
