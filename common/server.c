@@ -52,6 +52,7 @@ static void server_wipe(server_t *server)
 {
     server->listener = server->event = false;
     if (server->fd > 0) {
+        epoll_modify(server->fd, 0, NULL);
         close(server->fd);
         server->fd = -1;
     }
@@ -167,12 +168,12 @@ event_t event_register(void *data)
     int fds[2];
     if (pipe(fds) != 0) {
         UNIXERR("pipe");
-        return INVALID_EVENT;
+        return NULL;
     }
     if (setnonblock(fds[0]) != 0) {
         close(fds[0]);
         close(fds[1]);
-        return INVALID_EVENT;
+        return NULL;
     }
 
     server_t *tmp = server_acquire();
@@ -181,20 +182,20 @@ event_t event_register(void *data)
     tmp->fd2   = fds[1];
     tmp->data  = data;
     epoll_register(fds[0], EPOLLIN, tmp);
-    return tmp->fd2;
+    return tmp;
 }
 
 bool event_fire(event_t event)
 {
     static const char *data = "";
-    return write(event, data, 1) == 0;
+    return write(event->fd2, data, 1) == 0;
 }
 
-static bool event_cancel(int event)
+static bool event_cancel(event_t event)
 {
     char buff[32];
     while (true) {
-        ssize_t res = read(event, buff, 32);
+        ssize_t res = read(event->fd, buff, 32);
         if (res == -1 && errno != EAGAIN && errno != EINTR) {
             UNIXERR("read");
             return false;
@@ -240,12 +241,12 @@ int server_loop(start_client_t starter, delete_client_t deleter,
                 (void)start_client(d, starter, deleter);
                 continue;
             } else if (d->event) {
-                if (!event_cancel(d->fd)) {
+                if (!event_cancel(d)) {
                     server_release(d);
                     continue;
                 }
                 if (handler) {
-                    if (!handler(d->data, config)) {
+                    if (!handler(d, config)) {
                         server_release(d);
                     }
                 }

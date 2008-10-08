@@ -39,16 +39,16 @@
 #include "buffer.h"
 
 typedef struct server_t server_t;
-typedef int event_t;
+typedef server_t *event_t;
 
-#define INVALID_EVENT (-1)
+#define INVALID_EVENT (NULL)
 
 typedef void *(*start_listener_t)(void);
 typedef void  (*delete_client_t)(void*);
 typedef void *(*start_client_t)(server_t*);
 typedef int   (*run_client_t)(server_t*, void*);
 typedef bool	(*refresh_t)(void*);
-typedef bool  (*event_handler_t)(void* data, void* config);
+typedef bool  (*event_handler_t)(event_t, void*);
 
 struct server_t {
     unsigned listener : 1;
@@ -69,6 +69,7 @@ int start_server(int port, start_listener_t starter, delete_client_t deleter);
 
 event_t event_register(void *data);
 bool event_fire(event_t event);
+#define event_data(event) ((event)->data)
 
 int server_loop(start_client_t starter, delete_client_t deleter,
                 run_client_t runner, event_handler_t handler,
