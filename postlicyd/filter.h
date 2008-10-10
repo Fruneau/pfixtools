@@ -51,7 +51,8 @@ typedef struct filter_hook_t {
     filter_result_t type;
     char *value;
 
-    bool postfix;
+    unsigned postfix:1;
+    unsigned async:1;
     int filter_id;
 } filter_hook_t;
 ARRAY(filter_hook_t)
@@ -63,6 +64,8 @@ typedef struct filter_param_t {
 } filter_param_t;
 ARRAY(filter_param_t)
 
+/** Description of a filter.
+ */
 typedef struct filter_t {
     char *name;
     filter_type_t type;
@@ -78,6 +81,17 @@ typedef struct filter_t {
 } filter_t;
 ARRAY(filter_t)
 
+/** Context of the query. To be filled with data to use when
+ * performing asynchronous filtering.
+ */
+typedef struct filter_context_t {
+    const filter_t *current_filter;
+    void *contexts[FTK_count];
+
+    void *data;
+} filter_context_t;
+
+
 #define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, NULL, ARRAY_INIT, -1 }
 #define CHECK_FILTER(Filter)                                                   \
     assert(Filter != FTK_UNKNOWN && Filter != FTK_count                        \
@@ -89,20 +103,38 @@ ARRAY(filter_t)
     assert(Param != ATK_UNKNOWN && Param != ATK_count                          \
            && "Unknown param")
 
+
+/* Callback to be implemented by a filter.
+ */
+
 typedef filter_result_t (*filter_runner_t)(const filter_t *filter,
-                                           const query_t *query);
+                                           const query_t *query,
+                                           filter_context_t *context);
 typedef bool (*filter_constructor_t)(filter_t *filter);
 typedef void (*filter_destructor_t)(filter_t *filter);
 
+typedef void *(*filter_context_constructor_t)(void);
+typedef void (*filter_context_destructor_t)(void*);
+
+
+/* Registration.
+ */
+
 __attribute__((nonnull(1,4)))
 filter_type_t filter_register(const char *type, filter_constructor_t constructor,
-                              filter_destructor_t destructor, filter_runner_t runner);
+                              filter_destructor_t destructor, filter_runner_t runner,
+                              filter_context_constructor_t context_constructor,
+                              filter_context_destructor_t context_destructor);
 
 __attribute__((nonnull(2)))
 filter_result_t filter_hook_register(filter_type_t filter, const char *name);
 
 __attribute__((nonnull(2)))
 filter_param_id_t filter_param_register(filter_type_t filter, const char *name);
+
+
+/* Filter builder.
+ */
 
 __attribute__((nonnull(1)))
 static inline void filter_init(filter_t *filter)
@@ -170,14 +202,20 @@ static inline void filter_params_wipe(filter_param_t *param)
 __attribute__((nonnull(1)))
 void filter_wipe(filter_t *filter);
 
-__attribute__((nonnull(1,2)))
-const filter_hook_t *filter_run(const filter_t *filter, const query_t *query);
+
+/* Runner.
+ */
 
 __attribute__((nonnull(1,2)))
-bool filter_test(const filter_t *filter, const query_t *query, filter_result_t expt);
+const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,
+                                filter_context_t *context);
+
+__attribute__((nonnull(1,2)))
+bool filter_test(const filter_t *filter, const query_t *query,
+                 filter_context_t *context, filter_result_t expt);
 
 
-/* Helpers
+/* Parsing Helpers
  */
 
 #define FILTER_PARAM_PARSE_STRING(Param, Dest)                                 \
@@ -215,5 +253,15 @@ bool filter_test(const filter_t *filter, const query_t *query, filter_result_t e
                         param->value_len, param->value);                       \
         }                                                                      \
     } break
+
+
+/* Filter context
+ */
+
+__attribute__((nonnull))
+void filter_context_prepare(filter_context_t *context, void* qctx);
+
+__attribute__((nonnull))
+void filter_context_wipe(filter_context_t *context);
 
 #endif

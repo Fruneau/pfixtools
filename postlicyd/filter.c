@@ -43,15 +43,29 @@ static filter_destructor_t  destructors[FTK_count];
 static bool                 hooks[FTK_count][HTK_count];
 static bool                 params[FTK_count][ATK_count];
 
+static filter_context_constructor_t ctx_constructors[FTK_count];
+static filter_context_destructor_t  ctx_destructors[FTK_count];
+
 static const filter_hook_t default_hook = {
     .type      = 0,
     .value     = (char*)"DUNNO",
     .postfix   = true,
+    .async     = false,
+    .filter_id = 0
+};
+
+static const filter_hook_t async_hook = {
+    .type      = 0,
+    .value     = NULL,
+    .postfix   = false,
+    .async     = true,
     .filter_id = 0
 };
 
 filter_type_t filter_register(const char *type, filter_constructor_t constructor,
-                              filter_destructor_t destructor, filter_runner_t runner)
+                              filter_destructor_t destructor, filter_runner_t runner,
+                              filter_context_constructor_t context_constructor,
+                              filter_context_destructor_t context_destructor)
 {
     filter_token tok = filter_tokenize(type, m_strlen(type));
     CHECK_FILTER(tok);
@@ -59,6 +73,9 @@ filter_type_t filter_register(const char *type, filter_constructor_t constructor
     runners[tok] = runner;
     constructors[tok] = constructor;
     destructors[tok] = destructor;
+
+    ctx_constructors[tok] = context_constructor;
+    ctx_destructors[tok]  = context_destructor;
     return tok;
 }
 
@@ -163,17 +180,24 @@ void filter_wipe(filter_t *filter)
     p_delete(&filter->name);
 }
 
-const filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
+const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,
+                                filter_context_t *context)
 {
     int start = 0;
     int end   = filter->hooks.len;
     debug("running filter %s (%s)", filter->name, ftokens[filter->type]);
-    filter_result_t res = runners[filter->type](filter, query);
+    filter_result_t res = runners[filter->type](filter, query, context);
 
+    context->current_filter = NULL;
+
+    debug("filter run, result is %s", htokens[res]);
     if (res == HTK_ABORT) {
         return NULL;
     }
-    debug("filter run, result is %s", htokens[res]);
+    if (res == HTK_ASYNC) {
+        context->current_filter = filter;
+        return &async_hook;
+    }
 
     while (start < end) {
         int mid = (start + end) / 2;
@@ -192,9 +216,10 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query)
     return &default_hook;
 }
 
-bool filter_test(const filter_t *filter, const query_t *query, filter_result_t result)
+bool filter_test(const filter_t *filter, const query_t *query,
+                 filter_context_t *context, filter_result_t result)
 {
-    return !!(runners[filter->type](filter, query) == result);
+    return !!(runners[filter->type](filter, query, context) == result);
 }
 
 void filter_set_name(filter_t *filter, const char *name, int len)
@@ -242,9 +267,30 @@ bool filter_add_hook(filter_t *filter, const char *name, int name_len,
             htokens[hook.type], ftokens[filter->type]);
         return false;
     }
+    hook.async   = false;
     hook.postfix = (strncmp(value, "postfix:", 8) == 0);
     hook.value = m_strdup(hook.postfix ? value + 8 : value);
     hook.filter_id = -1;
     array_add(filter->hooks, hook);
     return true;
+}
+
+void filter_context_prepare(filter_context_t *context, void *qctx)
+{
+    for (int i = 0 ; i < FTK_count ; ++i) {
+        if (ctx_constructors[i] != NULL) {
+            context->contexts[i] = ctx_constructors[i]();
+        }
+    }
+    context->current_filter = NULL;
+    context->data = qctx;
+}
+
+void filter_context_wipe(filter_context_t *context)
+{
+    for (int i = 0 ; i < FTK_count ; ++i) {
+        if (ctx_destructors[i] != NULL) {
+            ctx_destructors[i](context->contexts[i]);
+        }
+    }
 }

@@ -84,7 +84,7 @@ static server_t* server_acquire(void)
     }
 }
 
-static void server_release(server_t *server)
+void server_release(server_t *server)
 {
     server_wipe(server);
     array_add(server_pool, server);
@@ -92,6 +92,7 @@ static void server_release(server_t *server)
 
 static void server_shutdown(void)
 {
+    printf("Server shutdown");
     array_deep_wipe(listeners, server_delete);
     array_deep_wipe(server_pool, server_delete);
 }
@@ -125,6 +126,7 @@ int start_server(int port, start_listener_t starter, delete_client_t deleter)
     tmp             = server_acquire();
     tmp->fd         = sock;
     tmp->listener   = true;
+    tmp->event      = false;
     tmp->data       = data;
     tmp->clear_data = deleter;
     epoll_register(sock, EPOLLIN, tmp);
@@ -154,6 +156,8 @@ static int start_client(server_t *server, start_client_t starter,
     }
 
     tmp             = server_acquire();
+    tmp->listener   = false;
+    tmp->event      = false;
     tmp->fd         = sock;
     tmp->data       = data;
     tmp->clear_data = deleter;
@@ -161,7 +165,7 @@ static int start_client(server_t *server, start_client_t starter,
     return 0;
 }
 
-event_t event_register(int fd, void *data)
+server_t * event_register(int fd, void *data)
 {
     int fds[2];
     if (fd == -1) {
@@ -177,6 +181,7 @@ event_t event_register(int fd, void *data)
     }
 
     server_t *tmp = server_acquire();
+    tmp->listener = false;
     tmp->event = true;
     tmp->fd    = fd == -1 ? fds[0] : fd;
     tmp->fd2   = fd == -1 ? fds[1] : -1;
@@ -185,7 +190,7 @@ event_t event_register(int fd, void *data)
     return tmp;
 }
 
-bool event_fire(event_t event)
+bool event_fire(server_t *event)
 {
     static const char *data = "";
     if (event->fd2 == -1) {
@@ -194,7 +199,7 @@ bool event_fire(event_t event)
     return write(event->fd2, data, 1) == 0;
 }
 
-static bool event_cancel(event_t event)
+bool event_cancel(server_t *event)
 {
     char buff[32];
     while (true) {
@@ -208,6 +213,12 @@ static bool event_cancel(event_t event)
             return true;
         }
     }
+}
+
+void event_release(server_t *event)
+{
+    epoll_unregister(event->fd);
+    server_release(event);
 }
 
 int server_loop(start_client_t starter, delete_client_t deleter,
@@ -245,14 +256,12 @@ int server_loop(start_client_t starter, delete_client_t deleter,
                 (void)start_client(d, starter, deleter);
                 continue;
             } else if (d->event) {
-                if (!event_cancel(d)) {
-                    server_release(d);
-                    continue;
-                }
                 if (handler) {
                     if (!handler(d, config)) {
-                        server_release(d);
+                        event_release(d);
                     }
+                } else {
+                    event_release(d);
                 }
                 continue;
             }

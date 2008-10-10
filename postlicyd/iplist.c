@@ -391,7 +391,8 @@ static void rbl_filter_destructor(filter_t *filter)
     filter->data = data;
 }
 
-static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
+static filter_result_t rbl_filter(const filter_t *filter, const query_t *query,
+                                  filter_context_t *context)
 {
     uint32_t ip;
     int32_t sum = 0;
@@ -450,7 +451,8 @@ static filter_result_t rbl_filter(const filter_t *filter, const query_t *query)
 static int rbl_init(void)
 {
     filter_type_t type =  filter_register("iplist", rbl_filter_constructor,
-                                          rbl_filter_destructor, rbl_filter);
+                                          rbl_filter_destructor, rbl_filter,
+                                          NULL, NULL);
     /* Hooks.
      */
     (void)filter_hook_register(type, "abort");

@@ -33,49 +33,15 @@
  * Copyright © 2008 Florent Bruneau
  */
 
-#ifndef PFIXTOOLS_SERVER_H
-#define PFIXTOOLS_SERVER_H
+#ifndef PFIXTOOLS_POSTLICYD_H
+#define PFIXTOOLS_POSTLICYD_H
 
-#include "buffer.h"
+#include "query.h"
+#include "filter.h"
 
-typedef struct server_t server_t;
-
-#define INVALID_EVENT (NULL)
-
-typedef void *(*start_listener_t)(void);
-typedef void  (*delete_client_t)(void*);
-typedef void *(*start_client_t)(server_t*);
-typedef int   (*run_client_t)(server_t*, void*);
-typedef bool	(*refresh_t)(void*);
-typedef bool  (*event_handler_t)(server_t *, void*);
-
-struct server_t {
-    unsigned listener : 1;
-    unsigned event    : 1;
-
-    int fd;
-    int fd2;
-
-    buffer_t ibuf;
-    buffer_t obuf;
-
-    delete_client_t clear_data;
-    void* data;
-};
-ARRAY(server_t);
-
-int start_server(int port, start_listener_t starter, delete_client_t deleter);
-
-void server_release(server_t *server);
-
-server_t *event_register(int fd, void *data);
-bool event_fire(server_t *event);
-bool event_cancel(server_t *event);
-void event_release(server_t *event);
-#define event_data(event) ((event)->data)
-
-int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, event_handler_t handler,
-                refresh_t refresh, void *config);
+typedef struct query_context_t {
+    query_t query;
+    filter_context_t context;
+} query_context_t;
 
 #endif

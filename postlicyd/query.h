@@ -94,18 +94,6 @@ typedef struct query_t {
     const char *eoq;
 } query_t;
 
-static inline query_t *query_new(void)
-{
-    return p_new(query_t, 1);
-}
-
-static inline void query_delete(query_t **query)
-{
-    if (*query) {
-        p_delete(query);
-    }
-}
-
 /** Parse the content of the text to fill the query.
  * The text pointed by \p p is segmented (and modified to add
  * a \0 at the end of each segment) and used to fill the query

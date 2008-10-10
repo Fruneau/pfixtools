@@ -500,7 +500,8 @@ static void strlist_filter_destructor(filter_t *filter)
     filter->data = config;
 }
 
-static filter_result_t strlist_filter(const filter_t *filter, const query_t *query)
+static filter_result_t strlist_filter(const filter_t *filter, const query_t *query,
+                                      filter_context_t *context)
 {
     char reverse[BUFSIZ];
     char normal[BUFSIZ];
@@ -600,7 +601,8 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
 static int strlist_init(void)
 {
     filter_type_t type =  filter_register("strlist", strlist_filter_constructor,
-                                          strlist_filter_destructor, strlist_filter);
+                                          strlist_filter_destructor, strlist_filter,
+                                          NULL, NULL);
     /* Hooks.
      */
     (void)filter_hook_register(type, "abort");

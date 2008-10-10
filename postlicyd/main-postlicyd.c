@@ -41,8 +41,8 @@
 #include "epoll.h"
 #include "policy_tokens.h"
 #include "server.h"
-#include "query.h"
 #include "config.h"
+#include "postlicyd.h"
 
 #define DAEMON_NAME             "postlicyd"
 #define DAEMON_VERSION          "0.2"
@@ -54,7 +54,18 @@ DECLARE_MAIN
 
 static void *query_starter(server_t* server)
 {
-    return query_new();
+    query_context_t *context = p_new(query_context_t, 1);
+    filter_context_prepare(&context->context, context);
+    return context;
+}
+
+static void query_stopper(void *data)
+{
+    query_context_t **context = data;
+    if (*context) {
+        filter_context_wipe(&(*context)->context);
+        p_delete(context);
+    }
 }
 
 static bool config_refresh(void *config)
@@ -66,7 +77,8 @@ __attribute__((format(printf,2,0)))
 static void policy_answer(server_t *pcy, const char *fmt, ...)
 {
     va_list args;
-    const query_t* query = pcy->data;
+    query_context_t *context = pcy->data;
+    const query_t* query = &context->query;
 
     buffer_addstr(&pcy->obuf, "action=");
     va_start(args, fmt);
@@ -79,21 +91,34 @@ static void policy_answer(server_t *pcy, const char *fmt, ...)
 
 static bool policy_process(server_t *pcy, const config_t *config)
 {
-    const query_t* query = pcy->data;
+    query_context_t *context = pcy->data;
+    const query_t* query = &context->query;
     const filter_t *filter;
     if (config->entry_points[query->state] == -1) {
         warn("no filter defined for current protocol_state (%d)", query->state);
         return false;
     }
-    filter = array_ptr(config->filters, config->entry_points[query->state]);
+    if (context->context.current_filter != NULL) {
+        filter = context->context.current_filter;
+    } else {
+        filter = array_ptr(config->filters, config->entry_points[query->state]);
+    }
     while (true) {
-        const filter_hook_t *hook = filter_run(filter, query);
+        const filter_hook_t *hook = filter_run(filter, query, &context->context);
         if (hook == NULL) {
             warn("request client=%s, from=<%s>, to=<%s>: aborted",
                  query->client_name,
                  query->sender == NULL ? "undefined" : query->sender,
                  query->recipient == NULL ? "undefined" : query->recipient);
             return false;
+        } else if (hook->async) {
+            debug("request client=%s, from=<%s>, to=<%s>: "
+                  "asynchronous filter from filter %s",
+                   query->client_name,
+                   query->sender == NULL ? "undefined" : query->sender,
+                   query->recipient == NULL ? "undefined" : query->recipient,
+                   filter->name);
+            return true;
         } else if (hook->postfix) {
             info("request client=%s, from=<%s>, to=<%s>: "
                  "awswer %s from filter %s: \"%s\"",
@@ -121,7 +146,8 @@ static int policy_run(server_t *pcy, void* vconfig)
     int search_offs = MAX(0, (int)(pcy->ibuf.len - 1));
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
     const char *eoq;
-    query_t  *query  = pcy->data;
+    query_context_t *context = pcy->data;
+    query_t  *query  = &context->query;
     const config_t *config = vconfig;
 
     if (nb < 0) {
@@ -144,6 +170,15 @@ static int policy_run(server_t *pcy, void* vconfig)
     query->eoq = eoq + strlen("\n\n");
     epoll_modify(pcy->fd, 0, pcy);
     return policy_process(pcy, config) ? 0 : -1;
+}
+
+static bool policy_event(server_t *event, void *config)
+{
+    if (!policy_process(event, config)) {
+        server_release(event);
+        return true;
+    }
+    return true;
 }
 
 int start_listener(int port)
@@ -239,7 +274,7 @@ int main(int argc, char *argv[])
     if (start_listener(config->port) < 0) {
         return EXIT_FAILURE;
     } else {
-        return server_loop(query_starter, (delete_client_t)query_delete,
-                           policy_run, NULL, config_refresh, config);
+        return server_loop(query_starter, query_stopper,
+                           policy_run, policy_event, config_refresh, config);
     }
 }

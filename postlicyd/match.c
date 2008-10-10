@@ -262,7 +262,8 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
     return true;
 }
 
-static filter_result_t match_filter(const filter_t *filter, const query_t *query)
+static filter_result_t match_filter(const filter_t *filter, const query_t *query,
+                                    filter_context_t *context)
 {
     const match_config_t *config = filter->data;
     foreach (const match_condition_t *condition, config->conditions) {
@@ -287,7 +288,8 @@ static filter_result_t match_filter(const filter_t *filter, const query_t *query
 static int match_init(void)
 {
     filter_type_t type =  filter_register("match", match_filter_constructor,
-                                          match_filter_destructor, match_filter);
+                                          match_filter_destructor, match_filter,
+                                          NULL, NULL);
     /* Hooks.
      */
     (void)filter_hook_register(type, "abort");

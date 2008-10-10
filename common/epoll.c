@@ -69,6 +69,14 @@ void epoll_modify(int fd, uint32_t events, void *ptr)
     }
 }
 
+void epoll_unregister(int fd)
+{
+    if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, NULL)) {
+        UNIXERR("epoll_ctl");
+        abort();
+    }
+}
+
 int epoll_select(struct epoll_event *events, int maxevents, int timeout)
 {
     return epoll_wait(epollfd, events, maxevents, timeout);

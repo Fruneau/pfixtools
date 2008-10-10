@@ -458,7 +458,8 @@ static void greylist_filter_destructor(filter_t *filter)
 }
 
 static filter_result_t greylist_filter(const filter_t *filter,
-                                       const query_t *query)
+                                       const query_t *query,
+                                       filter_context_t *context)
 {
     const greylist_config_t *config = filter->data;
     if (query->state != SMTP_RCPT) {
@@ -475,7 +476,7 @@ static int greylist_init(void)
 {
     filter_type_t type =  filter_register("greylist", greylist_filter_constructor,
                                           greylist_filter_destructor,
-                                          greylist_filter);
+                                          greylist_filter, NULL, NULL);
     /* Hooks.
      */
     (void)filter_hook_register(type, "abort");
