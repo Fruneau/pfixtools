@@ -52,6 +52,9 @@
 
 DECLARE_MAIN
 
+static config_t *config = NULL;
+
+
 static void *query_starter(server_t* server)
 {
     query_context_t *context = p_new(query_context_t, 1);
@@ -68,9 +71,9 @@ static void query_stopper(void *data)
     }
 }
 
-static bool config_refresh(void *config)
+static bool config_refresh(void *mconfig)
 {
-    return config_reload(config);
+    return config_reload(mconfig);
 }
 
 __attribute__((format(printf,2,0)))
@@ -89,20 +92,21 @@ static void policy_answer(server_t *pcy, const char *fmt, ...)
     epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
 }
 
-static bool policy_process(server_t *pcy, const config_t *config)
+static bool policy_process(server_t *pcy, const config_t *mconfig)
 {
     query_context_t *context = pcy->data;
     const query_t* query = &context->query;
     const filter_t *filter;
-    if (config->entry_points[query->state] == -1) {
+    if (mconfig->entry_points[query->state] == -1) {
         warn("no filter defined for current protocol_state (%d)", query->state);
         return false;
     }
     if (context->context.current_filter != NULL) {
         filter = context->context.current_filter;
     } else {
-        filter = array_ptr(config->filters, config->entry_points[query->state]);
+        filter = array_ptr(mconfig->filters, mconfig->entry_points[query->state]);
     }
+    context->context.current_filter = NULL;
     while (true) {
         const filter_hook_t *hook = filter_run(filter, query, &context->context);
         if (hook == NULL) {
@@ -135,8 +139,8 @@ static bool policy_process(server_t *pcy, const config_t *config)
                    query->sender == NULL ? "undefined" : query->sender,
                    query->recipient == NULL ? "undefined" : query->recipient,
                    htokens[hook->type], filter->name,
-                   (array_ptr(config->filters, hook->filter_id))->name);
-            filter = array_ptr(config->filters, hook->filter_id);
+                   (array_ptr(mconfig->filters, hook->filter_id))->name);
+            filter = array_ptr(mconfig->filters, hook->filter_id);
         }
     }
 }
@@ -148,7 +152,8 @@ static int policy_run(server_t *pcy, void* vconfig)
     const char *eoq;
     query_context_t *context = pcy->data;
     query_t  *query  = &context->query;
-    const config_t *config = vconfig;
+    context->server = pcy;
+    const config_t *mconfig = vconfig;
 
     if (nb < 0) {
         if (errno == EAGAIN || errno == EINTR)
@@ -169,17 +174,37 @@ static int policy_run(server_t *pcy, void* vconfig)
         return -1;
     query->eoq = eoq + strlen("\n\n");
     epoll_modify(pcy->fd, 0, pcy);
-    return policy_process(pcy, config) ? 0 : -1;
+    return policy_process(pcy, mconfig) ? 0 : -1;
 }
 
-static bool policy_event(server_t *event, void *config)
+static void policy_async_handler(filter_context_t *context,
+                                 const filter_hook_t *hook)
 {
-    if (!policy_process(event, config)) {
-        server_release(event);
-        return true;
+    const filter_t *filter = context->current_filter;
+    query_context_t *qctx  = context->data;
+    query_t         *query = &qctx->query;
+    server_t        *server = qctx->server;
+
+    debug("request client=%s, from=<%s>, to=<%s>: "
+           "awswer %s from filter %s: next filter %s",
+           query->client_name,
+           query->sender == NULL ? "undefined" : query->sender,
+           query->recipient == NULL ? "undefined" : query->recipient,
+           htokens[hook->type], filter->name,
+           (array_ptr(config->filters, hook->filter_id))->name);
+    context->current_filter = array_ptr(config->filters, hook->filter_id);
+
+    if (!policy_process(server, config)) {
+        server_release(server);
     }
-    return true;
 }
+
+static int postlicyd_init(void)
+{
+    filter_async_handler_register(policy_async_handler);
+    return 0;
+}
+module_init(postlicyd_init);
 
 int start_listener(int port)
 {
@@ -256,7 +281,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    config_t *config = config_read(argv[optind]);
+    config = config_read(argv[optind]);
     if (config == NULL) {
         return EXIT_FAILURE;
     }
@@ -275,6 +300,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     } else {
         return server_loop(query_starter, query_stopper,
-                           policy_run, policy_event, config_refresh, config);
+                           policy_run, config_refresh, config);
     }
 }

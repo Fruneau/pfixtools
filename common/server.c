@@ -44,21 +44,16 @@ static server_t* server_new(void)
 {
     server_t* server = p_new(server_t, 1);
     server->fd  = -1;
-    server->fd2 = -1;
     return server;
 }
 
 static void server_wipe(server_t *server)
 {
-    server->listener = server->event = false;
-    if (server->fd > 0) {
-        epoll_modify(server->fd, 0, NULL);
+    server->listener = false;
+    if (server->fd >= 0) {
+        epoll_unregister(server->fd);
         close(server->fd);
         server->fd = -1;
-    }
-    if (server->fd2 > 0) {
-        close(server->fd2);
-        server->fd2 = -1;
     }
     if (server->data && server->clear_data) {
         server->clear_data(&server->data);
@@ -126,8 +121,8 @@ int start_server(int port, start_listener_t starter, delete_client_t deleter)
     tmp             = server_acquire();
     tmp->fd         = sock;
     tmp->listener   = true;
-    tmp->event      = false;
     tmp->data       = data;
+    tmp->run        = NULL;
     tmp->clear_data = deleter;
     epoll_register(sock, EPOLLIN, tmp);
     array_add(listeners, tmp);
@@ -135,7 +130,7 @@ int start_server(int port, start_listener_t starter, delete_client_t deleter)
 }
 
 static int start_client(server_t *server, start_client_t starter,
-                        delete_client_t deleter)
+                        run_client_t runner, delete_client_t deleter)
 {
     server_t *tmp;
     void* data = NULL;
@@ -157,73 +152,32 @@ static int start_client(server_t *server, start_client_t starter,
 
     tmp             = server_acquire();
     tmp->listener   = false;
-    tmp->event      = false;
     tmp->fd         = sock;
     tmp->data       = data;
+    tmp->run        = runner;
     tmp->clear_data = deleter;
     epoll_register(sock, EPOLLIN, tmp);
     return 0;
 }
 
-server_t * event_register(int fd, void *data)
+server_t *server_register(int fd, run_client_t runner, void *data)
 {
-    int fds[2];
-    if (fd == -1) {
-        if (pipe(fds) != 0) {
-            UNIXERR("pipe");
-            return NULL;
-        }
-        if (setnonblock(fds[0]) != 0) {
-            close(fds[0]);
-            close(fds[1]);
-            return NULL;
-        }
+    if (fd < 0) {
+        return NULL;
     }
 
-    server_t *tmp = server_acquire();
-    tmp->listener = false;
-    tmp->event = true;
-    tmp->fd    = fd == -1 ? fds[0] : fd;
-    tmp->fd2   = fd == -1 ? fds[1] : -1;
-    tmp->data  = data;
-    epoll_register(fds[0], EPOLLIN, tmp);
+    server_t *tmp   = server_acquire();
+    tmp->listener   = false;
+    tmp->fd         = fd;
+    tmp->data       = data;
+    tmp->run        = runner;
+    tmp->clear_data = NULL;
+    epoll_register(fd, EPOLLIN, tmp);
     return tmp;
 }
 
-bool event_fire(server_t *event)
-{
-    static const char *data = "";
-    if (event->fd2 == -1) {
-        return false;
-    }
-    return write(event->fd2, data, 1) == 0;
-}
-
-bool event_cancel(server_t *event)
-{
-    char buff[32];
-    while (true) {
-        ssize_t res = read(event->fd, buff, 32);
-        if (res == -1 && errno != EAGAIN && errno != EINTR) {
-            UNIXERR("read");
-            return false;
-        } else if (res == -1 && errno == EINTR) {
-            continue;
-        } else if (res != 32) {
-            return true;
-        }
-    }
-}
-
-void event_release(server_t *event)
-{
-    epoll_unregister(event->fd);
-    server_release(event);
-}
-
 int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, event_handler_t handler,
-                refresh_t refresh, void* config)
+                run_client_t runner, refresh_t refresh, void* config)
 {
     info("entering processing loop");
     while (!sigint) {
@@ -253,21 +207,12 @@ int server_loop(start_client_t starter, delete_client_t deleter,
             server_t *d = evts[n].data.ptr;
 
             if (d->listener) {
-                (void)start_client(d, starter, deleter);
-                continue;
-            } else if (d->event) {
-                if (handler) {
-                    if (!handler(d, config)) {
-                        event_release(d);
-                    }
-                } else {
-                    event_release(d);
-                }
+                (void)start_client(d, starter, runner, deleter);
                 continue;
             }
 
             if (evts[n].events & EPOLLIN) {
-                if (runner(d, config) < 0) {
+                if (d->run(d, config) < 0) {
                     server_release(d);
                     continue;
                 }

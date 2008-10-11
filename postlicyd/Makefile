@@ -38,15 +38,17 @@ GENERATED = policy_tokens.h policy_tokens.c \
 						param_tokens.h param_tokens.c
 TESTS     = tst-rbl tst-filters tst-greylist
 
-FILTERS		= iplist.c greylist.c strlist.c match.c
+UB_LIBS   = -L/usr/local/lib -lunbound
+
+FILTERS		= iplist.c greylist.c match.c
 
 postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c $(FILTERS) $(GENERATED)
-postlicyd_LIBADD  = $(TC_LIBS)
+postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS)
 
 tst-rbl_SOURCES   = tst-rbl.c ../common/lib.a filter.c config.c query.c iplist.c $(GENERATED)
 
 tst-filters_SOURCES = tst-filters.c ../common/lib.a config.c filter.c query.c $(FILTERS) $(GENERATED)
-tst-filters_LIBADD  = $(TC_LIBS)
+tst-filters_LIBADD  = $(UB_LIBS) $(TC_LIBS)
 
 tst-greylist_SOURCES = tst-greylist.c ../common/lib.a
 tst-greylist_LIBADD  = $(TC_LIBS)

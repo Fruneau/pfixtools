@@ -45,6 +45,7 @@ static bool                 params[FTK_count][ATK_count];
 
 static filter_context_constructor_t ctx_constructors[FTK_count];
 static filter_context_destructor_t  ctx_destructors[FTK_count];
+static filter_async_handler_t       async_handler = NULL;
 
 static const filter_hook_t default_hook = {
     .type      = 0,
@@ -99,6 +100,11 @@ filter_param_id_t filter_param_register(filter_type_t filter,
 
     params[filter][tok] = true;
     return tok;
+}
+
+void filter_async_handler_register(filter_async_handler_t handler)
+{
+    async_handler = handler;
 }
 
 bool filter_build(filter_t *filter)
@@ -180,22 +186,16 @@ void filter_wipe(filter_t *filter)
     p_delete(&filter->name);
 }
 
-const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,
-                                filter_context_t *context)
+static inline const filter_hook_t *filter_hook_for_result(const filter_t *filter,
+                                                          filter_result_t res)
 {
     int start = 0;
     int end   = filter->hooks.len;
-    debug("running filter %s (%s)", filter->name, ftokens[filter->type]);
-    filter_result_t res = runners[filter->type](filter, query, context);
 
-    context->current_filter = NULL;
-
-    debug("filter run, result is %s", htokens[res]);
     if (res == HTK_ABORT) {
         return NULL;
     }
     if (res == HTK_ASYNC) {
-        context->current_filter = filter;
         return &async_hook;
     }
 
@@ -214,6 +214,22 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,
     }
     warn("missing hook %s for filter %s", htokens[res], filter->name);
     return &default_hook;
+}
+
+const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,
+                                filter_context_t *context)
+{
+    debug("running filter %s (%s)", filter->name, ftokens[filter->type]);
+    filter_result_t res = runners[filter->type](filter, query, context);
+
+    if (res == HTK_ASYNC) {
+        context->current_filter = filter;
+    } else {
+        context->current_filter = NULL;
+    }
+
+    debug("filter run, result is %s", htokens[res]);
+    return filter_hook_for_result(filter, res);
 }
 
 bool filter_test(const filter_t *filter, const query_t *query,
@@ -293,4 +309,16 @@ void filter_context_wipe(filter_context_t *context)
             ctx_destructors[i](context->contexts[i]);
         }
     }
+}
+
+void filter_post_async_result(filter_context_t *context, filter_result_t result)
+{
+    const filter_t *filter = context->current_filter;
+    const filter_hook_t *hook = NULL;
+
+    if (result == HTK_ASYNC) {
+        return;
+    }
+    hook = filter_hook_for_result(filter, result);
+    async_handler(context, hook);
 }

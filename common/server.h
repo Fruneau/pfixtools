@@ -51,14 +51,13 @@ typedef bool  (*event_handler_t)(server_t *, void*);
 
 struct server_t {
     unsigned listener : 1;
-    unsigned event    : 1;
 
     int fd;
-    int fd2;
 
     buffer_t ibuf;
     buffer_t obuf;
 
+    run_client_t run;
     delete_client_t clear_data;
     void* data;
 };
@@ -66,16 +65,10 @@ ARRAY(server_t);
 
 int start_server(int port, start_listener_t starter, delete_client_t deleter);
 
+server_t *server_register(int fd, run_client_t runner, void *data);
 void server_release(server_t *server);
 
-server_t *event_register(int fd, void *data);
-bool event_fire(server_t *event);
-bool event_cancel(server_t *event);
-void event_release(server_t *event);
-#define event_data(event) ((event)->data)
-
 int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, event_handler_t handler,
-                refresh_t refresh, void *config);
+                run_client_t runner, refresh_t refresh, void *config);
 
 #endif

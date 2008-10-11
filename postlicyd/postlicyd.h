@@ -42,6 +42,7 @@
 typedef struct query_context_t {
     query_t query;
     filter_context_t context;
+    server_t *server;
 } query_context_t;
 
 #endif

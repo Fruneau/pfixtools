@@ -39,19 +39,25 @@
 #include "common.h"
 
 typedef enum {
+  RBL_ASYNC,
   RBL_ERROR,
   RBL_FOUND,
   RBL_NOTFOUND,
 } rbl_result_t;
+ARRAY(rbl_result_t);
+
+typedef void (*rbl_result_callback_t)(rbl_result_t *result, void *data);
 
 /** Check the presence of the given IP in the given rbl.
  */
-__attribute__((nonnull(1)))
-rbl_result_t rbl_check(const char *rbl, uint32_t ip);
+__attribute__((nonnull(1,3)))
+bool rbl_check(const char *rbl, uint32_t ip, rbl_result_t *result,
+               rbl_result_callback_t callback, void *data);
 
 /** Check the presence of the given hostname in the given rhbl.
  */
-__attribute__((nonnull(1,2)))
-rbl_result_t rhbl_check(const char *rhbl, const char *hostname);
+__attribute__((nonnull(1,2,3)))
+bool rhbl_check(const char *rhbl, const char *hostname, rbl_result_t *result,
+                rbl_result_callback_t callback, void *data);
 
 #endif

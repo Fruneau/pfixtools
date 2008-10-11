@@ -116,6 +116,8 @@ typedef void (*filter_destructor_t)(filter_t *filter);
 typedef void *(*filter_context_constructor_t)(void);
 typedef void (*filter_context_destructor_t)(void*);
 
+typedef void (*filter_async_handler_t)(filter_context_t *context,
+                                       const filter_hook_t *result);
 
 /* Registration.
  */
@@ -132,6 +134,8 @@ filter_result_t filter_hook_register(filter_type_t filter, const char *name);
 __attribute__((nonnull(2)))
 filter_param_id_t filter_param_register(filter_type_t filter, const char *name);
 
+__attribute__((nonnull))
+void filter_async_handler_register(filter_async_handler_t handler);
 
 /* Filter builder.
  */
@@ -263,5 +267,8 @@ void filter_context_prepare(filter_context_t *context, void* qctx);
 
 __attribute__((nonnull))
 void filter_context_wipe(filter_context_t *context);
+
+__attribute__((nonnull))
+void filter_post_async_result(filter_context_t *context, filter_result_t result);
 
 #endif
