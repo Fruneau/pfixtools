@@ -621,7 +621,9 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
         for (uint32_t i = 0 ; len > 0 && i < config->host_offsets.len ; ++i) { \
             const char *rbl = array_ptr(config->hosts,                         \
                                         array_elt(config->host_offsets, i));   \
-            if (rhbl_check(normal, rbl, array_ptr(async->results, result_pos), \
+            debug("running check of field %s (%s) against %s", STR(Field),     \
+                  normal, rbl);                                                \
+            if (rhbl_check(rbl, normal, array_ptr(async->results, result_pos), \
                            strlist_filter_async, context)) {                   \
                 async->error = false;                                          \
                 ++async->awaited;                                              \

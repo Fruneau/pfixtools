@@ -143,6 +143,7 @@ static inline bool rbl_dns_check(const char *hostname, rbl_result_t *result,
     context->result = result;
     context->call   = callback;
     context->data   = data;
+    debug("running dns resolution on %s", hostname);
     if (ub_resolve_async(ctx, (char*)hostname, 1, 1, context, rbl_callback, NULL) == 0) {
         *result = RBL_ASYNC;
         return true;
