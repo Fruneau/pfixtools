@@ -64,6 +64,15 @@ typedef struct strlist_config_t {
     unsigned match_reverse    :1;
 } strlist_config_t;
 
+typedef struct strlist_async_data_t {
+    A(rbl_result_t) results;
+    int awaited;
+    uint32_t sum;
+    bool error;
+} strlist_async_data_t;
+
+static filter_type_t filter_type = FTK_UNKNOWN;
+
 
 static strlist_config_t *strlist_config_new(void)
 {
@@ -500,14 +509,79 @@ static void strlist_filter_destructor(filter_t *filter)
     filter->data = config;
 }
 
+static void strlist_filter_async(rbl_result_t *result, void *arg)
+{
+    filter_context_t   *context = arg;
+    const filter_t      *filter = context->current_filter;
+    const strlist_config_t *data = filter->data;
+    strlist_async_data_t  *async = context->contexts[filter_type];
+
+    if (*result != RBL_ERROR) {
+        async->error = false;
+    }
+    --async->awaited;
+
+    debug("got asynchronous request result for filter %s, rbl %d, still awaiting %d answers",
+          filter->name, result - array_ptr(async->results, 0), async->awaited);
+
+    if (async->awaited == 0) {
+        filter_result_t res = HTK_FAIL;
+        if (async->error) {
+            res = HTK_ERROR;
+        } else {
+            uint32_t j = 0;
+#define DO_SUM(Field)                                                          \
+        if (data->match_ ## Field) {                                           \
+            for (uint32_t i = 0 ; i < array_len(data->host_offsets) ; ++i) {   \
+                int weight = array_elt(data->host_weights, i);                 \
+                                                                               \
+                switch (array_elt(async->results, j)) {                        \
+                  case RBL_ASYNC:                                              \
+                    crit("no more awaited answer but result is ASYNC");        \
+                    abort();                                                   \
+                  case RBL_FOUND:                                              \
+                    async->sum += weight;                                      \
+                    break;                                                     \
+                  default:                                                     \
+                    break;                                                     \
+                }                                                              \
+                ++j;                                                           \
+            }                                                                  \
+        }
+            DO_SUM(helo);
+            DO_SUM(client);
+            DO_SUM(reverse);
+            DO_SUM(recipient);
+            DO_SUM(sender);
+#undef DO_SUM
+            debug("score is %d", async->sum);
+            if (async->sum >= (uint32_t)data->hard_threshold) {
+                res = HTK_HARD_MATCH;
+            } else if (async->sum >= (uint32_t)data->soft_threshold) {
+                res = HTK_SOFT_MATCH;
+            }
+        }
+        debug("answering to filter %s", filter->name);
+        filter_post_async_result(context, res);
+    }
+}
+
+
 static filter_result_t strlist_filter(const filter_t *filter, const query_t *query,
                                       filter_context_t *context)
 {
     char reverse[BUFSIZ];
     char normal[BUFSIZ];
     const strlist_config_t *config = filter->data;
-    int sum = 0;
-    bool error = true;
+    strlist_async_data_t *async = context->contexts[filter_type];
+    int result_pos = 0;
+    async->sum = 0;
+    async->error = true;
+    array_ensure_exact_capacity(async->results, (config->match_client
+                                + config->match_sender + config->match_helo
+                                + config->match_recipient + config->match_reverse)
+                                * array_len(config->host_offsets));
+    async->awaited = 0;
 
 
     if (config->is_email && 
@@ -532,12 +606,12 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
             const bool part    = array_elt(config->partiales, i);              \
             if ((!part && trie_lookup(trie, rev ? reverse : normal))           \
                 || (part && trie_prefix(trie, rev ? reverse : normal))) {      \
-                sum += weight;                                                 \
-                if (sum >= config->hard_threshold) {                           \
+                async->sum += weight;                                          \
+                if (async->sum >= (uint32_t)config->hard_threshold) {          \
                     return HTK_HARD_MATCH;                                     \
                 }                                                              \
             }                                                                  \
-            error = false;                                                     \
+            async->error = false;                                              \
         }                                                                      \
     }
 #define DNS(Flag, Field)                                                       \
@@ -545,24 +619,14 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
         const int len = m_strlen(query->Field);                                \
         strlist_copy(normal, query->Field, len, false);                        \
         for (uint32_t i = 0 ; len > 0 && i < config->host_offsets.len ; ++i) { \
-            const char *rbl    = array_ptr(config->hosts,                      \
-                                           array_elt(config->host_offsets, i));\
-            const int weight   = array_elt(config->host_weights, i);           \
-            switch (rhbl_check(normal, rbl)) {                                 \
-              case RBL_FOUND:                                                  \
-                error = false;                                                 \
-                sum += weight;                                                 \
-                if (sum >= config->hard_threshold) {                           \
-                    return HTK_HARD_MATCH;                                     \
-                }                                                              \
-                break;                                                         \
-              case RBL_NOTFOUND:                                               \
-                error = false;                                                 \
-                break;                                                         \
-              case RBL_ERROR:                                                  \
-                warn("rbl %s unavailable", rbl);                               \
-                break;                                                         \
+            const char *rbl = array_ptr(config->hosts,                         \
+                                        array_elt(config->host_offsets, i));   \
+            if (rhbl_check(normal, rbl, array_ptr(async->results, result_pos), \
+                           strlist_filter_async, context)) {                   \
+                async->error = false;                                          \
+                ++async->awaited;                                              \
             }                                                                  \
+            ++result_pos;                                                      \
         }                                                                      \
     }
 
@@ -585,40 +649,56 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
     }
 #undef  DNS
 #undef  LOOKUP
-    if (error) {
+    if (async->awaited > 0) {
+        return HTK_ASYNC;
+    }
+    if (async->error) {
         err("filter %s: all the rbls returned an error", filter->name);
         return HTK_ERROR;
     }
-    if (sum >= config->hard_threshold) {
+    if (async->sum >= (uint32_t)config->hard_threshold) {
         return HTK_HARD_MATCH;
-    } else if (sum >= config->soft_threshold) {
+    } else if (async->sum >= (uint32_t)config->soft_threshold) {
         return HTK_SOFT_MATCH;
     } else {
         return HTK_FAIL;
     }
 }
 
+static void *strlist_context_constructor(void)
+{
+    return p_new(strlist_async_data_t, 1);
+}
+
+static void strlist_context_destructor(void *data)
+{
+    strlist_async_data_t *ctx = data;
+    array_wipe(ctx->results);
+    p_delete(&ctx);
+}
+
 static int strlist_init(void)
 {
-    filter_type_t type =  filter_register("strlist", strlist_filter_constructor,
-                                          strlist_filter_destructor, strlist_filter,
-                                          NULL, NULL);
+    filter_type =  filter_register("strlist", strlist_filter_constructor,
+                                   strlist_filter_destructor, strlist_filter,
+                                   strlist_context_constructor,
+                                   strlist_context_destructor);
     /* Hooks.
      */
-    (void)filter_hook_register(type, "abort");
-    (void)filter_hook_register(type, "error");
-    (void)filter_hook_register(type, "fail");
-    (void)filter_hook_register(type, "hard_match");
-    (void)filter_hook_register(type, "soft_match");
+    (void)filter_hook_register(filter_type, "abort");
+    (void)filter_hook_register(filter_type, "error");
+    (void)filter_hook_register(filter_type, "fail");
+    (void)filter_hook_register(filter_type, "hard_match");
+    (void)filter_hook_register(filter_type, "soft_match");
 
     /* Parameters.
      */
-    (void)filter_param_register(type, "file");
-    (void)filter_param_register(type, "rbldns");
-    (void)filter_param_register(type, "dns");
-    (void)filter_param_register(type, "hard_threshold");
-    (void)filter_param_register(type, "soft_threshold");
-    (void)filter_param_register(type, "fields");
+    (void)filter_param_register(filter_type, "file");
+    (void)filter_param_register(filter_type, "rbldns");
+    (void)filter_param_register(filter_type, "dns");
+    (void)filter_param_register(filter_type, "hard_threshold");
+    (void)filter_param_register(filter_type, "soft_threshold");
+    (void)filter_param_register(filter_type, "fields");
     return 0;
 }
 module_init(strlist_init);

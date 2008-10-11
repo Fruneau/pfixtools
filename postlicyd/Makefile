@@ -40,7 +40,7 @@ TESTS     = tst-rbl tst-filters tst-greylist
 
 UB_LIBS   = -L/usr/local/lib -lunbound
 
-FILTERS		= iplist.c greylist.c match.c
+FILTERS		= iplist.c greylist.c strlist.c match.c
 
 postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c $(FILTERS) $(GENERATED)
 postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS)
