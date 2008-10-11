@@ -38,7 +38,7 @@ GENERATED = policy_tokens.h policy_tokens.c \
 						param_tokens.h param_tokens.c
 TESTS     = tst-rbl tst-filters tst-greylist
 
-UB_LIBS   = -L/usr/local/lib -lunbound
+UB_LIBS   = -lunbound
 
 FILTERS		= iplist.c greylist.c strlist.c match.c
 
