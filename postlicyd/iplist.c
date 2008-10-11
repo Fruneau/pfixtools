@@ -509,6 +509,7 @@ static void *iplist_context_constructor(void)
 static void iplist_context_destructor(void *data)
 {
     iplist_async_data_t *ctx = data;
+    array_wipe(ctx->results);
     p_delete(&ctx);
 }
 

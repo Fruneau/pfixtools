@@ -211,13 +211,6 @@ int server_loop(start_client_t starter, delete_client_t deleter,
                 continue;
             }
 
-            if (evts[n].events & EPOLLIN) {
-                if (d->run(d, config) < 0) {
-                    server_release(d);
-                    continue;
-                }
-            }
-
             if ((evts[n].events & EPOLLOUT) && d->obuf.len) {
                 if (buffer_write(&d->obuf, d->fd) < 0) {
                     server_release(d);
@@ -226,6 +219,13 @@ int server_loop(start_client_t starter, delete_client_t deleter,
                 if (!d->obuf.len) {
                     epoll_modify(d->fd, EPOLLIN, d);
                 }
+            }
+
+            if (evts[n].events & EPOLLIN) {
+                if (d->run(d, config) < 0) {
+                    server_release(d);
+                }
+                continue;
             }
         }
     }

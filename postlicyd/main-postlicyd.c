@@ -92,6 +92,46 @@ static void policy_answer(server_t *pcy, const char *fmt, ...)
     epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
 }
 
+static const filter_t *next_filter(server_t *pcy, const filter_t *filter,
+                                   const query_t *query, const filter_hook_t *hook, bool *ok) {
+    if (hook == NULL) {
+        warn("request client=%s, from=<%s>, to=<%s>: aborted",
+             query->client_name,
+             query->sender == NULL ? "undefined" : query->sender,
+             query->recipient == NULL ? "undefined" : query->recipient);
+        *ok = false;
+        return NULL;
+    } else if (hook->async) {
+        debug("request client=%s, from=<%s>, to=<%s>: "
+              "asynchronous filter from filter %s",
+               query->client_name,
+               query->sender == NULL ? "undefined" : query->sender,
+               query->recipient == NULL ? "undefined" : query->recipient,
+               filter->name);
+        *ok = true;
+        return NULL;
+    } else if (hook->postfix) {
+        info("request client=%s, from=<%s>, to=<%s>: "
+             "awswer %s from filter %s: \"%s\"",
+             query->client_name,
+             query->sender == NULL ? "undefined" : query->sender,
+             query->recipient == NULL ? "undefined" : query->recipient,
+             htokens[hook->type], filter->name, hook->value);
+        policy_answer(pcy, "%s", hook->value);
+        *ok = true;
+        return NULL;
+    } else {
+        debug("request client=%s, from=<%s>, to=<%s>: "
+               "awswer %s from filter %s: next filter %s",
+               query->client_name,
+               query->sender == NULL ? "undefined" : query->sender,
+               query->recipient == NULL ? "undefined" : query->recipient,
+               htokens[hook->type], filter->name,
+               (array_ptr(config->filters, hook->filter_id))->name);
+        return array_ptr(config->filters, hook->filter_id);
+    }
+}
+
 static bool policy_process(server_t *pcy, const config_t *mconfig)
 {
     query_context_t *context = pcy->data;
@@ -108,39 +148,11 @@ static bool policy_process(server_t *pcy, const config_t *mconfig)
     }
     context->context.current_filter = NULL;
     while (true) {
+        bool  ok = false;
         const filter_hook_t *hook = filter_run(filter, query, &context->context);
-        if (hook == NULL) {
-            warn("request client=%s, from=<%s>, to=<%s>: aborted",
-                 query->client_name,
-                 query->sender == NULL ? "undefined" : query->sender,
-                 query->recipient == NULL ? "undefined" : query->recipient);
-            return false;
-        } else if (hook->async) {
-            debug("request client=%s, from=<%s>, to=<%s>: "
-                  "asynchronous filter from filter %s",
-                   query->client_name,
-                   query->sender == NULL ? "undefined" : query->sender,
-                   query->recipient == NULL ? "undefined" : query->recipient,
-                   filter->name);
-            return true;
-        } else if (hook->postfix) {
-            info("request client=%s, from=<%s>, to=<%s>: "
-                 "awswer %s from filter %s: \"%s\"",
-                 query->client_name,
-                 query->sender == NULL ? "undefined" : query->sender,
-                 query->recipient == NULL ? "undefined" : query->recipient,
-                 htokens[hook->type], filter->name, hook->value);
-            policy_answer(pcy, "%s", hook->value);
-            return true;
-        } else {
-            debug("request client=%s, from=<%s>, to=<%s>: "
-                   "awswer %s from filter %s: next filter %s",
-                   query->client_name,
-                   query->sender == NULL ? "undefined" : query->sender,
-                   query->recipient == NULL ? "undefined" : query->recipient,
-                   htokens[hook->type], filter->name,
-                   (array_ptr(mconfig->filters, hook->filter_id))->name);
-            filter = array_ptr(mconfig->filters, hook->filter_id);
+        filter = next_filter(pcy, filter, query, hook, &ok);
+        if (filter == NULL) {
+            return ok;
         }
     }
 }
@@ -180,21 +192,17 @@ static int policy_run(server_t *pcy, void* vconfig)
 static void policy_async_handler(filter_context_t *context,
                                  const filter_hook_t *hook)
 {
+    bool ok = false;
     const filter_t *filter = context->current_filter;
     query_context_t *qctx  = context->data;
     query_t         *query = &qctx->query;
     server_t        *server = qctx->server;
 
-    debug("request client=%s, from=<%s>, to=<%s>: "
-           "awswer %s from filter %s: next filter %s",
-           query->client_name,
-           query->sender == NULL ? "undefined" : query->sender,
-           query->recipient == NULL ? "undefined" : query->recipient,
-           htokens[hook->type], filter->name,
-           (array_ptr(config->filters, hook->filter_id))->name);
-    context->current_filter = array_ptr(config->filters, hook->filter_id);
-
-    if (!policy_process(server, config)) {
+    context->current_filter = next_filter(server, filter, query, hook, &ok);
+    if (context->current_filter != NULL) {
+        ok = policy_process(server, config);
+    }
+    if (!ok) {
         server_release(server);
     }
 }
