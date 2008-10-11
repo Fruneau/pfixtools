@@ -49,6 +49,7 @@ typedef struct rbl_context_t {
 ARRAY(rbl_context_t);
 
 static struct ub_ctx *ctx = NULL;
+static server_t *async_event = NULL;
 static PA(rbl_context_t) ctx_pool = ARRAY_INIT;
 
 static rbl_context_t *rbl_context_new(void)
@@ -88,6 +89,11 @@ static void rbl_exit(void)
     if (ctx != NULL) {
         ub_ctx_delete(ctx);
         ctx = NULL;
+    }
+    if (async_event != NULL) {
+        async_event->fd = -1;
+        server_release(async_event);
+        async_event = NULL;
     }
     array_deep_wipe(ctx_pool, rbl_context_delete);
 }
@@ -134,7 +140,7 @@ static inline bool rbl_dns_check(const char *hostname, rbl_result_t *result,
     if (ctx == NULL) {
         ctx = ub_ctx_create();
         ub_ctx_async(ctx, true);
-        if (server_register(ub_fd(ctx), rbl_handler, NULL) == NULL) {
+        if ((async_event = server_register(ub_fd(ctx), rbl_handler, NULL)) == NULL) {
             crit("cannot register asynchronous DNS event handler");
             abort();
         }
