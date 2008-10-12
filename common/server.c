@@ -40,6 +40,13 @@
 static PA(server_t) listeners   = ARRAY_INIT;
 static PA(server_t) server_pool = ARRAY_INIT;
 
+struct ev_loop *global_loop    = NULL;
+static start_client_t  client_start   = NULL;
+static delete_client_t client_delete  = NULL;
+static run_client_t    client_run     = NULL;
+static refresh_t       config_refresh = NULL;
+static void           *config_ptr     = NULL;
+
 static server_t* server_new(void)
 {
     server_t* server = p_new(server_t, 1);
@@ -49,9 +56,8 @@ static server_t* server_new(void)
 
 static void server_wipe(server_t *server)
 {
-    server->listener = false;
     if (server->fd >= 0) {
-        epoll_unregister(server->fd);
+        ev_io_stop(global_loop, &server->io);
         close(server->fd);
         server->fd = -1;
     }
@@ -85,14 +91,82 @@ void server_release(server_t *server)
     array_add(server_pool, server);
 }
 
+static int server_init(void)
+{
+    global_loop = ev_default_loop(0);
+    return 0;
+}
+
 static void server_shutdown(void)
 {
-    printf("Server shutdown");
     array_deep_wipe(listeners, server_delete);
     array_deep_wipe(server_pool, server_delete);
 }
-
+module_init(server_init);
 module_exit(server_shutdown);
+
+static void client_cb(EV_P_ struct ev_io *w, int events)
+{
+    server_t *server = (server_t*)w;
+
+    debug("Entering client_cb for %p, %d (%d | %d)", w, events, EV_WRITE, EV_READ);
+
+    if (events & EV_WRITE && server->obuf.len) {
+        if (buffer_write(&server->obuf, server->fd) < 0) {
+            server_release(server);
+            return;
+        }
+        if (!server->obuf.len) {
+            ev_io_set(&server->io, server->fd, EV_READ);
+        }
+    }
+
+    if (events & EV_READ) {
+        if (server->run(server, config_ptr) < 0) {
+            server_release(server);
+            return;
+        }
+    }
+}
+
+static int start_client(server_t *server, start_client_t starter,
+                        run_client_t runner, delete_client_t deleter)
+{
+    server_t *tmp;
+    void* data = NULL;
+    int sock;
+
+    sock = accept_nonblock(server->fd);
+    if (sock < 0) {
+        UNIXERR("accept");
+        return -1;
+    }
+
+    if (starter) {
+        data = starter(server);
+        if (data == NULL) {
+            close(sock);
+            return -1;
+        }
+    }
+
+    tmp             = server_acquire();
+    tmp->fd         = sock;
+    tmp->data       = data;
+    tmp->run        = runner;
+    tmp->clear_data = deleter;
+    ev_io_init(&tmp->io, client_cb, tmp->fd, EV_READ);
+    ev_io_start(global_loop, &tmp->io);
+    return 0;
+}
+
+static void server_cb(EV_P_ struct ev_io *w, int events)
+{
+    server_t *server = (server_t*)w;
+    if (start_client(server, client_start, client_run, client_delete) != 0) {
+        ev_unloop(EV_A_ EVUNLOOP_ALL);
+    }
+}
 
 int start_server(int port, start_listener_t starter, delete_client_t deleter)
 {
@@ -120,43 +194,12 @@ int start_server(int port, start_listener_t starter, delete_client_t deleter)
 
     tmp             = server_acquire();
     tmp->fd         = sock;
-    tmp->listener   = true;
     tmp->data       = data;
     tmp->run        = NULL;
     tmp->clear_data = deleter;
-    epoll_register(sock, EPOLLIN, tmp);
+    ev_io_init(&tmp->io, server_cb, tmp->fd, EV_READ);
+    ev_io_start(global_loop, &tmp->io);
     array_add(listeners, tmp);
-    return 0;
-}
-
-static int start_client(server_t *server, start_client_t starter,
-                        run_client_t runner, delete_client_t deleter)
-{
-    server_t *tmp;
-    void* data = NULL;
-    int sock;
-
-    sock = accept_nonblock(server->fd);
-    if (sock < 0) {
-        UNIXERR("accept");
-        return -1;
-    }
-
-    if (starter) {
-        data = starter(server);
-        if (data == NULL) {
-            close(sock);
-            return -1;
-        }
-    }
-
-    tmp             = server_acquire();
-    tmp->listener   = false;
-    tmp->fd         = sock;
-    tmp->data       = data;
-    tmp->run        = runner;
-    tmp->clear_data = deleter;
-    epoll_register(sock, EPOLLIN, tmp);
     return 0;
 }
 
@@ -167,68 +210,51 @@ server_t *server_register(int fd, run_client_t runner, void *data)
     }
 
     server_t *tmp   = server_acquire();
-    tmp->listener   = false;
     tmp->fd         = fd;
     tmp->data       = data;
     tmp->run        = runner;
     tmp->clear_data = NULL;
-    epoll_register(fd, EPOLLIN, tmp);
+    ev_io_init(&tmp->io, client_cb, tmp->fd, EV_READ);
+    ev_io_start(global_loop, &tmp->io);
     return tmp;
+}
+
+static void refresh_cb(EV_P_ struct ev_signal *w, int event)
+{
+    if (!config_refresh(config_ptr)) {
+        ev_unloop(EV_A_ EVUNLOOP_ALL);
+    }
+}
+
+static void exit_cb(EV_P_ struct ev_signal *w, int event)
+{
+    ev_unloop(EV_A_ EVUNLOOP_ALL);
 }
 
 int server_loop(start_client_t starter, delete_client_t deleter,
                 run_client_t runner, refresh_t refresh, void* config)
 {
-    info("entering processing loop");
-    while (!sigint) {
-        struct epoll_event evts[1024];
-        int n;
+    struct ev_signal ev_sighup;
+    struct ev_signal ev_sigint;
+    struct ev_signal ev_sigterm;
 
-        if (sighup && refresh) {
-            sighup = false;
-            info("refreshing...");
-            if (!refresh(config)) {
-                crit("error while refreshing configuration");
-                return EXIT_FAILURE;
-            }
-            info("refresh done, processing loop restarts");
-        }
+    client_start   = starter;
+    client_delete  = deleter;
+    client_run     = runner;
+    config_refresh = refresh;
+    config_ptr     = config;
 
-        n = epoll_select(evts, countof(evts), -1);
-        if (n < 0) {
-            if (errno != EAGAIN && errno != EINTR) {
-                UNIXERR("epoll_wait");
-                return EXIT_FAILURE;
-            }
-            continue;
-        }
-
-        while (--n >= 0) {
-            server_t *d = evts[n].data.ptr;
-
-            if (d->listener) {
-                (void)start_client(d, starter, runner, deleter);
-                continue;
-            }
-
-            if ((evts[n].events & EPOLLOUT) && d->obuf.len) {
-                if (buffer_write(&d->obuf, d->fd) < 0) {
-                    server_release(d);
-                    continue;
-                }
-                if (!d->obuf.len) {
-                    epoll_modify(d->fd, EPOLLIN, d);
-                }
-            }
-
-            if (evts[n].events & EPOLLIN) {
-                if (d->run(d, config) < 0) {
-                    server_release(d);
-                }
-                continue;
-            }
-        }
+    if (refresh != NULL) {
+        ev_signal_init(&ev_sighup, refresh_cb, SIGHUP);
+        ev_signal_start(global_loop, &ev_sighup);
     }
+    ev_signal_init(&ev_sigint, exit_cb, SIGINT);
+    ev_signal_start(global_loop, &ev_sigint);
+    ev_signal_init(&ev_sigterm, exit_cb, SIGTERM);
+    ev_signal_start(global_loop, &ev_sigterm);
+
+    info("entering processing loop");
+    ev_loop(global_loop, 0);
     info("exit requested");
     return EXIT_SUCCESS;
 }

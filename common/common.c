@@ -41,9 +41,6 @@
 
 #include "common.h"
 
-sig_atomic_t sigint  = false;
-sig_atomic_t sighup  = false;
-
 bool daemon_process  = true;
 int  log_level       = LOG_INFO;
 bool log_syslog      = false;
@@ -53,15 +50,6 @@ static FILE *pidfile = NULL;
 void common_sighandler(int sig)
 {
     switch (sig) {
-      case SIGTERM:
-      case SIGINT:
-        sigint = true;
-        return;
-
-      case SIGHUP:
-        sighup = true;
-        return;
-
       default:
         err("Killed (got signal %d)...", sig);
         exit(-1);

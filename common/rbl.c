@@ -36,7 +36,6 @@
 #include <unbound.h>
 #include <netdb.h>
 #include "array.h"
-#include "epoll.h"
 #include "server.h"
 #include "rbl.h"
 
@@ -126,11 +125,11 @@ static int rbl_handler(server_t *event, void *config)
 {
     int retval = 0;
     debug("rbl_handler called: ub_fd triggered");
-    epoll_modify(event->fd, 0, event);
+    server_none(event);
     if ((retval = ub_process(ctx)) != 0) {
         err("error in DNS resolution: %s", ub_strerror(retval));
     }
-    epoll_modify(event->fd, EPOLLIN, event);
+    server_ro(event);
     return 0;
 }
 

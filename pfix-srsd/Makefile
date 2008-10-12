@@ -32,7 +32,7 @@
 PROGRAMS  = pfix-srsd
 
 pfix-srsd_SOURCES = main-srsd.c ../common/lib.a
-pfix-srsd_LIBADD  = -lsrs2
+pfix-srsd_LIBADD  = -lsrs2 -lev
 
 all:
 

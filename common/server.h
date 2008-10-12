@@ -36,22 +36,21 @@
 #ifndef PFIXTOOLS_SERVER_H
 #define PFIXTOOLS_SERVER_H
 
+#include <ev.h>
 #include "buffer.h"
 
 typedef struct server_t server_t;
-
-#define INVALID_EVENT (NULL)
 
 typedef void *(*start_listener_t)(void);
 typedef void  (*delete_client_t)(void*);
 typedef void *(*start_client_t)(server_t*);
 typedef int   (*run_client_t)(server_t*, void*);
 typedef bool	(*refresh_t)(void*);
-typedef bool  (*event_handler_t)(server_t *, void*);
+
+extern struct ev_loop *global_loop;
 
 struct server_t {
-    unsigned listener : 1;
-
+    struct ev_io io;
     int fd;
 
     buffer_t ibuf;
@@ -67,6 +66,25 @@ int start_server(int port, start_listener_t starter, delete_client_t deleter);
 
 server_t *server_register(int fd, run_client_t runner, void *data);
 void server_release(server_t *server);
+
+static inline void server_none(server_t *server)
+{
+    ev_io_stop(global_loop, &server->io);
+}
+
+static inline void server_rw(server_t *server)
+{
+    ev_io_stop(global_loop, &server->io);
+    ev_io_set(&server->io, server->fd, EV_READ | EV_WRITE);
+    ev_io_start(global_loop, &server->io);
+}
+
+static inline void server_ro(server_t *server)
+{
+    ev_io_stop(global_loop, &server->io);
+    ev_io_set(&server->io, server->fd, EV_READ);
+    ev_io_start(global_loop, &server->io);
+}
 
 int server_loop(start_client_t starter, delete_client_t deleter,
                 run_client_t runner, refresh_t refresh, void *config);

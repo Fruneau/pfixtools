@@ -104,8 +104,6 @@ typedef void (*exitcall_t)(void);
 #define UNIXERR(fun)     err("%s:%d:%s %s: %m",                      \
                              __FILE__, __LINE__, __func__, fun)
 
-extern sig_atomic_t sigint;
-extern sig_atomic_t sighup;
 extern int          log_level;
 extern bool         log_syslog;
 
@@ -130,9 +128,6 @@ int common_setup(const char* pidfile, bool unsafe, const char* runas_user,
 static inline void common_startup(void)
 {
     signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT,  &common_sighandler);
-    signal(SIGTERM, &common_sighandler);
-    signal(SIGHUP,  &common_sighandler);
     signal(SIGSEGV, &common_sighandler);
 }
 

@@ -43,7 +43,7 @@ UB_LIBS   = -lunbound
 FILTERS		= iplist.c greylist.c strlist.c match.c
 
 postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c $(FILTERS) $(GENERATED)
-postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS)
+postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev
 
 tst-rbl_SOURCES   = tst-rbl.c ../common/lib.a filter.c config.c query.c iplist.c $(GENERATED)
 

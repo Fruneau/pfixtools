@@ -38,7 +38,6 @@
 
 #include "buffer.h"
 #include "common.h"
-#include "epoll.h"
 #include "policy_tokens.h"
 #include "server.h"
 #include "config.h"
@@ -74,7 +73,6 @@ static void query_stopper(void *data)
 static bool config_refresh(void *mconfig)
 {
     if (filter_running > 0) {
-        sighup = true;
         sleep(1);
         return true;
     }
@@ -105,7 +103,7 @@ static void policy_answer(server_t *pcy, const char *message)
     }
     buffer_addstr(&pcy->obuf, "\n\n");
     buffer_consume(&pcy->ibuf, query->eoq - pcy->ibuf.data);
-    epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
+    server_rw(pcy);
 }
 
 static const filter_t *next_filter(server_t *pcy, const filter_t *filter,
@@ -175,10 +173,6 @@ static bool policy_process(server_t *pcy, const config_t *mconfig)
 
 static int policy_run(server_t *pcy, void* vconfig)
 {
-    if (sighup) {
-        return 0;
-    }
-
     int search_offs = MAX(0, (int)(pcy->ibuf.len - 1));
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
     const char *eoq;
@@ -205,7 +199,7 @@ static int policy_run(server_t *pcy, void* vconfig)
     if (!query_parse(pcy->data, pcy->ibuf.data))
         return -1;
     query->eoq = eoq + strlen("\n\n");
-    epoll_modify(pcy->fd, 0, pcy);
+    server_none(pcy);
     return policy_process(pcy, mconfig) ? 0 : -1;
 }
 

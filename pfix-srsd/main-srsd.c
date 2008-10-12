@@ -38,7 +38,6 @@
 
 #include <srs2.h>
 
-#include "epoll.h"
 #include "mem.h"
 #include "buffer.h"
 #include "server.h"
@@ -127,7 +126,7 @@ int process_srs(server_t *srsd, void* vconfig)
                 return -1;
             }
             if (srsd->obuf.len) {
-              epoll_modify(srsd->fd, EPOLLIN | EPOLLOUT, srsd);
+                server_rw(srsd);
             }
             return 0;
         }
@@ -175,7 +174,7 @@ int process_srs(server_t *srsd, void* vconfig)
         buffer_consume(&srsd->ibuf, nl - srsd->ibuf.data);
     }
     if (srsd->obuf.len) {
-      epoll_modify(srsd->fd, EPOLLIN | EPOLLOUT, srsd);
+        server_rw(srsd);
     }
     return 0;
 }
