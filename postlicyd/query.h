@@ -113,4 +113,11 @@ const char *query_field_for_name(const query_t *query, const char *name);
 __attribute__((nonnull))
 const char *query_field_for_id(const query_t *query, postlicyd_token id);
 
+/** Formats the given string by replacing ${field_name} with the content
+ * of the query.
+ * Unknown and empty fields are filled with (null).
+ */
+__attribute__((nonnull(3)))
+ssize_t query_format(char *dest, size_t len, const char* fmt, const query_t *query);
+
 #endif

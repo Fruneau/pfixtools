@@ -81,17 +81,28 @@ static bool config_refresh(void *mconfig)
     return config_reload(mconfig);
 }
 
-__attribute__((format(printf,2,0)))
-static void policy_answer(server_t *pcy, const char *fmt, ...)
+static void policy_answer(server_t *pcy, const char *message)
 {
-    va_list args;
     query_context_t *context = pcy->data;
     const query_t* query = &context->query;
 
     buffer_addstr(&pcy->obuf, "action=");
-    va_start(args, fmt);
-    buffer_addvf(&pcy->obuf, fmt, args);
-    va_end(args);
+    buffer_ensure(&pcy->obuf, m_strlen(message) + 64);
+
+    ssize_t size = array_size(pcy->obuf) - array_len(pcy->obuf);
+    ssize_t format_size = query_format(array_ptr(pcy->obuf, array_len(pcy->obuf)),
+                                       size, message, query);
+    if (format_size == -1) {
+        buffer_addstr(&pcy->obuf, message);
+    } else if (format_size > size) {
+        buffer_ensure(&pcy->obuf, format_size + 1);
+        query_format(array_ptr(pcy->obuf, array_len(pcy->obuf)),
+                     array_size(pcy->obuf) - array_len(pcy->obuf),
+                     message, query);
+        array_len(pcy->obuf) += format_size;
+    } else {
+        array_len(pcy->obuf) += format_size;
+    }
     buffer_addstr(&pcy->obuf, "\n\n");
     buffer_consume(&pcy->ibuf, query->eoq - pcy->ibuf.data);
     epoll_modify(pcy->fd, EPOLLIN | EPOLLOUT, pcy);
@@ -122,7 +133,7 @@ static const filter_t *next_filter(server_t *pcy, const filter_t *filter,
              query->sender == NULL ? "undefined" : query->sender,
              query->recipient == NULL ? "undefined" : query->recipient,
              htokens[hook->type], filter->name, hook->value);
-        policy_answer(pcy, "%s", hook->value);
+        policy_answer(pcy, hook->value);
         *ok = true;
         return NULL;
     } else {

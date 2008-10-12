@@ -36,6 +36,7 @@
 
 #include "query.h"
 #include "policy_tokens.h"
+#include "str.h"
 
 bool query_parse(query_t *query, char *p)
 {
@@ -185,6 +186,59 @@ const char *query_field_for_id(const query_t *query, postlicyd_token id)
 const char *query_field_for_name(const query_t *query, const char *name)
 {
     postlicyd_token id = policy_tokenize(name, strlen(name));
+    if (id == PTK_UNKNOWN) {
+        warn("unknown query field %s", name);
+        return NULL;
+    }
     return query_field_for_id(query, id);
 }
 
+ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *query)
+{
+    size_t written = 0;
+    size_t pos = 0;
+    const char *end = fmt + m_strlen(fmt);
+
+#define WRITE(Src, Len)                                                        \
+    do {                                                                       \
+        size_t __len     = (Len);                                              \
+        if (written < len) {                                                   \
+            size_t __to_write = MIN(len - written - 1, __len);                 \
+            memcpy(dest + written, (Src), __to_write);                         \
+            written += __to_write;                                             \
+        }                                                                      \
+        pos += __len;                                                          \
+    } while (0)
+    while (*fmt != '\0') {
+        const char *next_format = strstr(fmt, "${");
+        if (next_format == NULL) {
+            next_format = end;
+        }
+        WRITE(fmt, next_format - fmt);
+        fmt = next_format;
+        if (*fmt != '\0') {
+            fmt += 2;
+            next_format = strchr(fmt, '}');
+            if (next_format == NULL) {
+                return -1;
+            }
+
+            postlicyd_token tok = policy_tokenize(fmt, next_format - fmt);
+            if (tok == PTK_UNKNOWN) {
+                warn("unknown field name \"%.*s\"", next_format - fmt, fmt);
+            }
+            const char *field = query == NULL ? NULL : query_field_for_id(query, tok);
+            if (field == NULL) {
+                WRITE("(null)", 6);
+            } else {
+                WRITE(field, m_strlen(field));
+            }
+            fmt = next_format + 1;
+        }
+    }
+
+    if (written > 0 && len > 0) {
+        dest[written] = '\0';
+    }
+    return pos;
+}
