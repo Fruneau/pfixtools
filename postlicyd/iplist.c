@@ -414,7 +414,7 @@ static void iplist_filter_async(rbl_result_t *result, void *arg)
     --async->awaited;
 
     debug("got asynchronous request result for filter %s, rbl %d, still awaiting %d answers",
-          filter->name, result - array_ptr(async->results, 0), async->awaited);
+          filter->name, (int)(result - array_ptr(async->results, 0)), async->awaited);
 
     if (async->awaited == 0) {
         filter_result_t res = HTK_FAIL;

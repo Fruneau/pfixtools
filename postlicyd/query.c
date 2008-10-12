@@ -225,7 +225,7 @@ ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *que
 
             postlicyd_token tok = policy_tokenize(fmt, next_format - fmt);
             if (tok == PTK_UNKNOWN) {
-                warn("unknown field name \"%.*s\"", next_format - fmt, fmt);
+                warn("unknown field name \"%.*s\"", (int)(next_format - fmt), fmt);
             }
             const char *field = query == NULL ? NULL : query_field_for_id(query, tok);
             if (field == NULL) {
