@@ -45,7 +45,7 @@
 #include "postlicyd.h"
 
 #define DAEMON_NAME             "postlicyd"
-#define DAEMON_VERSION          "0.2"
+#define DAEMON_VERSION          "0.3"
 #define DEFAULT_PORT            10000
 #define RUNAS_USER              "nobody"
 #define RUNAS_GROUP             "nogroup"
