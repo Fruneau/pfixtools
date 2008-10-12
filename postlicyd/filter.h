@@ -43,6 +43,7 @@
 #include "query.h"
 #include "array.h"
 
+
 typedef filter_token filter_type_t;
 typedef hook_token   filter_result_t;
 typedef param_token  filter_param_id_t;
@@ -118,6 +119,10 @@ typedef void (*filter_context_destructor_t)(void*);
 
 typedef void (*filter_async_handler_t)(filter_context_t *context,
                                        const filter_hook_t *result);
+
+/** Number of filter currently running.
+ */
+extern uint32_t filter_running;
 
 /* Registration.
  */

@@ -73,6 +73,11 @@ static void query_stopper(void *data)
 
 static bool config_refresh(void *mconfig)
 {
+    if (filter_running > 0) {
+        sighup = true;
+        sleep(1);
+        return true;
+    }
     return config_reload(mconfig);
 }
 
@@ -159,6 +164,10 @@ static bool policy_process(server_t *pcy, const config_t *mconfig)
 
 static int policy_run(server_t *pcy, void* vconfig)
 {
+    if (sighup) {
+        return 0;
+    }
+
     int search_offs = MAX(0, (int)(pcy->ibuf.len - 1));
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
     const char *eoq;

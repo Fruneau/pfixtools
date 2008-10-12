@@ -63,6 +63,8 @@ static const filter_hook_t async_hook = {
     .filter_id = 0
 };
 
+uint32_t filter_running = 0;
+
 filter_type_t filter_register(const char *type, filter_constructor_t constructor,
                               filter_destructor_t destructor, filter_runner_t runner,
                               filter_context_constructor_t context_constructor,
@@ -220,11 +222,13 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,
                                 filter_context_t *context)
 {
     debug("running filter %s (%s)", filter->name, ftokens[filter->type]);
+    ++filter_running;
     filter_result_t res = runners[filter->type](filter, query, context);
 
     if (res == HTK_ASYNC) {
         context->current_filter = filter;
     } else {
+        --filter_running;
         context->current_filter = NULL;
     }
 
@@ -319,6 +323,7 @@ void filter_post_async_result(filter_context_t *context, filter_result_t result)
     if (result == HTK_ASYNC) {
         return;
     }
+    --filter_running;
     hook = filter_hook_for_result(filter, result);
     async_handler(context, hook);
 }
