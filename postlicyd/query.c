@@ -149,3 +149,42 @@ bool query_parse(query_t *query, char *p)
 #undef PARSE_CHECK
 }
 
+const char *query_field_for_id(const query_t *query, postlicyd_token id)
+{
+    switch (id) {
+#define CASE(Up, Low)                                                          \
+      case PTK_ ## Up: return query->Low;
+      CASE(HELO_NAME, helo_name)
+      CASE(QUEUE_ID, queue_id)
+      CASE(SENDER, sender)
+      CASE(SENDER_DOMAIN, sender_domain)
+      CASE(RECIPIENT, recipient)
+      CASE(RECIPIENT_DOMAIN, recipient_domain)
+      CASE(RECIPIENT_COUNT, recipient_count)
+      CASE(CLIENT_ADDRESS, client_address)
+      CASE(CLIENT_NAME, client_name)
+      CASE(REVERSE_CLIENT_NAME, reverse_client_name)
+      CASE(INSTANCE, instance)
+      CASE(SASL_METHOD, sasl_method)
+      CASE(SASL_USERNAME, sasl_username)
+      CASE(SASL_SENDER, sasl_sender)
+      CASE(SIZE, size)
+      CASE(CCERT_SUBJECT, ccert_subject)
+      CASE(CCERT_ISSUER, ccert_issuer)
+      CASE(CCERT_FINGERPRINT, ccert_fingerprint)
+      CASE(ENCRYPTION_PROTOCOL, encryption_protocol)
+      CASE(ENCRYPTION_CIPHER, encryption_cipher)
+      CASE(ENCRYPTION_KEYSIZE, encryption_keysize)
+      CASE(ETRN_DOMAIN, etrn_domain)
+      CASE(STRESS, stress)
+#undef CASE
+      default: return NULL;
+    }
+}
+
+const char *query_field_for_name(const query_t *query, const char *name)
+{
+    postlicyd_token id = policy_tokenize(name, strlen(name));
+    return query_field_for_id(query, id);
+}
+

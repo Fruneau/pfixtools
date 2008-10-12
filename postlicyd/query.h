@@ -39,6 +39,7 @@
 
 #include "mem.h"
 #include "common.h"
+#include "policy_tokens.h"
 
 enum smtp_state {
     SMTP_CONNECT,
@@ -101,5 +102,15 @@ typedef struct query_t {
  */
 __attribute__((nonnull(1,2)))
 bool query_parse(query_t *query, char *p);
+
+/** Return the value of the field with the given name.
+ */
+__attribute__((nonnull(1,2)))
+const char *query_field_for_name(const query_t *query, const char *name);
+
+/** Returns the value of the field with the given id.
+ */
+__attribute__((nonnull))
+const char *query_field_for_id(const query_t *query, postlicyd_token id);
 
 #endif

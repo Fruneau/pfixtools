@@ -182,36 +182,7 @@ static void match_filter_destructor(filter_t *filter)
 
 static inline bool match_condition(const match_condition_t *cond, const query_t *query)
 {
-    const char *field = NULL;
-    switch (cond->field) {
-#define CASE(Up, Low)                                                          \
-      case PTK_ ## Up: field = query->Low; break;
-      CASE(HELO_NAME, helo_name)
-      CASE(QUEUE_ID, queue_id)
-      CASE(SENDER, sender)
-      CASE(SENDER_DOMAIN, sender_domain)
-      CASE(RECIPIENT, recipient)
-      CASE(RECIPIENT_DOMAIN, recipient_domain)
-      CASE(RECIPIENT_COUNT, recipient_count)
-      CASE(CLIENT_ADDRESS, client_address)
-      CASE(CLIENT_NAME, client_name)
-      CASE(REVERSE_CLIENT_NAME, reverse_client_name)
-      CASE(INSTANCE, instance)
-      CASE(SASL_METHOD, sasl_method)
-      CASE(SASL_USERNAME, sasl_username)
-      CASE(SASL_SENDER, sasl_sender)
-      CASE(SIZE, size)
-      CASE(CCERT_SUBJECT, ccert_subject)
-      CASE(CCERT_ISSUER, ccert_issuer)
-      CASE(CCERT_FINGERPRINT, ccert_fingerprint)
-      CASE(ENCRYPTION_PROTOCOL, encryption_protocol)
-      CASE(ENCRYPTION_CIPHER, encryption_cipher)
-      CASE(ENCRYPTION_KEYSIZE, encryption_keysize)
-      CASE(ETRN_DOMAIN, etrn_domain)
-      CASE(STRESS, stress)
-#undef CASE
-      default: return false;
-    }
+    const char *field = query_field_for_id(query, cond->field);
     debug("running condition: \"%s\" %s %s\"%s\"",
           field, condition_names[cond->condition],
           cond->case_sensitive ? "" : "(alternative) ",
