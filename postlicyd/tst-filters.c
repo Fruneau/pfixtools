@@ -87,6 +87,9 @@ static bool run_testcase(const config_t *config, const char *basepath,
     }
 
     bool ok = true;
+    filter_context_t context;
+    filter_context_prepare(&context, NULL);
+
     while (eol < end) {
         char *neol = memchr(eol, '\n', end - eol);
         if (neol == NULL) {
@@ -122,9 +125,11 @@ static bool run_testcase(const config_t *config, const char *basepath,
           printf("  test %s: %s\n", Name, __test ? "SUCCESS" : "FAILED");      \
           ok = ok && __test;                                                   \
         } while (0)
-        TEST(filter->name, filter_test(filter, &query, result));
+        TEST(filter->name, filter_test(filter, &query, &context, result));
         eol = neol + 1;
+
     }
+    filter_context_wipe(&context);
     return ok;
 }
 
@@ -162,20 +167,24 @@ static bool run_greylisttest(const config_t *config, const char *basepath)
 //    FILTER(greylist2);
 #undef FILTER
 
-    /* Test greylist */
-    TEST("greylisted", filter_test(greylist1, &q1, HTK_GREYLIST));
-    TEST("too_fast", filter_test(greylist1, &q1, HTK_GREYLIST));
-    sleep(5);
-    TEST("too_slow", filter_test(greylist1, &q1, HTK_GREYLIST));
-    sleep(2);
-    TEST("whitelisted", filter_test(greylist1, &q1, HTK_WHITELIST));
-    TEST("other_greylisted", filter_test(greylist1, &q2, HTK_GREYLIST));
-    TEST("auto_whitelisted", filter_test(greylist1, &q1, HTK_WHITELIST));
-    TEST("other_auto_whitelisted", filter_test(greylist1, &q2, HTK_WHITELIST));
-    TEST("greylisted", filter_test(greylist1, &q3, HTK_GREYLIST));
-    sleep(10);
-    TEST("cleanup", filter_test(greylist1, &q1, HTK_GREYLIST));
+    filter_context_t context;
+    filter_context_prepare(&context, NULL);
 
+    /* Test greylist */
+    TEST("greylisted", filter_test(greylist1, &q1, &context, HTK_GREYLIST));
+    TEST("too_fast", filter_test(greylist1, &q1, &context, HTK_GREYLIST));
+    sleep(5);
+    TEST("too_slow", filter_test(greylist1, &q1, &context, HTK_GREYLIST));
+    sleep(2);
+    TEST("whitelisted", filter_test(greylist1, &q1, &context, HTK_WHITELIST));
+    TEST("other_greylisted", filter_test(greylist1, &q2, &context, HTK_GREYLIST));
+    TEST("auto_whitelisted", filter_test(greylist1, &q1, &context, HTK_WHITELIST));
+    TEST("other_auto_whitelisted", filter_test(greylist1, &q2, &context, HTK_WHITELIST));
+    TEST("greylisted", filter_test(greylist1, &q3, &context, HTK_GREYLIST));
+    sleep(10);
+    TEST("cleanup", filter_test(greylist1, &q1, &context, HTK_GREYLIST));
+
+    filter_context_wipe(&context);
     return ok;
 }
 

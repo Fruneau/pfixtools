@@ -262,7 +262,7 @@ bool filter_test(const filter_t *filter, const query_t *query,
 /* Filter context
  */
 
-__attribute__((nonnull))
+__attribute__((nonnull(1)))
 void filter_context_prepare(filter_context_t *context, void* qctx);
 
 __attribute__((nonnull))
