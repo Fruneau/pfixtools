@@ -65,6 +65,7 @@ ARRAY(server_t);
 int start_server(int port, start_listener_t starter, delete_client_t deleter);
 
 server_t *server_register(int fd, run_client_t runner, void *data);
+void server_delete(server_t **server);
 void server_release(server_t *server);
 
 static inline void server_none(server_t *server)

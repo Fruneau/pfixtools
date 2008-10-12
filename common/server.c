@@ -34,7 +34,6 @@
  */
 
 #include "server.h"
-#include "epoll.h"
 #include "common.h"
 
 static PA(server_t) listeners   = ARRAY_INIT;
@@ -66,7 +65,7 @@ static void server_wipe(server_t *server)
     }
 }
 
-static void server_delete(server_t **server)
+void server_delete(server_t **server)
 {
     if (*server) {
         buffer_wipe(&(*server)->ibuf);

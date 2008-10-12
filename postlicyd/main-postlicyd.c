@@ -51,8 +51,9 @@
 
 DECLARE_MAIN
 
-static config_t *config = NULL;
-
+static config_t *config  = NULL;
+static bool refresh      = false;
+static PA(server_t) busy = ARRAY_INIT;
 
 static void *query_starter(server_t* server)
 {
@@ -72,11 +73,17 @@ static void query_stopper(void *data)
 
 static bool config_refresh(void *mconfig)
 {
+    refresh = true;
     if (filter_running > 0) {
-        sleep(1);
         return true;
     }
-    return config_reload(mconfig);
+    bool ret = config_reload(mconfig);
+    foreach (server_t **server, busy) {
+        server_ro(*server);
+    }}
+    array_len(busy) = 0;
+    refresh = false;
+    return ret;
 }
 
 static void policy_answer(server_t *pcy, const char *message)
@@ -173,6 +180,11 @@ static bool policy_process(server_t *pcy, const config_t *mconfig)
 
 static int policy_run(server_t *pcy, void* vconfig)
 {
+    if (refresh) {
+        array_add(busy, pcy);
+        return 0;
+    }
+
     int search_offs = MAX(0, (int)(pcy->ibuf.len - 1));
     int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
     const char *eoq;
@@ -219,6 +231,9 @@ static void policy_async_handler(filter_context_t *context,
     if (!ok) {
         server_release(server);
     }
+    if (refresh && filter_running == 0) {
+        config_refresh(config);
+    }
 }
 
 static int postlicyd_init(void)
@@ -226,7 +241,13 @@ static int postlicyd_init(void)
     filter_async_handler_register(policy_async_handler);
     return 0;
 }
+
+static void postlicyd_shutdown(void)
+{
+    array_deep_wipe(busy, server_delete);
+}
 module_init(postlicyd_init);
+module_exit(postlicyd_shutdown);
 
 int start_listener(int port)
 {
