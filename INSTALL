@@ -1,0 +1,29 @@
+Installation instruction for pfixtools
+
+1)  Install dependencies; you will need at least the following packages:
+        gperf, libbz2-dev, libsrs2-dev, libunbound-dev, pkg-config
+    Install tokyocabinet: http://tokyocabinet.sourceforge.net/
+
+2)  Compile:
+    $ make
+    $ sudo make install
+
+3)  Prepare the configuration in /etc/pfixtools
+      - postlicyd.conf, read postlicyd.example.conf to learn more
+      - postlicyd-rsyncrbl.conf, read postlicyd-rsyncrbl.example.conf to learn more
+      - additional files required by the configuration, such as client_whitelist
+        postgrey2postlicyd can be used to migrate from an existing
+        postgrey clients whitelist
+    If you are using RBLs, you should add a crontab entry for postlicyd-rsyncrbl
+
+4)  Create the spool:
+    # mkdir -p /var/spool/pfixtools/
+    # chown nobody:nogroup /var/spool/pfixtools/
+
+5)  Policy daemon startup script: /etc/init.d/postlicyd
+    Use your distribution's favorite way to start/stop services.
+    Start the policy daemon:
+    # /etc/init.d/postlicyd start
+
+6) Tell postfix to use postlicyd as a policy daemon and reload postfix
+
