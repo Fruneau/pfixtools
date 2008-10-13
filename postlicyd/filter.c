@@ -50,6 +50,8 @@ static filter_async_handler_t       async_handler = NULL;
 static const filter_hook_t default_hook = {
     .type      = 0,
     .value     = (char*)"DUNNO",
+    .counter   = -1,
+    .cost      = 0,
     .postfix   = true,
     .async     = false,
     .filter_id = 0
@@ -58,6 +60,8 @@ static const filter_hook_t default_hook = {
 static const filter_hook_t async_hook = {
     .type      = 0,
     .value     = NULL,
+    .counter   = -1,
+    .cost      = 0,
     .postfix   = false,
     .async     = true,
     .filter_id = 0
@@ -288,6 +292,35 @@ bool filter_add_hook(filter_t *filter, const char *name, int name_len,
         return false;
     }
     hook.async   = false;
+
+    /* Value format is (counter:id:incr)?(postfix:reply|filter_name)
+     */
+    if (strncmp(value, "counter:", 8) == 0) {
+        char *end = NULL;
+        value += 8;
+        hook.counter = strtol(value, &end, 10);
+        if (end == value || *end != ':') {
+              err("hook %s, cannot read counter id", htokens[hook.type]);
+              return false;
+        } else if (hook.counter < 0 || hook.counter >= MAX_COUNTERS) {
+            err("hook %s, invalid counter id %d", htokens[hook.type], hook.counter);
+            return false;
+        }
+        value = end + 1;
+        hook.cost = strtol(value, &end, 10);
+        if (end == value || *end != ':') {
+            err("hook %s, cannot read counter increment", htokens[hook.type]);
+            return false;
+        } else if (hook.cost < 0) {
+            err("hook %s, invalid counter increment value %d", htokens[hook.type],
+                hook.cost);
+            return false;
+        }
+        value = end + 1;
+    } else {
+        hook.counter = -1;
+        hook.cost    = 0;
+    }
     hook.postfix = (strncmp(value, "postfix:", 8) == 0);
     if (hook.postfix && query_format(NULL, 0, value + 8, NULL) == -1) {
         err("invalid formatted text \"%s\"", value + 8);
@@ -317,6 +350,12 @@ void filter_context_wipe(filter_context_t *context)
             ctx_destructors[i](context->contexts[i]);
         }
     }
+}
+
+void filter_context_clean(filter_context_t *context)
+{
+    p_clear(&context->counters, 1);
+    context->instance[0] = '\0';
 }
 
 void filter_post_async_result(filter_context_t *context, filter_result_t result)
