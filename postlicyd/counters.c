@@ -68,6 +68,8 @@ static bool counter_filter_constructor(filter_t *filter)
         return false;                                                          \
     }
 
+    config->hard_threshold = 1;
+    config->soft_threshold = 1;
     foreach (filter_param_t *param, filter->params) {
         switch (param->type) {
           FILTER_PARAM_PARSE_INT(COUNTER, config->counter);
