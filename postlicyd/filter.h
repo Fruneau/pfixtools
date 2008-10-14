@@ -52,9 +52,13 @@ typedef struct filter_hook_t {
     filter_result_t type;
     char *value;
 
+    int counter;
+    int cost;
+
     unsigned postfix:1;
     unsigned async:1;
     int filter_id;
+
 } filter_hook_t;
 ARRAY(filter_hook_t)
 
@@ -82,13 +86,24 @@ typedef struct filter_t {
 } filter_t;
 ARRAY(filter_t)
 
+#define MAX_COUNTERS (64)
+
 /** Context of the query. To be filled with data to use when
  * performing asynchronous filtering.
  */
 typedef struct filter_context_t {
+    /* filter context
+     */
     const filter_t *current_filter;
     void *contexts[FTK_count];
 
+    /* message context
+     */
+    char instance[64];
+    uint32_t counters[MAX_COUNTERS];
+
+    /* connection context
+     */
     void *data;
 } filter_context_t;
 
@@ -272,6 +287,9 @@ void filter_context_prepare(filter_context_t *context, void* qctx);
 
 __attribute__((nonnull))
 void filter_context_wipe(filter_context_t *context);
+
+__attribute__((nonnull))
+void filter_context_clean(filter_context_t *context);
 
 __attribute__((nonnull))
 void filter_post_async_result(filter_context_t *context, filter_result_t result);

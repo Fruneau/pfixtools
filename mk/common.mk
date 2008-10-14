@@ -49,7 +49,7 @@ $(LIBS:=.a): $$(patsubst %.c,.%.o,$$($$(patsubst %.a,%,$$@)_SOURCES)) Makefile
 	$(RM) $@
 	$(AR) rcs $@ $(filter %.o,$^)
 
-$(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile ../common.ld
+$(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
 	$(CC) -o $@ $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
 -include $(foreach p,$(PROGRAMS) $(TESTS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))

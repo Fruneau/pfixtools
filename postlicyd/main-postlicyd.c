@@ -115,6 +115,17 @@ static void policy_answer(server_t *pcy, const char *message)
 
 static const filter_t *next_filter(server_t *pcy, const filter_t *filter,
                                    const query_t *query, const filter_hook_t *hook, bool *ok) {
+    if (hook != NULL) {
+        query_context_t *context = pcy->data;
+        if (hook->counter >= 0 && hook->counter < MAX_COUNTERS && hook->cost > 0) {
+            context->context.counters[hook->counter] += hook->cost;
+            debug("request client=%s, from=<%s>, to=<%s>: added %d to counter %d (now %u)",
+                  query->client_name,
+                  query->sender == NULL ? "undefined" : query->sender,
+                  query->recipient == NULL ? "undefined" : query->recipient,
+                  hook->cost, hook->counter, context->context.counters[hook->counter]);
+        }
+    }
     if (hook == NULL) {
         warn("request client=%s, from=<%s>, to=<%s>: aborted",
              query->client_name,
@@ -211,6 +222,10 @@ static int policy_run(server_t *pcy, void* vconfig)
     if (!query_parse(pcy->data, pcy->ibuf.data))
         return -1;
     query->eoq = eoq + strlen("\n\n");
+    if (query->instance == NULL || strcmp(context->context.instance, query->instance) != 0) {
+        filter_context_clean(&context->context);
+        m_strcat(context->context.instance, 64, query->instance);
+    }
     server_none(pcy);
     return policy_process(pcy, mconfig) ? 0 : -1;
 }
