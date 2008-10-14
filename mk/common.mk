@@ -1,7 +1,7 @@
 include ../mk/cflags.mk
 
 prefix ?= /usr/local
-LDFLAGS += -Wl,--warn-common -L/opt/local/lib
+LDFLAGS += -L/opt/local/lib
 CFLAGS  += --std=gnu99 -I../ -I../common -I/opt/local/include
 
 INSTALL_PROGS = $(addprefix install-,$(PROGRAMS))
@@ -50,7 +50,7 @@ $(LIBS:=.a): $$(patsubst %.c,.%.o,$$($$(patsubst %.a,%,$$@)_SOURCES)) Makefile
 	$(AR) rcs $@ $(filter %.o,$^)
 
 $(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile ../common.ld
-	$(CC) -o $@ $(filter %.ld,$^) $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
+	$(CC) -o $@ $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
 -include $(foreach p,$(PROGRAMS) $(TESTS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
 

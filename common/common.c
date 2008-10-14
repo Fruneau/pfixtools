@@ -280,8 +280,16 @@ int common_setup(const char* pidfilename, bool unsafe, const char* runas_user,
     return EXIT_SUCCESS;
 }
 
-extern initcall_t __madinit[];
-extern exitcall_t __madexit[];
+#include "array.h"
+
+ARRAY(exitcall_t)
+
+static A(exitcall_t) __exit = ARRAY_INIT;
+
+void common_register_exit(exitcall_t _exit)
+{
+    array_add(__exit, _exit);
+}
 
 static void common_shutdown(void)
 {
@@ -289,23 +297,22 @@ static void common_shutdown(void)
         info("stopping...");
     }
     pidfile_close();
-    for (int i = -1; __madexit[i]; i--) {
-        (*__madexit[i])();
+    for (int i = array_len(__exit) - 1 ; i >= 0 ; --i) {
+        array_elt(__exit, i)();
     }
+    array_wipe(__exit);
 }
 
-static void __attribute__((__constructor__,__used__))
-common_initialize(void)
+void common_init(void)
 {
+    static bool __ran = false;
+    if (__ran) {
+        return;
+    }
     if (atexit(common_shutdown)) {
         fputs("Cannot hook my atexit function, quitting !\n", stderr);
         abort();
     }
-
-    for (int i = 0; __madinit[i]; i++) {
-        if ((*__madinit[i])()) {
-            exit(EXIT_FAILURE);
-        }
-    }
+    __ran = true;
 }
 

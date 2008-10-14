@@ -63,11 +63,23 @@
 typedef int  (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
 
-#define __init __attribute__((__used__,__section__("MAD_INIT,__text,regular")))
-#define __exit __attribute__((__used__,__section__("MAD_EXIT,__text,regular")))
+void common_register_exit(exitcall_t _exit);
+void common_init(void);
 
-#define module_init(fn)  static __init initcall_t __init_##fn = fn;
-#define module_exit(fn)  static __exit exitcall_t __exit_##fn = fn;
+#define module_init(fn)                                                        \
+    __attribute__((constructor,used))                                          \
+    static void __init_wrapper__ ## fn (void) {                                \
+        common_init();                                                         \
+        if (fn() != 0) {                                                       \
+            exit(-1);                                                          \
+        }                                                                      \
+    }
+#define module_exit(fn)                                                        \
+    __attribute__((constructor,used))                                          \
+    static void __exit_wrapper ## fn(void) {                                   \
+        common_init();                                                         \
+        common_register_exit(fn);                                              \
+    }
 
 #define likely(expr)    __builtin_expect((expr) != 0, 1)
 #define unlikely(expr)  __builtin_expect((expr) != 0, 0)
