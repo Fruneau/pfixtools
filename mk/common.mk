@@ -1,8 +1,8 @@
 include ../mk/cflags.mk
 
 prefix ?= /usr/local
-LDFLAGS += -Wl,--warn-common
-CFLAGS  += --std=gnu99 -I../ -I../common
+LDFLAGS += -Wl,--warn-common -L/opt/local/lib
+CFLAGS  += --std=gnu99 -I../ -I../common -I/opt/local/include
 
 INSTALL_PROGS = $(addprefix install-,$(PROGRAMS))
 

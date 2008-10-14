@@ -2,9 +2,9 @@ SECTIONS {
     .rodata : {
         . = ALIGN(8);
         __madinit = . ;
-        *( .mad.init )
+        *( MAD_INIT )
         QUAD(0)
-        *( .mad.exit )
+        *( MAD_EXIT )
         __madexit = . ;
     }
 }

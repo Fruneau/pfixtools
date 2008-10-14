@@ -50,7 +50,7 @@ CFLAGS += -Wchar-subscripts
 # warn about undefined preprocessor identifiers
 CFLAGS += -Wundef
 # warn about local variable shadowing another local variable
-CFLAGS += -Wshadow
+#CFLAGS += -Wshadow
 # warn about casting of pointers to increased alignment requirements
 CFLAGS += -Wcast-align
 # make string constants const
@@ -70,7 +70,7 @@ CFLAGS += $(if $(GCC4),-Winit-self)
 # warn about pointer arithmetic on void* and function pointers
 CFLAGS += -Wpointer-arith
 # warn about multiple declarations
-CFLAGS += -Wredundant-decls
+#CFLAGS += -Wredundant-decls
 # warn if the format string is not a string literal
 CFLAGS += -Wformat-nonliteral
 # do not warn about zero-length formats.

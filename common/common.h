@@ -63,8 +63,8 @@
 typedef int  (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
 
-#define __init __attribute__((__used__,__section__(".mad.init")))
-#define __exit __attribute__((__used__,__section__(".mad.exit")))
+#define __init __attribute__((__used__,__section__("MAD_INIT,__text,regular")))
+#define __exit __attribute__((__used__,__section__("MAD_EXIT,__text,regular")))
 
 #define module_init(fn)  static __init initcall_t __init_##fn = fn;
 #define module_exit(fn)  static __exit exitcall_t __exit_##fn = fn;

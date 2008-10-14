@@ -287,14 +287,15 @@ bool filter_add_hook(filter_t *filter, const char *name, int name_len,
             htokens[hook.type], ftokens[filter->type]);
         return false;
     }
-    hook.async   = false;
+    hook.async     = false;
+    hook.filter_id = -1;
+    hook.value      = NULL;
     hook.postfix = (strncmp(value, "postfix:", 8) == 0);
     if (hook.postfix && query_format(NULL, 0, value + 8, NULL) == -1) {
         err("invalid formatted text \"%s\"", value + 8);
         return false;
     }
     hook.value = m_strdup(hook.postfix ? value + 8 : value);
-    hook.filter_id = -1;
     array_add(filter->hooks, hook);
     return true;
 }
