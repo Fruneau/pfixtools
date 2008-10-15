@@ -286,9 +286,9 @@ ARRAY(exitcall_t)
 
 static A(exitcall_t) __exit = ARRAY_INIT;
 
-void common_register_exit(exitcall_t _exit)
+void common_register_exit(exitcall_t exitcall)
 {
-    array_add(__exit, _exit);
+    array_add(__exit, exitcall);
 }
 
 static void common_shutdown(void)

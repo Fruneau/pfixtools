@@ -63,7 +63,7 @@
 typedef int  (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
 
-void common_register_exit(exitcall_t _exit);
+void common_register_exit(exitcall_t exitcall);
 void common_init(void);
 
 #define module_init(fn)                                                        \

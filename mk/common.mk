@@ -1,8 +1,8 @@
 include ../mk/cflags.mk
 
 prefix ?= /usr/local
-LDFLAGS += -L/opt/local/lib
-CFLAGS  += --std=gnu99 -I../ -I../common -I/opt/local/include
+LDFLAGS += $(if $(DARWIN),-L/opt/local/lib,-Wl,-warn-common)
+CFLAGS  += --std=gnu99 -I../ -I../common $(if $(DARWIN),-I/opt/local/include,)
 
 INSTALL_PROGS = $(addprefix install-,$(PROGRAMS))
 

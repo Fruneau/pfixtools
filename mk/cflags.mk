@@ -32,6 +32,9 @@
 ifneq ($(filter 4.%,$(shell gcc -dumpversion)),)
   GCC4=1
 endif
+ifneq ($(filter Darwin%,$(shell uname)),)
+  DARWIN=1
+endif
 
 # Use pipes and not temp files.
 CFLAGS += -pipe
@@ -50,7 +53,8 @@ CFLAGS += -Wchar-subscripts
 # warn about undefined preprocessor identifiers
 CFLAGS += -Wundef
 # warn about local variable shadowing another local variable
-#CFLAGS += -Wshadow
+# # disabled on Darwin because of warnings in ev.h
+CFLAGS += $(if $(DARWIN),,-Wshadow)
 # warn about casting of pointers to increased alignment requirements
 CFLAGS += -Wcast-align
 # make string constants const
@@ -70,7 +74,8 @@ CFLAGS += $(if $(GCC4),-Winit-self)
 # warn about pointer arithmetic on void* and function pointers
 CFLAGS += -Wpointer-arith
 # warn about multiple declarations
-#CFLAGS += -Wredundant-decls
+# #disabled on Darwin because of warnings in ev.h
+CFLAGS += $(if $(DARWIN),,-Wredundant-decls)
 # warn if the format string is not a string literal
 CFLAGS += -Wformat-nonliteral
 # do not warn about zero-length formats.
