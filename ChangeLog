@@ -1,0 +1,62 @@
+version 0.4
+
+  * common:
+    NEW: support for Darwin                                                FRU
+    CHA: use libev in the event loop                                       FRU
+    CHA: rewrite module_init() and module_exit() to work on nonGNU systems FRU
+
+  * postlicyd:
+    NEW: add persistent counters and filters on this counters              FRU
+
+
+------------------------------------------------------------------------------
+version 0.3                                                       Oct 12, 2008
+
+  * common:
+    CHA: asynchronous DNS resolution for RBL                               FRU
+    CHA: add final '.' to hostname for DNS resolution                       MC
+    CHA: fix build on 64 bits                                               MC
+
+  * postlicyd:
+    NEW: asynchronous filters                                              FRU
+    NEW: add performance tests of the TCBDB backend                        FRU
+    NEW: add a script to rsync rbl databases                               FRU
+    NEW: allow templated replies (filled with query field)                 FRU
+
+
+------------------------------------------------------------------------------
+version 0.2                                                        Oct 5, 2008
+
+  * common:
+    NEW: add support for DNS resolution for RBL                            FRU
+
+  * postlicyd:
+    NEW: add basic support for rbldns zone file format                     FRU
+    NEW: add sender/recipient domain fields for matching                   FRU
+    NEW: conversion script postgrey to postlicyd                           mYk
+    CHA: faster ip lookup structure                                        FRU
+    CHA: fix startup sequence                                              FRU
+
+
+------------------------------------------------------------------------------
+version 0.1                                                        Oct 4, 2008
+
+  * common:
+    NEW: initial version                                                MC/FRU
+
+  * pfix-srsd:
+    NEW: initial version                                                    MC
+
+  * postlicyd:
+    NEW: initial version                                                MC/FRU
+
+
+------------------------------------------------------------------------------
+acronyms (see Authors)
+
+  FRU:  Florent Bruneau             <florent.bruneau@polytechnique.org>
+  MC:   Pierre Habouzit             <madcoder@debian.org>
+  mYk:  Aymeric Augustin            <aymeric.augusting@m4x.org>
+
+-----------------------------------------------------------------------------
+vim:et:ts=4:sw=4:tw=80:enc=utf-8: 
