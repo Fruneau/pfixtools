@@ -74,8 +74,8 @@ install-postlicyd-tools:
 	install tools/rbldns2postlicyd	 $(DESTDIR)$(prefix)/bin/rbldns2postlicyd
 
 install-postlicyd-conf:
-	install example/postlicyd.conf $(DESTDIR)/etc/pfixtools/postlicyd.example.conf
-	install example/postlicyd-rsyncrbl.conf $(DESTDIR)/etc/pfixtools/postlicyd-rsyncrbl.example.conf
+	install -m 640 example/postlicyd.conf $(DESTDIR)/etc/pfixtools/postlicyd.example.conf
+	install -m 640 example/postlicyd-rsyncrbl.conf $(DESTDIR)/etc/pfixtools/postlicyd-rsyncrbl.example.conf
 
 .PHONY: clean distclean install install-dir $(SUBDIRS) $(CLEAN_TARGETS) \
 				$(DISTCLEAN_TARGETS) $(INSTALL_TARGETS) install-postlicyd-tools \
