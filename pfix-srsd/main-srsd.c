@@ -43,7 +43,7 @@
 #include "server.h"
 
 #define DAEMON_NAME             "pfix-srsd"
-#define DAEMON_VERSION          "0.1"
+#define DAEMON_VERSION          "0.3"
 #define DEFAULT_ENCODER_PORT    10001
 #define DEFAULT_DECODER_PORT    10002
 #define RUNAS_USER              "nobody"
