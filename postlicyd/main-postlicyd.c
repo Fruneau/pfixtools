@@ -41,7 +41,7 @@
 #include "policy_tokens.h"
 #include "server.h"
 #include "config.h"
-#include "postlicyd.h"
+#include "query.h"
 
 #define DAEMON_NAME             "postlicyd"
 #define DAEMON_VERSION          "0.3"
@@ -51,11 +51,17 @@
 
 DECLARE_MAIN
 
+typedef struct query_context_t {
+    query_t query;
+    filter_context_t context;
+    client_t *client;
+} query_context_t;
+
 static config_t *config  = NULL;
 static bool refresh      = false;
-static PA(server_t) busy = ARRAY_INIT;
+static PA(client_t) busy = ARRAY_INIT;
 
-static void *query_starter(server_t* server)
+static void *query_starter(listener_t* server)
 {
     query_context_t *context = p_new(query_context_t, 1);
     filter_context_prepare(&context->context, context);
@@ -78,45 +84,50 @@ static bool config_refresh(void *mconfig)
         return true;
     }
     bool ret = config_reload(mconfig);
-    foreach (server_t **server, busy) {
-        server_ro(*server);
+    foreach (client_t **server, busy) {
+        client_io_ro(*server);
     }}
     array_len(busy) = 0;
     refresh = false;
     return ret;
 }
 
-static void policy_answer(server_t *pcy, const char *message)
+static void policy_answer(client_t *pcy, const char *message)
 {
-    query_context_t *context = pcy->data;
+    query_context_t *context = client_data(pcy);
     const query_t* query = &context->query;
+    buffer_t *buf = client_output_buffer(pcy);
 
-    buffer_addstr(&pcy->obuf, "action=");
-    buffer_ensure(&pcy->obuf, m_strlen(message) + 64);
+    /* Write reply "action=ACTION [text]" */
+    buffer_addstr(buf, "action=");
+    buffer_ensure(buf, m_strlen(message) + 64);
 
-    ssize_t size = array_size(pcy->obuf) - array_len(pcy->obuf);
-    ssize_t format_size = query_format(array_ptr(pcy->obuf, array_len(pcy->obuf)),
+    ssize_t size = array_size(*buf) - array_len(*buf);
+    ssize_t format_size = query_format(array_ptr(*buf, array_len(*buf)),
                                        size, message, query);
     if (format_size == -1) {
-        buffer_addstr(&pcy->obuf, message);
+        buffer_addstr(buf, message);
     } else if (format_size > size) {
-        buffer_ensure(&pcy->obuf, format_size + 1);
-        query_format(array_ptr(pcy->obuf, array_len(pcy->obuf)),
-                     array_size(pcy->obuf) - array_len(pcy->obuf),
+        buffer_ensure(buf, format_size + 1);
+        query_format(array_ptr(*buf, array_len(*buf)),
+                     array_size(*buf) - array_len(*buf),
                      message, query);
-        array_len(pcy->obuf) += format_size;
+        array_len(*buf) += format_size;
     } else {
-        array_len(pcy->obuf) += format_size;
+        array_len(*buf) += format_size;
     }
-    buffer_addstr(&pcy->obuf, "\n\n");
-    buffer_consume(&pcy->ibuf, query->eoq - pcy->ibuf.data);
-    server_rw(pcy);
+    buffer_addstr(buf, "\n\n");
+
+    /* Finalize query. */
+    buf = client_input_buffer(pcy);
+    buffer_consume(buf, query->eoq - buf->data);
+    client_io_rw(pcy);
 }
 
-static const filter_t *next_filter(server_t *pcy, const filter_t *filter,
+static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
                                    const query_t *query, const filter_hook_t *hook, bool *ok) {
     if (hook != NULL) {
-        query_context_t *context = pcy->data;
+        query_context_t *context = client_data(pcy);
         if (hook->counter >= 0 && hook->counter < MAX_COUNTERS && hook->cost > 0) {
             context->context.counters[hook->counter] += hook->cost;
             debug("request client=%s, from=<%s>, to=<%s>: added %d to counter %d (now %u)",
@@ -164,9 +175,9 @@ static const filter_t *next_filter(server_t *pcy, const filter_t *filter,
     }
 }
 
-static bool policy_process(server_t *pcy, const config_t *mconfig)
+static bool policy_process(client_t *pcy, const config_t *mconfig)
 {
-    query_context_t *context = pcy->data;
+    query_context_t *context = client_data(pcy);
     const query_t* query = &context->query;
     const filter_t *filter;
     if (mconfig->entry_points[query->state] == -1) {
@@ -189,20 +200,22 @@ static bool policy_process(server_t *pcy, const config_t *mconfig)
     }
 }
 
-static int policy_run(server_t *pcy, void* vconfig)
+static int policy_run(client_t *pcy, void* vconfig)
 {
+    const config_t *mconfig = vconfig;
     if (refresh) {
         array_add(busy, pcy);
         return 0;
     }
 
-    int search_offs = MAX(0, (int)(pcy->ibuf.len - 1));
-    int nb = buffer_read(&pcy->ibuf, pcy->fd, -1);
+    query_context_t *context = client_data(pcy);
+    query_t         *query   = &context->query;
+    context->client = pcy;
+
+    buffer_t *buf   = client_input_buffer(pcy);
+    int search_offs = MAX(0, (int)(buf->len - 1));
+    int nb          = client_read(pcy);
     const char *eoq;
-    query_context_t *context = pcy->data;
-    query_t  *query  = &context->query;
-    context->server = pcy;
-    const config_t *mconfig = vconfig;
 
     if (nb < 0) {
         if (errno == EAGAIN || errno == EINTR)
@@ -211,22 +224,26 @@ static int policy_run(server_t *pcy, void* vconfig)
         return -1;
     }
     if (nb == 0) {
-        if (pcy->ibuf.len)
+        if (buf->len)
             err("unexpected end of data");
         return -1;
     }
 
-    if (!(eoq = strstr(pcy->ibuf.data + search_offs, "\n\n")))
+    if (!(eoq = strstr(buf->data + search_offs, "\n\n"))) {
         return 0;
+    }
 
-    if (!query_parse(pcy->data, pcy->ibuf.data))
+    if (!query_parse(query, buf->data)) {
         return -1;
+    }
     query->eoq = eoq + strlen("\n\n");
+
+    /* The instance changed => reset the static context */
     if (query->instance == NULL || strcmp(context->context.instance, query->instance) != 0) {
         filter_context_clean(&context->context);
         m_strcat(context->context.instance, 64, query->instance);
     }
-    server_none(pcy);
+    client_io_none(pcy);
     return policy_process(pcy, mconfig) ? 0 : -1;
 }
 
@@ -237,14 +254,14 @@ static void policy_async_handler(filter_context_t *context,
     const filter_t *filter = context->current_filter;
     query_context_t *qctx  = context->data;
     query_t         *query = &qctx->query;
-    server_t        *server = qctx->server;
+    client_t        *server = qctx->client;
 
     context->current_filter = next_filter(server, filter, query, hook, &ok);
     if (context->current_filter != NULL) {
         ok = policy_process(server, config);
     }
     if (!ok) {
-        server_release(server);
+        client_release(server);
     }
     if (refresh && filter_running == 0) {
         config_refresh(config);
@@ -259,15 +276,10 @@ static int postlicyd_init(void)
 
 static void postlicyd_shutdown(void)
 {
-    array_deep_wipe(busy, server_delete);
+    array_deep_wipe(busy, client_delete);
 }
 module_init(postlicyd_init);
 module_exit(postlicyd_shutdown);
-
-int start_listener(int port)
-{
-    return start_server(port, NULL, NULL);
-}
 
 /* administrivia {{{ */
 
@@ -354,7 +366,7 @@ int main(int argc, char *argv[])
 
     pidfile_refresh();
 
-    if (start_listener(config->port) < 0) {
+    if (start_listener(config->port) == NULL) {
         return EXIT_FAILURE;
     } else {
         return server_loop(query_starter, query_stopper,

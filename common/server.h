@@ -36,56 +36,34 @@
 #ifndef PFIXTOOLS_SERVER_H
 #define PFIXTOOLS_SERVER_H
 
-#include <ev.h>
 #include "buffer.h"
 
-typedef struct server_t server_t;
+typedef struct client_t client_t;
+typedef struct listener_t listener_t;
+PARRAY(client_t)
+PARRAY(listener_t)
 
 typedef void *(*start_listener_t)(void);
 typedef void  (*delete_client_t)(void*);
-typedef void *(*start_client_t)(server_t*);
-typedef int   (*run_client_t)(server_t*, void*);
+typedef void *(*start_client_t)(listener_t*);
+typedef int   (*run_client_t)(client_t*, void*);
 typedef bool	(*refresh_t)(void*);
 
-extern struct ev_loop *global_loop;
 
-struct server_t {
-    struct ev_io io;
-    int fd;
+listener_t *start_listener(int port);
 
-    buffer_t ibuf;
-    buffer_t obuf;
+client_t *client_register(int fd, run_client_t runner, void *data);
+void client_delete(client_t **client);
+void client_release(client_t *client);
 
-    run_client_t run;
-    delete_client_t clear_data;
-    void* data;
-};
-ARRAY(server_t);
+void client_io_none(client_t *client);
+void client_io_rw(client_t *client);
+void client_io_ro(client_t *client);
 
-int start_server(int port, start_listener_t starter, delete_client_t deleter);
-
-server_t *server_register(int fd, run_client_t runner, void *data);
-void server_delete(server_t **server);
-void server_release(server_t *server);
-
-static inline void server_none(server_t *server)
-{
-    ev_io_stop(global_loop, &server->io);
-}
-
-static inline void server_rw(server_t *server)
-{
-    ev_io_stop(global_loop, &server->io);
-    ev_io_set(&server->io, server->fd, EV_READ | EV_WRITE);
-    ev_io_start(global_loop, &server->io);
-}
-
-static inline void server_ro(server_t *server)
-{
-    ev_io_stop(global_loop, &server->io);
-    ev_io_set(&server->io, server->fd, EV_READ);
-    ev_io_start(global_loop, &server->io);
-}
+ssize_t client_read(client_t *client);
+buffer_t *client_input_buffer(client_t *client);
+buffer_t *client_output_buffer(client_t *client);
+void *client_data(client_t *client);
 
 int server_loop(start_client_t starter, delete_client_t deleter,
                 run_client_t runner, refresh_t refresh, void *config);

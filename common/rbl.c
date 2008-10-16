@@ -48,7 +48,7 @@ typedef struct rbl_context_t {
 ARRAY(rbl_context_t);
 
 static struct ub_ctx *ctx = NULL;
-static server_t *async_event = NULL;
+static client_t *async_event = NULL;
 static PA(rbl_context_t) ctx_pool = ARRAY_INIT;
 
 static rbl_context_t *rbl_context_new(void)
@@ -90,8 +90,7 @@ static void rbl_exit(void)
         ctx = NULL;
     }
     if (async_event != NULL) {
-        async_event->fd = -1;
-        server_release(async_event);
+        client_release(async_event);
         async_event = NULL;
     }
     array_deep_wipe(ctx_pool, rbl_context_delete);
@@ -121,15 +120,15 @@ static void rbl_callback(void *arg, int err, struct ub_result *result)
     rbl_context_release(context);
 }
 
-static int rbl_handler(server_t *event, void *config)
+static int rbl_handler(client_t *event, void *config)
 {
     int retval = 0;
     debug("rbl_handler called: ub_fd triggered");
-    server_none(event);
+    client_io_none(event);
     if ((retval = ub_process(ctx)) != 0) {
         err("error in DNS resolution: %s", ub_strerror(retval));
     }
-    server_ro(event);
+    client_io_ro(event);
     return 0;
 }
 
@@ -139,7 +138,7 @@ static inline bool rbl_dns_check(const char *hostname, rbl_result_t *result,
     if (ctx == NULL) {
         ctx = ub_ctx_create();
         ub_ctx_async(ctx, true);
-        if ((async_event = server_register(ub_fd(ctx), rbl_handler, NULL)) == NULL) {
+        if ((async_event = client_register(ub_fd(ctx), rbl_handler, NULL)) == NULL) {
             crit("cannot register asynchronous DNS event handler");
             abort();
         }

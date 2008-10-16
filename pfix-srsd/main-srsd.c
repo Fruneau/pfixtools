@@ -60,27 +60,12 @@ typedef struct srs_config_t {
 /* Server {{{1
  */
 
-static const char* const decoder_ptr = "decoder";
-static const char* const encoder_ptr = "encoder";
+static listener_t *decoder_ptr = NULL;
+static listener_t *encoder_ptr = NULL;
 
-static void *srsd_new_decoder(void)
+static void *srsd_starter(listener_t *server)
 {
-    return (void*)decoder_ptr;
-}
-
-static void *srsd_new_encoder(void)
-{
-    return (void*)encoder_ptr;
-}
-
-static void *srsd_starter(server_t *server)
-{
-    return server->data;
-}
-
-int start_listener(int port, bool decoder)
-{
-    return start_server(port, decoder ? srsd_new_decoder : srsd_new_encoder, NULL);
+    return server;
 }
 
 
@@ -107,74 +92,77 @@ void urldecode(char *s, char *end)
     *s++ = '\0';
 }
 
-int process_srs(server_t *srsd, void* vconfig)
+int process_srs(client_t *srsd, void* vconfig)
 {
     srs_config_t* config = vconfig;
-    int res = buffer_read(&srsd->ibuf, srsd->fd, -1);
+    buffer_t *ibuf = client_input_buffer(srsd);
+    buffer_t *obuf = client_output_buffer(srsd);
+    bool decoder = (client_data(srsd) == decoder_ptr);
+    int res = client_read(srsd);
 
     if ((res < 0 && errno != EINTR && errno != EAGAIN) || res == 0)
         return -1;
 
-    while (srsd->ibuf.len > 4) {
+    while (ibuf->len > 4) {
         char buf[BUFSIZ], *p, *q, *nl;
         int err;
 
-        nl = strchr(srsd->ibuf.data + 4, '\n');
+        nl = strchr(ibuf->data + 4, '\n');
         if (!nl) {
-            if (srsd->ibuf.len > BUFSIZ) {
+            if (ibuf->len > BUFSIZ) {
                 err("unreasonnable amount of data without a \\n");
                 return -1;
             }
-            if (srsd->obuf.len) {
-                server_rw(srsd);
+            if (obuf->len) {
+                client_io_rw(srsd);
             }
             return 0;
         }
 
-        if (strncmp("get ", srsd->ibuf.data, 4)) {
+        if (strncmp("get ", ibuf->data, 4)) {
 						err("bad request, not starting with \"get \"");
             return -1;
         }
 
-        for (p = srsd->ibuf.data + 4; p < nl && isspace(*p); p++);
+        for (p = ibuf->data + 4; p < nl && isspace(*p); p++);
         for (q = nl++; q >= p && isspace(*q); *q-- = '\0');
 
         if (p == q) {
-            buffer_addstr(&srsd->obuf, "400 empty request ???\n");
+            buffer_addstr(&*obuf, "400 empty request ???\n");
             warn("empty request");
             goto skip;
         }
 
         urldecode(p, q);
 
-        if (srsd->data == (void*)decoder_ptr) {
+        if (decoder) {
             err = srs_reverse(config->srs, buf, ssizeof(buf), p);
         } else {
             err = srs_forward(config->srs, buf, ssizeof(buf), p, config->domain);
         }
 
         if (err == 0) {
-            buffer_addstr(&srsd->obuf, "200 ");
-            buffer_addstr(&srsd->obuf, buf);
+            buffer_addstr(&*obuf, "200 ");
+            buffer_addstr(&*obuf, buf);
         } else {
             switch (SRS_ERROR_TYPE(err)) {
               case SRS_ERRTYPE_SRS:
               case SRS_ERRTYPE_SYNTAX:
-                buffer_addstr(&srsd->obuf, "500 ");
+                buffer_addstr(&*obuf, "500 ");
                 break;
               default:
-                buffer_addstr(&srsd->obuf, "400 ");
+                buffer_addstr(&*obuf, "400 ");
                 break;
             }
-            buffer_addstr(&srsd->obuf, srs_strerror(err));
+            buffer_addstr(obuf, srs_strerror(err));
         }
-        buffer_addch(&srsd->obuf, '\n');
+        buffer_addch(obuf, '\n');
 
       skip:
-        buffer_consume(&srsd->ibuf, nl - srsd->ibuf.data);
+        buffer_consume(ibuf, nl - ibuf->data);
     }
-    if (srsd->obuf.len) {
-        server_rw(srsd);
+    if (obuf->len) {
+        client_io_rw(srsd);
     }
     return 0;
 }
@@ -323,8 +311,8 @@ int main(int argc, char *argv[])
     if (!config.srs
         || common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP,
                         daemonize) != EXIT_SUCCESS
-        || start_listener(port_enc, false) < 0
-        || start_listener(port_dec, true) < 0) {
+        || (encoder_ptr = start_listener(port_enc)) == NULL
+        || (decoder_ptr = start_listener(port_dec)) == NULL) {
         return EXIT_FAILURE;
     }
     return server_loop(srsd_starter, NULL, process_srs, NULL, &config);
