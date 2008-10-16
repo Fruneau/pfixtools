@@ -3,6 +3,7 @@ Installation instruction for pfixtools
 1)  Install dependencies; you will need at least the following packages:
         gperf, libbz2-dev, libsrs2-dev, libunbound-dev, pkg-config
     Install tokyocabinet: http://tokyocabinet.sourceforge.net/
+    Install libev: http://software.schmorp.de/pkg/libev.html
 
 2)  Compile:
     $ make
