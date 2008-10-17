@@ -157,6 +157,7 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
                 return NULL;
             }
         } else {
+            unlink(tmppath);
             info("database cleanup finished: nothing to do, %u entries", new_count);
         }
     }
