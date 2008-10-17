@@ -176,8 +176,6 @@ static void client_cb(EV_P_ struct ev_io *w, int events)
 {
     client_t *server = (client_t*)w;
 
-    debug("Entering client_cb for %p, %d (%d | %d)", w, events, EV_WRITE, EV_READ);
-
     if (events & EV_WRITE && server->obuf.len) {
         if (buffer_write(&server->obuf, server->io.fd) < 0) {
             client_release(server);
@@ -319,9 +317,14 @@ module_exit(server_shutdown);
 
 static void refresh_cb(EV_P_ struct ev_signal *w, int event)
 {
+    log_state = "refreshing ";
     if (!gl_config_refresh(gl_config)) {
         ev_unloop(EV_A_ EVUNLOOP_ALL);
+        info("failed");
+    } else {
+        info("done");
     }
+    log_state = "";
 }
 
 static void exit_cb(EV_P_ struct ev_signal *w, int event)
@@ -351,6 +354,7 @@ int server_loop(start_client_t starter, delete_client_t deleter,
     ev_signal_init(&ev_sigterm, exit_cb, SIGTERM);
     ev_signal_start(gl_loop, &ev_sigterm);
 
+    log_state = "";
     info("entering processing loop");
     ev_loop(gl_loop, 0);
     info("exit requested");

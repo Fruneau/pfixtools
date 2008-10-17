@@ -41,9 +41,10 @@
 
 #include "common.h"
 
-bool daemon_process  = true;
-int  log_level       = LOG_INFO;
-bool log_syslog      = false;
+bool daemon_process   = true;
+int  log_level        = LOG_INFO;
+bool log_syslog       = false;
+const char *log_state = "";
 
 static FILE *pidfile = NULL;
 
@@ -293,8 +294,9 @@ void common_register_exit(exitcall_t exitcall)
 
 static void common_shutdown(void)
 {
+    log_state = "stopping ";
     if (daemon_process && log_syslog) {
-        info("stopping...");
+        info("");
     }
     pidfile_close();
     for (int i = array_len(__exit) - 1 ; i >= 0 ; --i) {
@@ -309,6 +311,7 @@ void common_init(void)
     if (__ran) {
         return;
     }
+    log_state = "starting ";
     if (atexit(common_shutdown)) {
         fputs("Cannot hook my atexit function, quitting !\n", stderr);
         abort();

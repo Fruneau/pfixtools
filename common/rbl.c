@@ -111,10 +111,7 @@ static void rbl_callback(void *arg, int err, struct ub_result *result)
         *context->result = RBL_FOUND;
     }
     if (context->call != NULL) {
-        debug("calling callback");
         context->call(context->result, context->data);
-    } else {
-        debug("no callback defined");
     }
     ub_resolve_free(result);
     rbl_context_release(context);

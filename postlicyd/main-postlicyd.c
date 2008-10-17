@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    info("starting %s v%s...", DAEMON_NAME, DAEMON_VERSION);
+    info("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     if (pidfile_open(pidfile) < 0) {
         crit("unable to write pidfile %s", pidfile);

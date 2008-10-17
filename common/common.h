@@ -94,14 +94,14 @@ void common_init(void);
   : (L) == LOG_ALERT   ? "alert "                                  \
   : "???   " )
 
-#define __log(Level, Fmt, ...)                                    \
-    if (log_level >= Level) {                                     \
-        if (log_syslog) {                                         \
-            syslog(Level, Fmt, ##__VA_ARGS__);                    \
-        } else {                                                  \
-            fprintf(stderr, "[%s] " Fmt "\n",                     \
-                    __level_name(Level), ##__VA_ARGS__);          \
-        }                                                         \
+#define __log(Level, Fmt, ...)                                     \
+    if (log_level >= Level) {                                      \
+        if (log_syslog) {                                          \
+            syslog(Level, "%s" Fmt, log_state, ##__VA_ARGS__);     \
+        } else {                                                   \
+            fprintf(stderr, "[%s] %s" Fmt "\n",                    \
+                    __level_name(Level), log_state, ##__VA_ARGS__);\
+        }                                                          \
     }
 
 #define debug(Fmt, ...)  __log(LOG_DEBUG,   Fmt, ##__VA_ARGS__)
@@ -118,6 +118,7 @@ void common_init(void);
 
 extern int          log_level;
 extern bool         log_syslog;
+extern const char  *log_state;
 
 void common_sighandler(int sig);
 

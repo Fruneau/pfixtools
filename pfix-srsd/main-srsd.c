@@ -304,7 +304,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    info("starting %s v%s...", DAEMON_NAME, DAEMON_VERSION);
+    info("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     config.domain = argv[optind];
     config.srs = srs_read_secrets(argv[optind + 1]);
