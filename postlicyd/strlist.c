@@ -119,6 +119,7 @@ static trie_t *strlist_create(const char *file, bool reverse, bool lock)
     file_map_t map;
     const char *p, *end;
     char line[BUFSIZ];
+    uint32_t count = 0;
 
     if (!file_map_open(&map, file, false)) {
         return NULL;
@@ -156,12 +157,14 @@ static trie_t *strlist_create(const char *file, bool reverse, bool lock)
             if (p < eos) {
                 strlist_copy(line, p, eos - p, reverse);
                 trie_insert(db, line);
+                ++count;
             }
         }
         p = eol + 1;
     }
     file_map_close(&map);
     trie_compile(db, lock);
+    info("%s loaded, %u entries", file, count);
     return db;
 }
 
@@ -241,6 +244,7 @@ static bool strlist_create_from_rhbl(const char *file, bool lock,
         trie_delete(&domains);
         *pdomains = NULL;
     }
+    info("rhbl %s loaded, %u hosts, %u domains", file, host_count, domain_count);
     return hosts != NULL || domains != NULL;
 
 }

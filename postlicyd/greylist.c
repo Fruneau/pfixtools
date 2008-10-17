@@ -105,7 +105,6 @@ static TCBDB *greylist_db_get(const greylist_config_t *config,
         char tmppath[PATH_MAX];
         snprintf(tmppath, PATH_MAX, "%s.tmp", path);
 
-        info("database cleanup started");
         awl_db = tcbdbnew();
         if (tcbdbopen(awl_db, path, BDBOREADER)) {
             tmp_db = tcbdbnew();
