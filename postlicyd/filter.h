@@ -262,16 +262,18 @@ bool filter_test(const filter_t *filter, const query_t *query,
         } else if (param->value_len == 1 && param->value[0] == '0') {          \
             (Dest) = false;                                                    \
         } else if (param->value_len == 4                                       \
-                   && ascii_tolower(param->value[0]) == 't') {                 \
-            (Dest) = ascii_tolower(param->value[1]) == 'r'                     \
-                  && ascii_tolower(param->value[2]) == 'u'                     \
-                  && ascii_tolower(param->value[3]) == 'e';                    \
+                   && ascii_tolower(param->value[0]) == 't'                    \
+                   && ascii_tolower(param->value[1]) == 'r'                    \
+                   && ascii_tolower(param->value[2]) == 'u'                    \
+                   && ascii_tolower(param->value[3]) == 'e') {                 \
+            (Dest) = true;                                                     \
         } else if (param->value_len == 5                                       \
-                   && ascii_tolower(param->value[0]) == 'f') {                 \
-            (Dest) = ascii_tolower(param->value[1]) == 'a'                     \
-                  && ascii_tolower(param->value[2]) == 'l'                     \
-                  && ascii_tolower(param->value[3]) == 's'                     \
-                  && ascii_tolower(param->value[4]) == 'e';                    \
+                   && ascii_tolower(param->value[0]) == 'f'                    \
+                   && ascii_tolower(param->value[1]) == 'a'                    \
+                   && ascii_tolower(param->value[2]) == 'l'                    \
+                   && ascii_tolower(param->value[3]) == 's'                    \
+                   && ascii_tolower(param->value[4]) == 'e') {                 \
+            (Dest) = false;                                                    \
         } else {                                                               \
             PARSE_CHECK(false, "invalid %s value %.*s", atokens[ATK_ ## Param],\
                         param->value_len, param->value);                       \
