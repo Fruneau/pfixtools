@@ -38,6 +38,17 @@
 #include "policy_tokens.h"
 #include "str.h"
 
+const char *smtp_state_names[SMTP_count] = {
+  "CONNECT",
+  "HELO",
+  "MAIL",
+  "RCPT",
+  "DATA",
+  "END-OF-MESSAGE",
+  "VRFY",
+  "ETRN",
+};
+
 bool query_parse(query_t *query, char *p)
 {
 #define PARSE_CHECK(expr, error, ...)                                        \
@@ -179,6 +190,12 @@ const char *query_field_for_id(const query_t *query, postlicyd_token id)
       CASE(ETRN_DOMAIN, etrn_domain)
       CASE(STRESS, stress)
 #undef CASE
+      case PTK_PROTOCOL_NAME:
+        return query->esmtp ? "ESMTP" : "SMTP";
+
+      case PTK_PROTOCOL_STATE:
+        return smtp_state_names[query->state];
+
       default: return NULL;
     }
 }

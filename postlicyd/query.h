@@ -55,6 +55,8 @@ enum smtp_state {
     SMTP_UNKNOWN,
 };
 
+extern const char *smtp_state_names[SMTP_count];
+
 /* \see http://www.postfix.org/SMTPD_POLICY_README.html */
 typedef struct query_t {
     unsigned state : 4;

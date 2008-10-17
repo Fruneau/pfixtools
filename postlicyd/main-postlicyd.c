@@ -126,53 +126,43 @@ static void policy_answer(client_t *pcy, const char *message)
 
 static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
                                    const query_t *query, const filter_hook_t *hook, bool *ok) {
+#define MESSAGE_FORMAT "request client=%s from=<%s> to=<%s> at %s: "
+#define MESSAGE_PARAMS query->client_name,                                          \
+                  query->sender == NULL ? "undefined" : query->sender,              \
+                  query->recipient == NULL ? "undefined" : query->recipient,        \
+                  smtp_state_names[query->state]
+
     if (hook != NULL) {
         query_context_t *context = client_data(pcy);
         if (hook->counter >= 0 && hook->counter < MAX_COUNTERS && hook->cost > 0) {
             context->context.counters[hook->counter] += hook->cost;
-            debug("request client=%s, from=<%s>, to=<%s>: added %d to counter %d (now %u)",
-                  query->client_name,
-                  query->sender == NULL ? "undefined" : query->sender,
-                  query->recipient == NULL ? "undefined" : query->recipient,
+            debug(MESSAGE_FORMAT "added %d to counter %d (now %u)", MESSAGE_PARAMS,
                   hook->cost, hook->counter, context->context.counters[hook->counter]);
         }
     }
     if (hook == NULL) {
-        warn("request client=%s, from=<%s>, to=<%s>: aborted",
-             query->client_name,
-             query->sender == NULL ? "undefined" : query->sender,
-             query->recipient == NULL ? "undefined" : query->recipient);
+        warn(MESSAGE_FORMAT "aborted", MESSAGE_PARAMS);
         *ok = false;
         return NULL;
     } else if (hook->async) {
-        debug("request client=%s, from=<%s>, to=<%s>: "
-              "asynchronous filter from filter %s",
-               query->client_name,
-               query->sender == NULL ? "undefined" : query->sender,
-               query->recipient == NULL ? "undefined" : query->recipient,
-               filter->name);
+        debug(MESSAGE_FORMAT "asynchronous filter from filter %s",
+              MESSAGE_PARAMS, filter->name);
         *ok = true;
         return NULL;
     } else if (hook->postfix) {
-        info("request client=%s, from=<%s>, to=<%s>: "
-             "awswer %s from filter %s: \"%s\"",
-             query->client_name,
-             query->sender == NULL ? "undefined" : query->sender,
-             query->recipient == NULL ? "undefined" : query->recipient,
+        info(MESSAGE_FORMAT "awswer %s from filter %s: \"%s\"", MESSAGE_PARAMS,
              htokens[hook->type], filter->name, hook->value);
         policy_answer(pcy, hook->value);
         *ok = true;
         return NULL;
     } else {
-        debug("request client=%s, from=<%s>, to=<%s>: "
-               "awswer %s from filter %s: next filter %s",
-               query->client_name,
-               query->sender == NULL ? "undefined" : query->sender,
-               query->recipient == NULL ? "undefined" : query->recipient,
-               htokens[hook->type], filter->name,
-               (array_ptr(config->filters, hook->filter_id))->name);
+        debug(MESSAGE_FORMAT "awswer %s from filter %s: next filter %s",
+              MESSAGE_PARAMS, htokens[hook->type], filter->name,
+              (array_ptr(config->filters, hook->filter_id))->name);
         return array_ptr(config->filters, hook->filter_id);
     }
+#undef MESSAGE_PARAMS
+#undef MESSAGE_FORMAT
 }
 
 static bool policy_process(client_t *pcy, const config_t *mconfig)
@@ -181,7 +171,7 @@ static bool policy_process(client_t *pcy, const config_t *mconfig)
     const query_t* query = &context->query;
     const filter_t *filter;
     if (mconfig->entry_points[query->state] == -1) {
-        warn("no filter defined for current protocol_state (%d)", query->state);
+        warn("no filter defined for current protocol_state (%s)", smtp_state_names[query->state]);
         return false;
     }
     if (context->context.current_filter != NULL) {
