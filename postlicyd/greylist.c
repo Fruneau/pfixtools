@@ -41,6 +41,8 @@
 
 typedef struct greylist_config_t {
     unsigned lookup_by_host : 1;
+    unsigned no_sender      : 1;
+    unsigned no_recipient   : 1;
     int delay;
     int retry_window;
     int client_awl;
@@ -51,6 +53,8 @@ typedef struct greylist_config_t {
 } greylist_config_t;
 
 #define GREYLIST_INIT { .lookup_by_host = false,       \
+                        .no_sender = false,            \
+                        .no_recipient = false,         \
                         .delay = 300,                  \
                         .retry_window = 2 * 24 * 3600, \
                         .client_awl = 5,               \
@@ -346,7 +350,8 @@ static bool try_greylist(const greylist_config_t *config,
      */
     klen = snprintf(key, sizeof(key), "%s/%s/%s",
                     c_net(config, c_addr, c_name, cnet, sizeof(cnet)),
-                    sender_normalize(sender, sbuf, sizeof(sbuf)), rcpt);
+                    config->no_sender ? "" : sender_normalize(sender, sbuf, sizeof(sbuf)),
+                    config->no_recipient ? "" : rcpt);
     klen = MIN(klen, ssizeof(key) - 1);
 
     res = tcbdbget3(config->obj_db, key, klen, &len);
@@ -434,6 +439,8 @@ static bool greylist_filter_constructor(filter_t *filter)
           FILTER_PARAM_PARSE_STRING(PATH,   path);
           FILTER_PARAM_PARSE_STRING(PREFIX, prefix);
           FILTER_PARAM_PARSE_BOOLEAN(LOOKUP_BY_HOST, config->lookup_by_host);
+          FILTER_PARAM_PARSE_BOOLEAN(NO_SENDER, config->no_sender);
+          FILTER_PARAM_PARSE_BOOLEAN(NO_RECIPIENT, config->no_recipient);
           FILTER_PARAM_PARSE_INT(RETRY_WINDOW, config->retry_window);
           FILTER_PARAM_PARSE_INT(CLIENT_AWL,   config->client_awl);
           FILTER_PARAM_PARSE_INT(DELAY,        config->delay);
@@ -463,8 +470,12 @@ static filter_result_t greylist_filter(const filter_t *filter,
                                        filter_context_t *context)
 {
     const greylist_config_t *config = filter->data;
-    if (query->state != SMTP_RCPT) {
-        warn("greylisting only works as smtpd_recipient_restrictions");
+    if (!config->no_recipient && query->state != SMTP_RCPT) {
+        warn("greylisting on recipient only works as smtpd_recipient_restrictions");
+        return HTK_ABORT;
+    }
+    if (!config->no_sender && query->state < SMTP_MAIL) {
+        warn("greylisting on sender must be performed after (or at) MAIL TO");
         return HTK_ABORT;
     }
 
@@ -488,6 +499,8 @@ static int greylist_init(void)
     /* Parameters.
      */
     (void)filter_param_register(type, "lookup_by_host");
+    (void)filter_param_register(type, "no_sender");
+    (void)filter_param_register(type, "no_recipient");
     (void)filter_param_register(type, "delay");
     (void)filter_param_register(type, "retry_window");
     (void)filter_param_register(type, "client_awl");
