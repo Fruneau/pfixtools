@@ -37,4 +37,6 @@ tst-trie_SOURCES = tst-trie.c lib.a
 
 all:
 
+.server.o: CFLAGS=$(if $(DARWIN),$(filter-out -Wredundant-decls,$(filter-out -Wshadow,$(CFLAGSBASE))),$(CFLAGSBASE))
+
 include ../mk/common.mk

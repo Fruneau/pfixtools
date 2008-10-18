@@ -37,50 +37,53 @@ ifneq ($(filter Darwin%,$(shell uname)),)
 endif
 
 # Use pipes and not temp files.
-CFLAGS += -pipe
+CFLAGSBASE += -pipe
 # optimize even more
-CFLAGS += -O2
+CFLAGSBASE += -O2
 # let the type char be unsigned by default
-CFLAGS += -funsigned-char
-CFLAGS += -fstrict-aliasing
+CFLAGSBASE += -funsigned-char
+CFLAGSBASE += -fstrict-aliasing
 # turn on all common warnings
-CFLAGS += -Wall
+CFLAGSBASE += -Wall
 # turn on extra warnings
-CFLAGS += $(if $(GCC4),-Wextra,-W)
+CFLAGSBASE += $(if $(GCC4),-Wextra,-W)
 # treat warnings as errors
-CFLAGS += -Werror
-CFLAGS += -Wchar-subscripts
+CFLAGSBASE += -Werror
+CFLAGSBASE += -Wchar-subscripts
 # warn about undefined preprocessor identifiers
-CFLAGS += -Wundef
+CFLAGSBASE += -Wundef
 # warn about local variable shadowing another local variable
 # # disabled on Darwin because of warnings in ev.h
-CFLAGS += $(if $(DARWIN),,-Wshadow)
+CFLAGSBASE += -Wshadow
 # warn about casting of pointers to increased alignment requirements
-CFLAGS += -Wcast-align
+CFLAGSBASE += -Wcast-align
 # make string constants const
-CFLAGS += -Wwrite-strings
+CFLAGSBASE += -Wwrite-strings
 # warn about implicit conversions with side effects
 # fgets, calloc and friends take an int, not size_t...
-#CFLAGS += -Wconversion
+#CFLAGSBASE += -Wconversion
 # warn about comparisons between signed and unsigned values
-CFLAGS += -Wsign-compare
+CFLAGSBASE += -Wsign-compare
 # warn about unused declared stuff
-CFLAGS += -Wunused
-CFLAGS += -Wno-unused-parameter
+CFLAGSBASE += -Wunused
+CFLAGSBASE += -Wno-unused-parameter
 # warn about variable use before initialization
-CFLAGS += -Wuninitialized
+CFLAGSBASE += -Wuninitialized
 # warn about variables which are initialized with themselves
-CFLAGS += $(if $(GCC4),-Winit-self)
+CFLAGSBASE += $(if $(GCC4),-Winit-self)
 # warn about pointer arithmetic on void* and function pointers
-CFLAGS += -Wpointer-arith
+CFLAGSBASE += -Wpointer-arith
 # warn about multiple declarations
 # #disabled on Darwin because of warnings in ev.h
-CFLAGS += $(if $(DARWIN),,-Wredundant-decls)
+CFLAGSBASE += -Wredundant-decls
 # warn if the format string is not a string literal
-CFLAGS += -Wformat-nonliteral
+CFLAGSBASE += -Wformat-nonliteral
 # do not warn about zero-length formats.
-CFLAGS += -Wno-format-zero-length
+CFLAGSBASE += -Wno-format-zero-length
 # do not warn about strftime format with y2k issues
-CFLAGS += -Wno-format-y2k
+CFLAGSBASE += -Wno-format-y2k
 # warn about functions without format attribute that should have one
-CFLAGS += -Wmissing-format-attribute
+CFLAGSBASE += -Wmissing-format-attribute
+
+CFLAGS=$(CFLAGSBASE)
+LDFLAGS=$(LDFLAGSBASE)
