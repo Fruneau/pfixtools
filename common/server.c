@@ -100,6 +100,8 @@ static void client_wipe(client_t *server)
     if (server->data && server->clear_data) {
         server->clear_data(&server->data);
     }
+    server->obuf.len = 0;
+    server->ibuf.len = 0;
     server->data = NULL;
     server->clear_data = NULL;
     server->run = NULL;
