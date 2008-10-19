@@ -42,7 +42,7 @@ CFLAGSBASE += -pipe
 CFLAGSBASE += -O2
 # let the type char be unsigned by default
 CFLAGSBASE += -funsigned-char
-CFLAGSBASE += -fstrict-aliasing
+CFLAGSBASE += -fno-strict-aliasing
 # turn on all common warnings
 CFLAGSBASE += -Wall
 # turn on extra warnings
