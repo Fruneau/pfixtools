@@ -456,6 +456,10 @@ static filter_result_t iplist_filter(const filter_t *filter, const query_t *quer
     bool  error = true;
 
     if (parse_ipv4(query->client_address, &end, &ip) != 0) {
+        if (strchr(query->client_address, ':')) {
+            /* iplist only works on IPv4 */
+            return HTK_FAIL;
+        }
         warn("invalid client address: %s, expected ipv4",
              query->client_address);
         return HTK_ERROR;
