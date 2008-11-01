@@ -46,6 +46,7 @@ postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c $
 postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev
 
 tst-rbl_SOURCES   = tst-rbl.c ../common/lib.a filter.c config.c query.c iplist.c $(GENERATED)
+tst-rbl_LIBADD    = $(UB_LIBS) -lev
 
 tst-filters_SOURCES = tst-filters.c ../common/lib.a config.c filter.c query.c $(FILTERS) $(GENERATED)
 tst-filters_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev
