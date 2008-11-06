@@ -1,3 +1,7 @@
+  * common:
+    FIX: fix build of the trie from an unsorted string list                FRU
+
+------------------------------------------------------------------------------
 version 0.4                                                       Oct 17, 2008
 
   * common:
