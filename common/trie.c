@@ -157,16 +157,29 @@ static inline uint32_t trie_add_leaf(trie_t *trie, const char *key)
 {
     trie_entry_t *entry;
     int len = m_strlen(key) + 1;
-    entry = array_ptr(trie->entries, trie_entry_new(trie));
+    int id  = trie_entry_new(trie);
+    entry = array_ptr(trie->entries, id);
     entry->c_offset = trie->c.len;
     entry->c_len    = len;
+#ifdef CHECK_INTEGRITY
+    for (int i = 0 ; i < len - 1 ; ++i) {
+        if (key[i] == '\0') {
+            printf("Found a '\\0' in the string of the leaf\n");
+            abort();
+        }
+    }
+    if (key[len - 1] != '\0') {
+      printf("Key does not end with a '\\0'");
+      abort();
+    }
+#endif
     array_append(trie->c, key, len);
     return trie->entries.len - 1;
 }
 
-static inline void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry,
-                                           uint32_t pchild)
+static inline void trie_entry_insert_child(trie_t *trie, uint32_t id, uint32_t pchild)
 {
+    trie_entry_t *entry = array_ptr(trie->entries, id);
     if (entry->children_len == 0) {
         entry->children_offset = pchild;
         entry->children_len    = 1;
@@ -180,16 +193,19 @@ static inline void trie_entry_insert_child(trie_t *trie, trie_entry_t *entry,
     }
 }
 
-static inline void trie_entry_split(trie_t *trie, trie_entry_t *entry, uint16_t pos)
+static inline void trie_entry_split(trie_t *trie, uint32_t id, uint16_t pos)
 {
     trie_entry_t *child;
+    trie_entry_t *entry;
     child    = array_ptr(trie->entries, trie_entry_new(trie));
+    entry    = array_ptr(trie->entries, id);
     if (pos == 0) {
         child->c_offset = entry->c_offset;
         child->c_len    = entry->c_len;
         entry->c_offset = 0;
         entry->c_len    = 0;
     } else {
+        assert(pos <= entry->c_len);
         child->c_offset = entry->c_offset + pos;
         child->c_len    = entry->c_len - pos;
         entry->c_len    = pos;
@@ -212,13 +228,18 @@ void trie_insert(trie_t *trie, const char* key)
 
 static inline void trie_compile_aux(trie_t *trie, uint32_t id,
                                     uint32_t first_key, uint32_t last_key,
-                                    int offset, int initial_diff)
+                                    int offset)
 {
     uint32_t forks[256];
     uint32_t fork_pos = 0;
     char current = '\0';
 
-    for (int off_diff = initial_diff ; fork_pos == 0 ; ++off_diff, ++offset) {
+#ifdef CHECK_INTEGRITY
+    assert(strcmp(array_ptr(trie->keys, array_elt(trie->keys_offset, first_key) + offset),
+                  array_ptr(trie->c, array_elt(trie->entries, id).c_offset)) == 0);
+#endif
+
+    for (int off_diff = 0 ; fork_pos == 0 ; ++off_diff, ++offset) {
         current = array_elt(trie->keys, array_elt(trie->keys_offset, first_key) + offset);
         for (uint32_t i = first_key + 1 ; i < last_key ; ++i) {
             const char *str = array_ptr(trie->keys, array_elt(trie->keys_offset, i));
@@ -226,10 +247,9 @@ static inline void trie_compile_aux(trie_t *trie, uint32_t id,
             if (c != current) {
                 array_ensure_capacity_delta(trie->entries, 2);
                 if (fork_pos == 0) {
-                    trie_entry_split(trie, array_ptr(trie->entries, id), off_diff);
+                    trie_entry_split(trie, id, off_diff);
                 }
-                trie_entry_insert_child(trie, array_ptr(trie->entries, id),
-                                        trie_add_leaf(trie, str + offset));
+                trie_entry_insert_child(trie, id, trie_add_leaf(trie, str + offset));
                 forks[fork_pos++] = i;
                 current = c;
             }
@@ -244,7 +264,7 @@ static inline void trie_compile_aux(trie_t *trie, uint32_t id,
     for (uint16_t i = 0 ; i < children_len ; ++i) {
         int child = array_elt(trie->entries, id).children_offset + i;
         if (forks[i] - 1 > first_key) {
-            trie_compile_aux(trie, child, first_key, forks[i], offset, 1);
+            trie_compile_aux(trie, child, first_key, forks[i], offset - 1);
         }
         first_key = forks[i];
     }
@@ -262,9 +282,9 @@ void trie_compile(trie_t *trie, bool memlock)
 #       include "qsort.c"
     }
 
-    array_ensure_capacity(trie->entries, trie->keys.len);
-    trie_compile_aux(trie, trie_add_leaf(trie, trie->keys.data),
-                     0, trie->keys_offset.len, 0, 0);
+    array_ensure_capacity(trie->entries, trie->keys_offset.len);
+    trie_compile_aux(trie, trie_add_leaf(trie, array_ptr(trie->keys, array_elt(trie->keys_offset, 0))),
+                     0, trie->keys_offset.len, 0);
     trie_cleanup_build_data(trie);
     array_adjust(trie->entries);
     array_adjust(trie->c);
@@ -375,7 +395,7 @@ static inline void trie_entry_inspect(const trie_t *trie, bool show_content,
             fputs("  ", stdout);
         }
         if (entry->c_len == 0) {
-            fputs("(nil)", stdout);
+            fputs("(0)", stdout);
         } else {
             const char *c = array_ptr(trie->c, entry->c_offset);
             printf("(%d) ", entry->c_len);

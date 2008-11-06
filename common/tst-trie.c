@@ -86,6 +86,51 @@ static trie_t *create_trie_from_file(const char *file)
     return db;
 }
 
+__attribute__((used))
+static void check_trie_with_file(const trie_t *db, const char *file)
+{
+    file_map_t map;
+    const char *p, *end;
+    char line[BUFSIZ];
+
+    if (!file_map_open(&map, file, false)) {
+        return;
+    }
+    p   = map.map;
+    end = map.end;
+    while (end > p && end[-1] != '\n') {
+        --end;
+    }
+    if (end != map.end) {
+        warn("file %s miss a final \\n, ignoring last line", file);
+    }
+
+    while (p < end && p != NULL) {
+        const char *eol = (char *)memchr(p, '\n', end - p);
+        if (eol == NULL) {
+            eol = end;
+        }
+        if (eol - p > BUFSIZ) {
+            p = eol - BUFSIZ;
+        }
+        int i = 0;
+#if 1
+        for (const char *s = eol - 1 ; s >= p ; --s) {
+            line[i++] = ascii_tolower(*s);
+        }
+#else
+        memcpy(line, p, eol - p);
+        i = eol - p;
+#endif
+        line[i] = '\0';
+        if (!trie_lookup(db, line)) {
+          warn("'%s' not found in the trie", line);
+        }
+        p = eol + 1;
+    }
+    file_map_close(&map);
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -131,6 +176,7 @@ int main(int argc, char *argv[])
     if (argc > 1) {
         trie = create_trie_from_file(argv[1]);
         trie_inspect(trie, false);
+        check_trie_with_file(trie, argv[1]);
         if (argc > 2) {
             const uint32_t how_many = 8 * 1000 * 1000;
             struct timeval start, end;
