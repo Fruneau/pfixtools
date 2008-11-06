@@ -23,7 +23,7 @@ encryption_keysize=256
 etrn_domain=
 stress=YEs
 
-match1=fail
+match1=match
 match2=fail
 hostnames1=fail
 hostnames2=hard_match
@@ -31,4 +31,4 @@ hostnames3=hard_match
 emails1=fail
 emails2=fail
 emails3=fail
-ips1=error
+ips1=fail

@@ -22,7 +22,7 @@ encryption_keysize=256
 etrn_domain=
 stress=yEs
 
-match1=fail
+match1=match
 match2=fail
 hostnames1=fail
 hostnames2=fail
