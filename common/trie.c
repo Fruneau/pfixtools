@@ -399,7 +399,7 @@ static inline void trie_entry_inspect(const trie_t *trie, bool show_content,
         if (entry->c_len == 0) {
             fputs("(0)", stdout);
         } else {
-            const char *c = array_ptr(trie->c, entry->c_offset);
+            const char *c = str(trie, entry);
             printf("(%d) ", entry->c_len);
             for (int i = 0 ; i < entry->c_len ; ++i) {
                 if (c[i]) {
@@ -411,9 +411,10 @@ static inline void trie_entry_inspect(const trie_t *trie, bool show_content,
         }
         fputs("\n", stdout);
     }
-    for (uint32_t i = entry->children_offset ;
-          i < entry->children_offset + entry->children_len ; ++i) {
-        trie_entry_inspect(trie, show_content, array_ptr(trie->entries, i), level + 1);
+    for (uint32_t i = 0 ; i < entry->children_len ; ++i) {
+        trie_entry_inspect(trie, show_content,
+                           array_ptr(trie->entries, entry->children_offset + i),
+                           level + 1);
     }
     if (level == 0) {
         printf("Average char per node: %d\n", trie->c.len / trie->entries.len);
