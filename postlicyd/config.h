@@ -71,6 +71,9 @@ __attribute__((nonnull(1)))
 config_t *config_read(const char *file);
 
 __attribute__((nonnull(1)))
+bool config_check(const char *file);
+
+__attribute__((nonnull(1)))
 bool config_reload(config_t *config);
 
 void config_delete(config_t **config);

@@ -113,70 +113,8 @@ static void config_exit()
 }
 module_exit(config_exit);
 
-static bool config_second_pass(config_t *config)
-{
-    bool ok = true;
-    if (config->filters.len > 0) {
-#       define QSORT_TYPE filter_t
-#       define QSORT_BASE config->filters.data
-#       define QSORT_NELT config->filters.len
-#       define QSORT_LT(a,b) strcmp(a->name, b->name) < 0
-#       include "qsort.c"
-    }
 
-    foreach (filter_t *filter, config->filters) {
-        if (!filter_update_references(filter, &config->filters)) {
-            ok = false;
-            break;
-        }
-    }}
-    if (!ok) {
-        return false;
-    }
-    if (!filter_check_safety(&config->filters)) {
-        return false;
-    }
-
-    ok = false;
-#define PARSE_CHECK(Expr, Fmt, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Fmt, ##__VA_ARGS__);                                               \
-        return false;                                                          \
-    }
-    foreach (filter_param_t *param, config->params) {
-        switch (param->type) {
-#define   CASE(Param, State)                                                   \
-            case ATK_ ## Param ## _FILTER:                                     \
-              ok = true;                                                       \
-              config->entry_points[SMTP_ ## State]                             \
-                  = filter_find_with_name(&config->filters, param->value);     \
-              PARSE_CHECK(config->entry_points[SMTP_ ## State] >= 0,           \
-                          "invalid filter name %s", param->value);             \
-              break;
-          CASE(CLIENT,      CONNECT)
-          CASE(EHLO,        EHLO)
-          CASE(HELO,        HELO)
-          CASE(SENDER,      MAIL)
-          CASE(RECIPIENT,   RCPT)
-          CASE(DATA,        DATA)
-          CASE(END_OF_DATA, END_OF_MESSAGE)
-          CASE(VERIFY,      VRFY)
-          CASE(ETRN,        ETRN)
-#undef    CASE
-          FILTER_PARAM_PARSE_INT(PORT, config->port);
-          default: break;
-        }
-    }}
-    array_deep_wipe(config->params, filter_params_wipe);
-
-    if (!ok) {
-        err("no entry point defined");
-    }
-
-    return ok;
-}
-
-static bool config_load(config_t *config)
+static bool config_parse(config_t *config)
 {
     filter_t filter;
     file_map_t map;
@@ -388,17 +326,11 @@ read_filter:
     }
     end_of_section = true;
     READ_NEXT;
-    if (!filter_build(&filter)) {
-        READ_ERROR("invalid filter %s", filter.name);
-    }
     array_add(config->filters, filter);
     filter_init(&filter);
     goto read_section;
 
 ok:
-    if (!config_second_pass(config)) {
-        goto error;
-    }
     file_map_close(&map);
     return true;
 
@@ -411,6 +343,95 @@ error:
     }
     file_map_close(&map);
     return false;
+}
+
+static bool config_build_structure(config_t *config)
+{
+    bool ok = true;
+    if (config->filters.len > 0) {
+#       define QSORT_TYPE filter_t
+#       define QSORT_BASE config->filters.data
+#       define QSORT_NELT config->filters.len
+#       define QSORT_LT(a,b) strcmp(a->name, b->name) < 0
+#       include "qsort.c"
+    }
+
+    foreach (filter_t *filter, config->filters) {
+        if (!filter_update_references(filter, &config->filters)) {
+            ok = false;
+            break;
+        }
+    }}
+    if (!ok) {
+        return false;
+    }
+    if (!filter_check_safety(&config->filters)) {
+        return false;
+    }
+
+    ok = false;
+#define PARSE_CHECK(Expr, Fmt, ...)                                            \
+    if (!(Expr)) {                                                             \
+        err(Fmt, ##__VA_ARGS__);                                               \
+        return false;                                                          \
+    }
+    foreach (filter_param_t *param, config->params) {
+        switch (param->type) {
+#define   CASE(Param, State)                                                   \
+            case ATK_ ## Param ## _FILTER:                                     \
+              ok = true;                                                       \
+              config->entry_points[SMTP_ ## State]                             \
+                  = filter_find_with_name(&config->filters, param->value);     \
+              PARSE_CHECK(config->entry_points[SMTP_ ## State] >= 0,           \
+                          "invalid filter name %s", param->value);             \
+              break;
+          CASE(CLIENT,      CONNECT)
+          CASE(EHLO,        EHLO)
+          CASE(HELO,        HELO)
+          CASE(SENDER,      MAIL)
+          CASE(RECIPIENT,   RCPT)
+          CASE(DATA,        DATA)
+          CASE(END_OF_DATA, END_OF_MESSAGE)
+          CASE(VERIFY,      VRFY)
+          CASE(ETRN,        ETRN)
+#undef    CASE
+          FILTER_PARAM_PARSE_INT(PORT, config->port);
+          default: break;
+        }
+    }}
+    array_deep_wipe(config->params, filter_params_wipe);
+
+    if (!ok) {
+        err("no entry point defined");
+    }
+    return ok;
+}
+
+static bool config_build_filters(config_t *config)
+{
+    foreach (filter_t *filter, config->filters) {
+        if (!filter_build(filter)) {
+            return false;
+        }
+    }}
+
+    return true;
+}
+
+static bool config_load(config_t *config) {
+    if (!config_parse(config)) {
+        err("Invalid configuration: cannot parse configuration file \"%s\"", config->filename);
+        return false;
+    }
+    if (!config_build_structure(config)) {
+        err("Invalid configuration: inconsistent filter structure");
+        return false;
+    }
+    if (!config_build_filters(config)) {
+        err("Invalid configuration: invalid filter");
+        return false;
+    }
+    return true;
 }
 
 bool config_reload(config_t *config)
@@ -427,4 +448,15 @@ config_t *config_read(const char *file)
         return NULL;
     }
     return config;
+}
+
+bool config_check(const char *file)
+{
+    config_t *config = config_new();
+    config->filename = file;
+
+    bool ret = config_parse(config) && config_build_structure(config);
+
+    config_delete(&config);
+    return ret;
 }

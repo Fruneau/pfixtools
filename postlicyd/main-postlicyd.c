@@ -283,6 +283,7 @@ void usage(void)
           "    -f           stay in foreground\n"
           "    -d           grow logging level\n"
           "    -u           unsafe mode (don't drop privileges)\n"
+          "    -c           check-conf\n"
          , stderr);
 }
 
@@ -295,8 +296,9 @@ int main(int argc, char *argv[])
     bool daemonize = true;
     int port = DEFAULT_PORT;
     bool port_from_cli = false;
+    bool check_conf = false;
 
-    for (int c = 0; (c = getopt(argc, argv, "ufd" "l:p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "ufdc" "l:p:")) >= 0; ) {
         switch (c) {
           case 'p':
             pidfile = optarg;
@@ -314,6 +316,11 @@ int main(int argc, char *argv[])
           case 'd':
             ++log_level;
             break;
+          case 'c':
+            check_conf = true;
+            daemonize  = false;
+            unsafe     = true;
+            break;
           default:
             usage();
             return EXIT_FAILURE;
@@ -330,6 +337,9 @@ int main(int argc, char *argv[])
     }
 
     info("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
+    if (check_conf) {
+        return config_check(argv[optind]) ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
 
     if (pidfile_open(pidfile) < 0) {
         crit("unable to write pidfile %s", pidfile);
