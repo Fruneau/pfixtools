@@ -43,7 +43,7 @@
 
 typedef A(char) buffer_t;
 
-#define BUFFER_INIT {NULL, 0, 0}
+#define BUFFER_INIT ARRAY_INIT
 
 DO_INIT(buffer_t, buffer);
 static inline void buffer_wipe(buffer_t *buf) {
