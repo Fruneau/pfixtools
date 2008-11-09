@@ -66,6 +66,7 @@ $(INSTALL_TARGETS): install-%: % install-dir
 install-postlicyd: install-postlicyd-tools install-postlicyd-conf
 install-dir:
 	install -d $(DESTDIR)$(prefix)/sbin
+	install -d $(DESTDIR)$(prefix)/bin
 	install -d $(DESTDIR)/etc/pfixtools
 
 install-postlicyd-tools:
