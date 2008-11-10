@@ -39,12 +39,26 @@
 #include "str.h"
 #include "rbl.h"
 #include "policy_tokens.h"
+#include "resources.h"
+
+typedef struct strlist_local_t {
+    char     *filename;
+    trie_t   **db;
+    int      weight;
+    unsigned reverse     :1;
+    unsigned partial     :1;
+} strlist_local_t;
+ARRAY(strlist_local_t)
+
+typedef struct strlist_resource_t {
+    off_t  size;
+    time_t mtime;
+    trie_t *trie1;
+    trie_t *trie2;
+} strlist_resource_t;
 
 typedef struct strlist_config_t {
-    PA(trie_t) tries;
-    A(int)     weights;
-    A(bool)    reverses;
-    A(bool)    partiales;
+    A(strlist_local_t) locals;
 
     A(char)     hosts;
     A(int)      host_offsets;
@@ -74,6 +88,21 @@ typedef struct strlist_async_data_t {
 static filter_type_t filter_type = FTK_UNKNOWN;
 
 
+static void strlist_local_wipe(strlist_local_t *entry)
+{
+    if (entry->filename != NULL) {
+        resource_release("strlist", entry->filename);
+        p_delete(&entry->filename);
+    }
+}
+
+static void strlist_resource_wipe(strlist_resource_t *res)
+{
+    trie_delete(&res->trie1);
+    trie_delete(&res->trie2);
+    p_delete(&res);
+}
+
 static strlist_config_t *strlist_config_new(void)
 {
     return p_new(strlist_config_t, 1);
@@ -82,10 +111,7 @@ static strlist_config_t *strlist_config_new(void)
 static void strlist_config_delete(strlist_config_t **config)
 {
     if (*config) {
-        array_deep_wipe((*config)->tries, trie_delete);
-        array_wipe((*config)->weights);
-        array_wipe((*config)->reverses);
-        array_wipe((*config)->partiales);
+        array_deep_wipe((*config)->locals, strlist_local_wipe);
         array_wipe((*config)->hosts);
         array_wipe((*config)->host_offsets);
         array_wipe((*config)->host_weights);
@@ -113,16 +139,17 @@ static inline void strlist_copy(char *dest, const char *str, ssize_t str_len,
 }
 
 
-static trie_t *strlist_create(const char *file, bool reverse, bool lock)
+static bool strlist_create(strlist_local_t *local,
+                           const char *file, int weight,
+                           bool reverse, bool partial, bool lock)
 {
-    trie_t *db;
     file_map_t map;
     const char *p, *end;
     char line[BUFSIZ];
     uint32_t count = 0;
 
     if (!file_map_open(&map, file, false)) {
-        return NULL;
+        return false;
     }
     p   = map.map;
     end = map.end;
@@ -134,7 +161,34 @@ static trie_t *strlist_create(const char *file, bool reverse, bool lock)
              file);
     }
 
-    db = trie_new();
+    strlist_resource_t *res = resource_get("strlist", file);
+    if (res == NULL) {
+        res = p_new(strlist_resource_t, 1);
+        resource_set("strlist", file, res, (resource_destructor_t)strlist_resource_wipe);
+    } else if (res->trie2 != NULL) {
+        err("A file (%s) cannot be used as a rbldns zone file and a strlist file at the same time",
+            file);
+        resource_release("strlist", file);
+        file_map_close(&map);
+        return false;
+    }
+
+    p_clear(local, 1);
+    local->filename = m_strdup(file);
+    local->db      = &res->trie1;
+    local->weight  = weight;
+    local->reverse = reverse;
+    local->partial = partial;
+    if (res->size == map.st.st_size && res->mtime == map.st.st_mtime) {
+        info("strlist %s up to date", file);
+        file_map_close(&map);
+        return true;
+    }
+    trie_delete(&res->trie1);
+    res->trie1 = trie_new();
+    res->size  = map.st.st_size;
+    res->mtime = map.st.st_mtime;
+
     while (p < end && p != NULL) {
         const char *eol = (char *)memchr(p, '\n', end - p);
         if (eol == NULL) {
@@ -143,8 +197,9 @@ static trie_t *strlist_create(const char *file, bool reverse, bool lock)
         if (eol - p >= BUFSIZ) {
             err("unreasonnable long line");
             file_map_close(&map);
-            trie_delete(&db);
-            return NULL;
+            trie_delete(&res->trie1);
+            strlist_local_wipe(local);
+            return false;
         }
         if (*p != '#') {
             const char *eos = eol;
@@ -156,22 +211,21 @@ static trie_t *strlist_create(const char *file, bool reverse, bool lock)
             }
             if (p < eos) {
                 strlist_copy(line, p, eos - p, reverse);
-                trie_insert(db, line);
+                trie_insert(res->trie1, line);
                 ++count;
             }
         }
         p = eol + 1;
     }
     file_map_close(&map);
-    trie_compile(db, lock);
+    trie_compile(res->trie1, lock);
     info("%s loaded, %u entries", file, count);
-    return db;
+    return true;
 }
 
-static bool strlist_create_from_rhbl(const char *file, bool lock,
-                                     trie_t **phosts, trie_t **pdomains)
+static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *domains,
+                                     const char *file, int weight, bool lock)
 {
-    trie_t *hosts, *domains;
     uint32_t host_count, domain_count;
     file_map_t map;
     const char *p, *end;
@@ -190,10 +244,47 @@ static bool strlist_create_from_rhbl(const char *file, bool lock,
              file);
     }
 
-    hosts = trie_new();
+
+    strlist_resource_t *res = resource_get("strlist", file);
+    if (res == NULL) {
+        res = p_new(strlist_resource_t, 1);
+        resource_set("strlist", file, res, (resource_destructor_t)strlist_resource_wipe);
+    } else if (res->trie2 == NULL) {
+        err("A file (%s) cannot be used as a rbldns zone file and a strlist file at the same time",
+            file);
+        resource_release("strlist", file);
+        file_map_close(&map);
+        return false;
+    }
+
+    p_clear(hosts, 1);
+    hosts->filename = m_strdup(file);
+    hosts->db = &res->trie1;
+    hosts->weight = weight;
+    hosts->reverse    = true;
     host_count = 0;
-    domains = trie_new();
+
+    p_clear(domains, 1);
+    /* don't set filename */
+    domains->db = &res->trie2;
+    domains->weight = weight;
+    domains->reverse      = true;
+    domains->partial      = true;
     domain_count = 0;
+
+    if (map.st.st_size == res->size && map.st.st_mtime == res->mtime) {
+        info("rbldns %s up to date", file);
+        file_map_close(&map);
+        return true;
+    }
+
+    trie_delete(&res->trie1);
+    trie_delete(&res->trie2);
+    res->trie1 = trie_new();
+    res->trie2 = trie_new();
+    res->size  = map.st.st_size;
+    res->mtime = map.st.st_mtime;
+
     while (p < end && p != NULL) {
         const char *eol = (char *)memchr(p, '\n', end - p);
         if (eol == NULL) {
@@ -202,8 +293,9 @@ static bool strlist_create_from_rhbl(const char *file, bool lock,
         if (eol - p >= BUFSIZ) {
             err("unreasonnable long line");
             file_map_close(&map);
-            trie_delete(&hosts);
-            trie_delete(&domains);
+            trie_delete(&res->trie1);
+            trie_delete(&res->trie2);
+            strlist_local_wipe(hosts);
             return false;
         }
         if (*p != '#') {
@@ -217,12 +309,12 @@ static bool strlist_create_from_rhbl(const char *file, bool lock,
             if (p < eos) {
                 if (isalnum(*p)) {
                     strlist_copy(line, p, eos - p, true);
-                    trie_insert(hosts, line);
+                    trie_insert(res->trie1, line);
                     ++host_count;
                 } else if (*p == '*') {
                     ++p;
                     strlist_copy(line, p, eos - p, true);
-                    trie_insert(domains, line);
+                    trie_insert(res->trie2, line);
                     ++domain_count;
                 }
             }
@@ -231,22 +323,21 @@ static bool strlist_create_from_rhbl(const char *file, bool lock,
     }
     file_map_close(&map);
     if (host_count > 0) {
-        trie_compile(hosts, lock);
-        *phosts = hosts;
+        trie_compile(res->trie1, lock);
     } else {
-        trie_delete(&hosts);
-        *phosts = NULL;
+        trie_delete(&res->trie1);
     }
     if (domain_count > 0) {
-        trie_compile(domains, lock);
-        *pdomains = domains;
+        trie_compile(res->trie2, lock);
     } else {
-        trie_delete(&domains);
-        *pdomains = NULL;
+        trie_delete(&res->trie2);
     }
     info("rhbl %s loaded, %u hosts, %u domains", file, host_count, domain_count);
-    return hosts != NULL || domains != NULL;
-
+    if (res->trie1 == NULL && res->trie2 == NULL) {
+        strlist_local_wipe(hosts);
+        return false;
+    }
+    return true;
 }
 
 
@@ -282,7 +373,6 @@ static bool strlist_filter_constructor(filter_t *filter)
             int  weight = 0;
             bool reverse = false;
             bool partial = false;
-            trie_t *trie = NULL;
             const char *current = param->value;
             const char *p = m_strchrnul(param->value, ':');
             char *next = NULL;
@@ -325,15 +415,13 @@ static bool strlist_filter_constructor(filter_t *filter)
                                 (int)(p - current), current);
                     break;
 
-                  case 3:
-                    trie = strlist_create(current, reverse, lock);
-                    PARSE_CHECK(trie != NULL,
+                  case 3: {
+                    strlist_local_t entry;
+                    PARSE_CHECK(strlist_create(&entry, current, weight,
+                                               reverse, partial, lock),
                                 "cannot load string list from %s", current);
-                    array_add(config->tries, trie);
-                    array_add(config->weights, weight);
-                    array_add(config->reverses, reverse);
-                    array_add(config->partiales, partial);
-                    break;
+                    array_add(config->locals, entry);
+                  } break;
                 }
                 if (i != 3) {
                     current = p + 1;
@@ -354,8 +442,6 @@ static bool strlist_filter_constructor(filter_t *filter)
           case ATK_RBLDNS: {
             bool lock = false;
             int  weight = 0;
-            trie_t *trie_hosts   = NULL;
-            trie_t *trie_domains = NULL;
             const char *current = param->value;
             const char *p = m_strchrnul(param->value, ':');
             char *next = NULL;
@@ -382,24 +468,19 @@ static bool strlist_filter_constructor(filter_t *filter)
                                 (int)(p - current), current);
                     break;
 
-                  case 2:
-                    PARSE_CHECK(strlist_create_from_rhbl(current, lock,
-                                                         &trie_hosts, &trie_domains),
+                  case 2: {
+                    strlist_local_t trie_hosts, trie_domains;
+                    PARSE_CHECK(strlist_create_from_rhbl(&trie_hosts, &trie_domains,
+                                                         current, weight, lock),
                                 "cannot load string list from rhbl %s", current);
-                    if (trie_hosts != NULL) {
-                        array_add(config->tries, trie_hosts);
-                        array_add(config->weights, weight);
-                        array_add(config->reverses, true);
-                        array_add(config->partiales, false);
+                    if (trie_hosts.db != NULL) {
+                        array_add(config->locals, trie_hosts);
                     }
-                    if (trie_domains != NULL) {
-                        array_add(config->tries, trie_domains);
-                        array_add(config->weights, weight);
-                        array_add(config->reverses, true);
-                        array_add(config->partiales, true);
+                    if (trie_domains.db != NULL) {
+                        array_add(config->locals, trie_domains);
                     }
                     config->is_hostname = true;
-                    break;
+                  } break;
                 }
                 if (i != 2) {
                     current = p + 1;
@@ -500,7 +581,7 @@ static bool strlist_filter_constructor(filter_t *filter)
 
     PARSE_CHECK(config->is_email != config->is_hostname,
                 "matched field MUST be emails XOR hostnames");
-    PARSE_CHECK(config->tries.len || config->host_offsets.len,
+    PARSE_CHECK(config->locals.len || config->host_offsets.len,
                 "no file parameter in the filter %s", filter->name);
     filter->data = config;
     return true;
@@ -603,20 +684,18 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
         const int len = m_strlen(query->Field);                                \
         strlist_copy(normal, query->Field, len, false);                        \
         strlist_copy(reverse, query->Field, len, true);                        \
-        for (uint32_t i = 0 ; i < config->tries.len ; ++i) {                   \
-            const int weight   = array_elt(config->weights, i);                \
-            const trie_t *trie = array_elt(config->tries, i);                  \
-            const bool rev     = array_elt(config->reverses, i);               \
-            const bool part    = array_elt(config->partiales, i);              \
-            if ((!part && trie_lookup(trie, rev ? reverse : normal))           \
-                || (part && trie_prefix(trie, rev ? reverse : normal))) {      \
-                async->sum += weight;                                          \
+        foreach (strlist_local_t *entry, config->locals) {                     \
+            if ((!entry->partial && trie_lookup(*(entry->db),                  \
+                                      entry->reverse ? reverse : normal))      \
+                || (entry->partial && trie_prefix(*(entry->db),                \
+                                                  entry->reverse ? reverse : normal))) {      \
+                async->sum += entry->weight;                                   \
                 if (async->sum >= (uint32_t)config->hard_threshold) {          \
                     return HTK_HARD_MATCH;                                     \
                 }                                                              \
             }                                                                  \
             async->error = false;                                              \
-        }                                                                      \
+        }}                                                                     \
     }
 #define DNS(Flag, Field)                                                       \
     if (config->match_ ## Flag) {                                              \

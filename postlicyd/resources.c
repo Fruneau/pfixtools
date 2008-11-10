@@ -123,14 +123,19 @@ void resource_garbage_collect(void)
     uint32_t used = 0;
     foreach (resource_t *res, resources) {
         if (res->key != NULL && res->refcount == 0) {
+            debug("resource gc: %s not referenced anymore", res->key);
             resource_wipe(res);
         } else if (res->key != NULL) {
+            debug("resource gc: keeping %s, still %d references",
+                  res->key, res->refcount);
             if (used < __Ai) {
                 array_elt(resources, used) = *res;
             }
             ++used;
         }
     }}
+    debug("resource gc: before %d resources, after %d",
+          array_len(resources), used);
     array_len(resources) = used;
 }
 

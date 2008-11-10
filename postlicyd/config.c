@@ -36,6 +36,7 @@
 #include "file.h"
 #include "config.h"
 #include "str.h"
+#include "resources.h"
 
 #define config_param_register(Param)
 
@@ -132,7 +133,6 @@ static bool config_parse(config_t *config)
         return false;
     }
 
-    config_close(config);
     filter_init(&filter);
     linep = p = map.map;
 
@@ -419,6 +419,8 @@ static bool config_build_filters(config_t *config)
 }
 
 static bool config_load(config_t *config) {
+    config_close(config);
+
     if (!config_parse(config)) {
         err("Invalid configuration: cannot parse configuration file \"%s\"", config->filename);
         return false;
@@ -431,6 +433,8 @@ static bool config_load(config_t *config) {
         err("Invalid configuration: invalid filter");
         return false;
     }
+
+    resource_garbage_collect();
     return true;
 }
 

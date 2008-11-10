@@ -58,7 +58,6 @@ void file_map_delete(file_map_t **map)
 
 bool file_map_open(file_map_t *map, const char *file, bool memlock)
 {
-    struct stat st;
     int fd;
 
     fd = open(file, O_RDONLY, 0000);
@@ -67,13 +66,13 @@ bool file_map_open(file_map_t *map, const char *file, bool memlock)
         return false;
     }
 
-    if (fstat(fd, &st) < 0) {
+    if (fstat(fd, &map->st) < 0) {
         UNIXERR("fstat");
         close(fd);
         return false;
     }
 
-    map->map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    map->map = mmap(NULL, map->st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (map->map == MAP_FAILED) {
         UNIXERR("mmap");
         close(fd);
@@ -82,8 +81,8 @@ bool file_map_open(file_map_t *map, const char *file, bool memlock)
     }
     close(fd);
 
-    map->end = map->map + st.st_size;
-    map->locked = memlock && mlock(map->map, st.st_size) == 0;
+    map->end = map->map + map->st.st_size;
+    map->locked = memlock && mlock(map->map, map->st.st_size) == 0;
     return true;
 }
 

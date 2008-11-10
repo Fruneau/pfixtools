@@ -42,6 +42,8 @@
  */
 
 typedef struct file_map_t {
+    struct stat st;
+
     const char *map;
     const char *end;
 

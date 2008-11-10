@@ -43,6 +43,7 @@
 #include "str.h"
 #include "file.h"
 #include "array.h"
+#include "resources.h"
 #include "rbl.h"
 
 #define IPv4_BITS        5
@@ -62,9 +63,24 @@ enum {
 };
 
 struct rbldb_t {
-    A(uint16_t) ips[1 << 16];
+    char        *filename;
+    A(uint16_t) *ips;
 };
 ARRAY(rbldb_t)
+
+typedef struct rbldb_resource_t {
+    time_t mtime;
+    off_t  size;
+    A(uint16_t) ips[1 << 16];
+} rbldb_resource_t;
+
+static void rbldb_resource_wipe(rbldb_resource_t *res)
+{
+    for (int i = 0 ; i < 1 << 16 ; ++i) {
+        array_wipe(res->ips[i]);
+    }
+    p_delete(&res);
+}
 
 static int get_o(const char *s, const char **out)
 {
@@ -129,6 +145,25 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         return NULL;
     }
 
+    rbldb_resource_t *res = resource_get("iplist", file);
+    if (res == NULL) {
+        debug("No resource found");
+        res = p_new(rbldb_resource_t, 1);
+        resource_set("iplist", file, res, (resource_destructor_t)rbldb_resource_wipe);
+    }
+
+    db = p_new(rbldb_t, 1);
+    db->filename = m_strdup(file);
+    db->ips = res->ips;
+    if (map.st.st_size == res->size && map.st.st_mtime == res->mtime) {
+        info("rbl %s up to date", file);
+        file_map_close(&map);
+        return db;
+    }
+    debug("mtime %d/%d, size %d/%d", (int)map.st.st_mtime, (int)res->mtime, (int)map.st.st_size, (int)res->size);
+    res->size  = map.st.st_size;
+    res->mtime = map.st.st_mtime;
+
     p   = map.map;
     end = map.end;
     while (end > p && end[-1] != '\n') {
@@ -139,7 +174,6 @@ rbldb_t *rbldb_create(const char *file, bool lock)
              file);
     }
 
-    db = p_new(rbldb_t, 1);
     while (p < end) {
         uint32_t ip;
 
@@ -149,7 +183,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         if (parse_ipv4(p, &p, &ip) < 0) {
             p = (char *)memchr(p, '\n', end - p) + 1;
         } else {
-            array_add(db->ips[ip >> 16], ip & 0xffff);
+            array_add(res->ips[ip >> 16], ip & 0xffff);
             ++ips;
         }
     }
@@ -158,14 +192,14 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     /* Lookup may perform serveral I/O, so avoid swap.
      */
     for (int i = 0 ; i < 1 << 16 ; ++i) {
-        array_adjust(db->ips[i]);
-        if (lock && !array_lock(db->ips[i])) {
+        array_adjust(res->ips[i]);
+        if (lock && !array_lock(res->ips[i])) {
             UNIXERR("mlock");
         }
-        if (db->ips[i].len) {
+        if (res->ips[i].len) {
 #       define QSORT_TYPE uint16_t
-#       define QSORT_BASE db->ips[i].data
-#       define QSORT_NELT db->ips[i].len
+#       define QSORT_BASE res->ips[i].data
+#       define QSORT_NELT res->ips[i].len
 #       define QSORT_LT(a,b) *a < *b
 #       include "qsort.c"
         }
@@ -177,9 +211,9 @@ rbldb_t *rbldb_create(const char *file, bool lock)
 
 static void rbldb_wipe(rbldb_t *db)
 {
-    for (int i = 0 ; i < 1 << 16 ; ++i) {
-        array_wipe(db->ips[i]);
-    }
+    resource_release("iplist", db->filename);
+    p_delete(&db->filename);
+    db->ips = NULL;
 }
 
 void rbldb_delete(rbldb_t **db)
