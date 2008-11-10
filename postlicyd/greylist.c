@@ -516,6 +516,7 @@ static bool greylist_filter_constructor(filter_t *filter)
           FILTER_PARAM_PARSE_INT(CLIENT_AWL,   config->client_awl);
           FILTER_PARAM_PARSE_INT(DELAY,        config->delay);
           FILTER_PARAM_PARSE_INT(MAX_AGE,      config->max_age);
+          FILTER_PARAM_PARSE_INT(CLEANUP_PERIOD, config->cleanup_period);
 
           default: break;
         }
@@ -576,6 +577,7 @@ static int greylist_init(void)
     (void)filter_param_register(type, "retry_window");
     (void)filter_param_register(type, "client_awl");
     (void)filter_param_register(type, "max_age");
+    (void)filter_param_register(type, "cleanup_period");
     (void)filter_param_register(type, "path");
     (void)filter_param_register(type, "prefix");
     return 0;
