@@ -4,6 +4,7 @@
   * postlicyd:
     NEW: 'check-configuration' option                                      FRU
     NEW: add 'cleanup_period' parameter to the greylister                  FRU
+    NEW: add 'log_format' global configuration variable                    FRU
     CHA: reload ip/string lists only if needed                             FRU
 
 
