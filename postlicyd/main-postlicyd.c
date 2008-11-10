@@ -83,7 +83,10 @@ static bool config_refresh(void *mconfig)
     if (filter_running > 0) {
         return true;
     }
+    log_state = "refreshing ";
+    info("reloading configuration");
     bool ret = config_reload(mconfig);
+    log_state = "";
     foreach (client_t **server, busy) {
         client_io_ro(*server);
     }}

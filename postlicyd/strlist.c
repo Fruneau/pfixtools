@@ -147,6 +147,7 @@ static bool strlist_create(strlist_local_t *local,
     const char *p, *end;
     char line[BUFSIZ];
     uint32_t count = 0;
+    time_t now = time(0);
 
     if (!file_map_open(&map, file, false)) {
         return false;
@@ -157,8 +158,7 @@ static bool strlist_create(strlist_local_t *local,
         --end;
     }
     if (end != map.end) {
-        warn("file %s miss a final \\n, ignoring last line",
-             file);
+        warn("%s: final \\n missing, ignoring last line", file);
     }
 
     strlist_resource_t *res = resource_get("strlist", file);
@@ -166,8 +166,7 @@ static bool strlist_create(strlist_local_t *local,
         res = p_new(strlist_resource_t, 1);
         resource_set("strlist", file, res, (resource_destructor_t)strlist_resource_wipe);
     } else if (res->trie2 != NULL) {
-        err("A file (%s) cannot be used as a rbldns zone file and a strlist file at the same time",
-            file);
+        err("%s not loaded: the file is already used as a rbldns zone file", file);
         resource_release("strlist", file);
         file_map_close(&map);
         return false;
@@ -180,7 +179,7 @@ static bool strlist_create(strlist_local_t *local,
     local->reverse = reverse;
     local->partial = partial;
     if (res->size == map.st.st_size && res->mtime == map.st.st_mtime) {
-        info("strlist %s up to date", file);
+        info("%s loaded: already up-to-date", file);
         file_map_close(&map);
         return true;
     }
@@ -195,7 +194,7 @@ static bool strlist_create(strlist_local_t *local,
             eol = end;
         }
         if (eol - p >= BUFSIZ) {
-            err("unreasonnable long line");
+            err("%s not loaded: unreasonnable long line", file);
             file_map_close(&map);
             trie_delete(&res->trie1);
             strlist_local_wipe(local);
@@ -219,7 +218,7 @@ static bool strlist_create(strlist_local_t *local,
     }
     file_map_close(&map);
     trie_compile(res->trie1, lock);
-    info("%s loaded, %u entries", file, count);
+    info("%s loaded: done in %us, %u entries", file, (uint32_t)(time(0) - now), count);
     return true;
 }
 
@@ -230,6 +229,7 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
     file_map_t map;
     const char *p, *end;
     char line[BUFSIZ];
+    time_t now = time(0);
 
     if (!file_map_open(&map, file, false)) {
         return false;
@@ -240,8 +240,7 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
         --end;
     }
     if (end != map.end) {
-        warn("file %s miss a final \\n, ignoring last line",
-             file);
+        warn("%s: final \\n missing, ignoring last line", file);
     }
 
 
@@ -250,8 +249,7 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
         res = p_new(strlist_resource_t, 1);
         resource_set("strlist", file, res, (resource_destructor_t)strlist_resource_wipe);
     } else if (res->trie2 == NULL) {
-        err("A file (%s) cannot be used as a rbldns zone file and a strlist file at the same time",
-            file);
+        err("%s not loaded: the file is already used as a strlist-file parameter", file);
         resource_release("strlist", file);
         file_map_close(&map);
         return false;
@@ -273,7 +271,7 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
     domain_count = 0;
 
     if (map.st.st_size == res->size && map.st.st_mtime == res->mtime) {
-        info("rbldns %s up to date", file);
+        info("%s loaded: already up-to-date", file);
         file_map_close(&map);
         return true;
     }
@@ -291,7 +289,7 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
             eol = end;
         }
         if (eol - p >= BUFSIZ) {
-            err("unreasonnable long line");
+            err("%s not loaded: unreasonnable long line", file);
             file_map_close(&map);
             trie_delete(&res->trie1);
             trie_delete(&res->trie2);
@@ -332,11 +330,13 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
     } else {
         trie_delete(&res->trie2);
     }
-    info("rhbl %s loaded, %u hosts, %u domains", file, host_count, domain_count);
     if (res->trie1 == NULL && res->trie2 == NULL) {
+        err("%s not loaded: no data found", file);
         strlist_local_wipe(hosts);
         return false;
     }
+    info("%s loaded: done in %us, %u hosts, %u domains", file,
+         (uint32_t)(time(0) - now), host_count, domain_count);
     return true;
 }
 

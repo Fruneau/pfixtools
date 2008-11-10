@@ -151,7 +151,7 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
         }
     }
     if (!greylist_db_need_cleanup(config, awl_db) || config->max_age <= 0) {
-        info("no cleanup needed");
+        info("%s loaded: no cleanup needed", path);
         res->db = awl_db;
         return &res->db;
     } else {
@@ -193,7 +193,6 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
                         }
                         ++old_count;
                     } while (tcbdbcurnext(cur));
-                    now = time(0);
                     tcbdbput(tmp_db, "@@cleanup@@", strlen("@@cleanup@@"), &now, sizeof(now));
                 }
                 tcxstrdel(key);
@@ -215,11 +214,11 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
         /** Cleanup successful, replace the old database with the new one.
          */
         if (trashable) {
-            info("database cleanup finished: database was corrupted, create a new one");
+            info("%s cleanup: database was corrupted, create a new one", path);
             unlink(path);
         } else if (replace) {
-            info("database cleanup finished: before %u entries, after %d entries",
-                   old_count, new_count);
+            info("%s cleanup: done in %us, before %u, after %u entries",
+                 path, (uint32_t)(time(0) - now), old_count, new_count);
             unlink(path);
             if (rename(tmppath, path) != 0) {
                 UNIXERR("rename");
@@ -228,7 +227,8 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
             }
         } else {
             unlink(tmppath);
-            info("database cleanup finished: nothing to do, %u entries", new_count);
+            info("%s cleanup: done in %us, nothing to do, %u entries",
+                 path, (uint32_t)(time(0) - now), old_count);
         }
     }
 
@@ -243,6 +243,7 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
         return NULL;
     }
 
+    info("%s loaded", path);
     res->db = awl_db;
     return &res->db;
 }
@@ -255,7 +256,6 @@ static bool greylist_initialize(greylist_config_t *config,
 
     if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        info("loading auto-whitelist database");
         config->awl_db = greylist_db_get(config, path,
                                          sizeof(struct awl_entry),
                                          (db_entry_checker_t)(greylist_check_awlentry));
@@ -266,7 +266,6 @@ static bool greylist_initialize(greylist_config_t *config,
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    info("loading greylist database");
     config->obj_db = greylist_db_get(config, path,
                                      sizeof(struct obj_entry),
                                      (db_entry_checker_t)(greylist_check_object));

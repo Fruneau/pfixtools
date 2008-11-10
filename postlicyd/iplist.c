@@ -140,6 +140,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     file_map_t map;
     const char *p, *end;
     uint32_t ips = 0;
+    time_t now = time(0);
 
     if (!file_map_open(&map, file, false)) {
         return NULL;
@@ -147,7 +148,6 @@ rbldb_t *rbldb_create(const char *file, bool lock)
 
     rbldb_resource_t *res = resource_get("iplist", file);
     if (res == NULL) {
-        debug("No resource found");
         res = p_new(rbldb_resource_t, 1);
         resource_set("iplist", file, res, (resource_destructor_t)rbldb_resource_wipe);
     }
@@ -156,11 +156,10 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     db->filename = m_strdup(file);
     db->ips = res->ips;
     if (map.st.st_size == res->size && map.st.st_mtime == res->mtime) {
-        info("rbl %s up to date", file);
+        info("%s loaded: already up-to-date", file);
         file_map_close(&map);
         return db;
     }
-    debug("mtime %d/%d, size %d/%d", (int)map.st.st_mtime, (int)res->mtime, (int)map.st.st_size, (int)res->size);
     res->size  = map.st.st_size;
     res->mtime = map.st.st_mtime;
 
@@ -170,8 +169,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         --end;
     }
     if (end != map.end) {
-        warn("file %s miss a final \\n, ignoring last line",
-             file);
+        warn("%s: final \\n missing, ignoring last line", file);
     }
 
     while (p < end) {
@@ -205,7 +203,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         }
     }
 
-    info("rbl %s loaded, %d IPs", file, ips);
+    info("%s loaded: done in %us, %u IPs", file, (uint32_t)(time(0) - now), ips);
     return db;
 }
 
