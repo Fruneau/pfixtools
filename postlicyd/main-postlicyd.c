@@ -336,10 +336,10 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    info("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
     if (check_conf) {
         return config_check(argv[optind]) ? EXIT_SUCCESS : EXIT_FAILURE;
     }
+    info("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     if (pidfile_open(pidfile) < 0) {
         crit("unable to write pidfile %s", pidfile);

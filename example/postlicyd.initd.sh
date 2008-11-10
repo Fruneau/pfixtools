@@ -14,7 +14,7 @@ CONF=/etc/pfixtools/postlicyd.conf
 mkdir -p `dirname "$PIDFILE"` || die "Can't create $PIDFILE"
 
 do_checkconf() {
-  $POSTLICYD -c "$CONF" &> /dev/null
+  $POSTLICYD -c "$CONF"
   return "$?"
 }
 
