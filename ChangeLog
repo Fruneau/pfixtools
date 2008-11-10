@@ -3,6 +3,9 @@
 
   * postlicyd:
     NEW: 'check-configuration' option                                      FRU
+    NEW: add 'cleanup_period' parameter to the greylister                  FRU
+    CHA: reload ip/string lists only if needed                             FRU
+
 
 ------------------------------------------------------------------------------
 version 0.4                                                       Oct 17, 2008
