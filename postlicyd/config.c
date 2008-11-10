@@ -79,6 +79,12 @@ config_param_register("verify_filter");
 config_param_register("port");
 
 
+/* Format of the log message.
+ * The message exact format is $log: "reply"
+ */
+config_param_register("log_format");
+
+
 static config_t *global_config = NULL;
 
 static inline config_t *config_new(void)
@@ -95,6 +101,7 @@ static void config_close(config_t *config)
     }
     array_deep_wipe(config->filters, filter_wipe);
     array_deep_wipe(config->params, filter_params_wipe);
+    p_delete(&config->log_format);
 }
 
 void config_delete(config_t **config)
@@ -396,10 +403,16 @@ static bool config_build_structure(config_t *config)
           CASE(ETRN,        ETRN)
 #undef    CASE
           FILTER_PARAM_PARSE_INT(PORT, config->port);
+          FILTER_PARAM_PARSE_STRING(LOG_FORMAT, config->log_format, true);
           default: break;
         }
     }}
     array_deep_wipe(config->params, filter_params_wipe);
+
+    if (config->log_format && !query_format_check(config->log_format)) {
+        err("invalid log format: \"%s\"", config->log_format);
+        return false;
+    }
 
     if (!ok) {
         err("no entry point defined");

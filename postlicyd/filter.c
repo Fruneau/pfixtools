@@ -324,7 +324,7 @@ bool filter_add_hook(filter_t *filter, const char *name, int name_len,
         hook.cost    = 0;
     }
     hook.postfix = (strncmp(value, "postfix:", 8) == 0);
-    if (hook.postfix && query_format(NULL, 0, value + 8, NULL) == -1) {
+    if (hook.postfix && !query_format_check(value + 8)) {
         err("invalid formatted text \"%s\"", value + 8);
         return false;
     }

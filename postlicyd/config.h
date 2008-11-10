@@ -65,7 +65,15 @@ struct config_t {
      * The parameter from CLI override the parameter from configuration file.
      */
     uint16_t port;
+
+    /* Log message.
+     */
+    char *log_format;
 };
+
+#define DEFAULT_LOG_FORMAT                                                     \
+    "request client=${client_name}[${client_address}] from=<${sender}> "       \
+    "to=<${recipient}> at ${protocol_state}"
 
 __attribute__((nonnull(1)))
 config_t *config_read(const char *file);

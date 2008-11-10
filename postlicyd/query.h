@@ -39,6 +39,7 @@
 
 #include "mem.h"
 #include "common.h"
+#include "buffer.h"
 #include "policy_tokens.h"
 
 enum smtp_state {
@@ -121,5 +122,14 @@ const char *query_field_for_id(const query_t *query, postlicyd_token id);
  */
 __attribute__((nonnull(3)))
 ssize_t query_format(char *dest, size_t len, const char* fmt, const query_t *query);
+
+/** Writes a query-formated string in a buffer.
+ */
+__attribute__((nonnull(1,2)))
+bool query_format_buffer(buffer_t *buf, const char *fmt, const query_t *query);
+
+/** Check the query-format string.
+ */
+#define query_format_check(fmt) (query_format(NULL, 0, fmt, NULL) >= 0)
 
 #endif

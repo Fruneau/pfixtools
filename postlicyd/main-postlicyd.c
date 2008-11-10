@@ -103,21 +103,8 @@ static void policy_answer(client_t *pcy, const char *message)
 
     /* Write reply "action=ACTION [text]" */
     buffer_addstr(buf, "action=");
-    buffer_ensure(buf, m_strlen(message) + 64);
-
-    ssize_t size = array_size(*buf) - array_len(*buf);
-    ssize_t format_size = query_format(array_ptr(*buf, array_len(*buf)),
-                                       size, message, query);
-    if (format_size == -1) {
+    if (!query_format_buffer(buf, message, query)) {
         buffer_addstr(buf, message);
-    } else if (format_size > size) {
-        buffer_ensure(buf, format_size + 1);
-        query_format(array_ptr(*buf, array_len(*buf)),
-                     array_size(*buf) - array_len(*buf),
-                     message, query);
-        array_len(*buf) += format_size;
-    } else {
-        array_len(*buf) += format_size;
     }
     buffer_addstr(buf, "\n\n");
 
@@ -129,43 +116,49 @@ static void policy_answer(client_t *pcy, const char *message)
 
 static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
                                    const query_t *query, const filter_hook_t *hook, bool *ok) {
-#define MESSAGE_FORMAT "request client=%s from=<%s> to=<%s> at %s: "
-#define MESSAGE_PARAMS query->client_name,                                          \
-                  query->sender == NULL ? "undefined" : query->sender,              \
-                  query->recipient == NULL ? "undefined" : query->recipient,        \
-                  smtp_state_names[query->state]
+    char log_prefix[BUFSIZ];
+    log_prefix[0] = '\0';
+
+#define log_reply(Level, Msg, ...)                                             \
+    if (log_level >= LOG_ ## Level) {                                          \
+        if (log_prefix[0] == '\0') {                                           \
+            query_format(log_prefix, BUFSIZ,                                   \
+                         config->log_format && config->log_format[0] ?         \
+                            config->log_format : DEFAULT_LOG_FORMAT, query);   \
+        }                                                                      \
+        __log(LOG_ ## Level, "%s: " Msg, log_prefix, ##__VA_ARGS__);           \
+    }
 
     if (hook != NULL) {
         query_context_t *context = client_data(pcy);
         if (hook->counter >= 0 && hook->counter < MAX_COUNTERS && hook->cost > 0) {
             context->context.counters[hook->counter] += hook->cost;
-            debug(MESSAGE_FORMAT "added %d to counter %d (now %u)", MESSAGE_PARAMS,
-                  hook->cost, hook->counter, context->context.counters[hook->counter]);
+            log_reply(DEBUG, "added %d to counter %d (now %u)",
+                      hook->cost, hook->counter,
+                      context->context.counters[hook->counter]);
         }
     }
     if (hook == NULL) {
-        warn(MESSAGE_FORMAT "aborted", MESSAGE_PARAMS);
+        log_reply(WARNING, "aborted");
         *ok = false;
         return NULL;
     } else if (hook->async) {
-        debug(MESSAGE_FORMAT "asynchronous filter from filter %s",
-              MESSAGE_PARAMS, filter->name);
+        log_reply(WARNING, "asynchronous filter from filter %s", filter->name);
         *ok = true;
         return NULL;
     } else if (hook->postfix) {
-        info(MESSAGE_FORMAT "awswer %s from filter %s: \"%s\"", MESSAGE_PARAMS,
-             htokens[hook->type], filter->name, hook->value);
+        log_reply(INFO, "awswer %s from filter %s: \"%s\"",
+                  htokens[hook->type], filter->name, hook->value);
         policy_answer(pcy, hook->value);
         *ok = true;
         return NULL;
     } else {
-        debug(MESSAGE_FORMAT "awswer %s from filter %s: next filter %s",
-              MESSAGE_PARAMS, htokens[hook->type], filter->name,
-              (array_ptr(config->filters, hook->filter_id))->name);
+        log_reply(DEBUG,  "awswer %s from filter %s: next filter %s",
+                  htokens[hook->type], filter->name,
+                  (array_ptr(config->filters, hook->filter_id))->name);
         return array_ptr(config->filters, hook->filter_id);
     }
-#undef MESSAGE_PARAMS
-#undef MESSAGE_FORMAT
+#undef log_reply
 }
 
 static bool policy_process(client_t *pcy, const config_t *mconfig)

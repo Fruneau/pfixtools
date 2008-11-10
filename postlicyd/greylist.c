@@ -506,8 +506,8 @@ static bool greylist_filter_constructor(filter_t *filter)
 
     foreach (filter_param_t *param, filter->params) {
         switch (param->type) {
-          FILTER_PARAM_PARSE_STRING(PATH,   path);
-          FILTER_PARAM_PARSE_STRING(PREFIX, prefix);
+          FILTER_PARAM_PARSE_STRING(PATH,   path, false);
+          FILTER_PARAM_PARSE_STRING(PREFIX, prefix, false);
           FILTER_PARAM_PARSE_BOOLEAN(LOOKUP_BY_HOST, config->lookup_by_host);
           FILTER_PARAM_PARSE_BOOLEAN(NO_SENDER, config->no_sender);
           FILTER_PARAM_PARSE_BOOLEAN(NO_RECIPIENT, config->no_recipient);

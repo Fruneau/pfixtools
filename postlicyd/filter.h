@@ -242,9 +242,9 @@ bool filter_test(const filter_t *filter, const query_t *query,
 /* Parsing Helpers
  */
 
-#define FILTER_PARAM_PARSE_STRING(Param, Dest)                                 \
+#define FILTER_PARAM_PARSE_STRING(Param, Dest, Copy)                           \
     case ATK_ ## Param: {                                                      \
-        (Dest) = param->value;                                                 \
+        (Dest) = (Copy) ? m_strdup(param->value) : param->value;               \
     } break
 
 #define FILTER_PARAM_PARSE_INT(Param, Dest)                                    \

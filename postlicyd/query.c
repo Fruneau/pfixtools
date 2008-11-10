@@ -259,3 +259,24 @@ ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *que
     }
     return pos;
 }
+
+bool query_format_buffer(buffer_t *buf, const char *fmt, const query_t *query)
+{
+    buffer_ensure(buf, m_strlen(fmt) + 64);
+
+    ssize_t size = array_free_space(*buf);
+    ssize_t format_size = query_format(array_end(*buf),
+                                       size, fmt, query);
+    if (format_size == -1) {
+        return false;
+    } else if (format_size > size) {
+        buffer_ensure(buf, format_size + 1);
+        query_format(array_end(*buf),
+                     array_free_space(*buf),
+                     fmt, query);
+        array_len(*buf) += format_size;
+    } else {
+        array_len(*buf) += format_size;
+    }
+    return true;
+}
