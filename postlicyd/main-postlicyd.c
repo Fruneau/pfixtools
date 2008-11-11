@@ -44,7 +44,7 @@
 #include "query.h"
 
 #define DAEMON_NAME             "postlicyd"
-#define DAEMON_VERSION          "0.4"
+#define DAEMON_VERSION          "0.5"
 #define DEFAULT_PORT            10000
 #define RUNAS_USER              "nobody"
 #define RUNAS_GROUP             "nogroup"
