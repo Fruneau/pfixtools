@@ -88,18 +88,30 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    static const char *format = "${sender} ${recipient} and ${client_name}[${client_address}] at ${protocol_state}";
-
-    time_t now = time(0);
-
-    char str[BUFSIZ];
-    static const int iterations = 10000000;
-    for (int i = 0 ; i < iterations ; ++i) {
-        query_format(str, BUFSIZ, format, &q);
+    static const int iterations = 50000000;
+    {
+      static const char *format = "${sender} ${recipient} and ${client_name}[${client_address}] at ${protocol_state}";
+      time_t now = time(0);
+      char str[BUFSIZ];
+      for (int i = 0 ; i < iterations ; ++i) {
+          query_format(str, BUFSIZ, format, &q);
+      }
+      time_t ellapsed = time(0) - now;
+      printf("Done %d iterations in %us (%d format per second)\n", iterations,
+             (uint32_t)ellapsed, (int)(iterations / ellapsed));
     }
 
-    time_t ellapsed = time(0) - now;
-    printf("Done %d iterations in %us (%d format per second)\n", iterations,
-           (uint32_t)ellapsed, (int)(iterations / ellapsed));
+    {
+      time_t now = time(0);
+      char str[BUFSIZ];
+      for (int i = 0 ; i < iterations ; ++i) {
+          snprintf(str, BUFSIZ, "%s %s and %s[%s] at %s",
+                   q.sender.str, q.recipient.str, q.client_name.str, q.client_address.str,
+                   smtp_state_names[q.state].str);
+      }
+      time_t ellapsed = time(0) - now;
+      printf("Done %d iterations in %us (%d format per second)\n", iterations,
+             (uint32_t)ellapsed, (int)(iterations / ellapsed));
+    }
     return 0;
 }
