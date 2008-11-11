@@ -681,9 +681,9 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
     }
 #define LOOKUP(Flag, Field)                                                    \
     if (config->match_ ## Flag) {                                              \
-        const int len = m_strlen(query->Field);                                \
-        strlist_copy(normal, query->Field, len, false);                        \
-        strlist_copy(reverse, query->Field, len, true);                        \
+        const int len = query->Field.len;                                      \
+        strlist_copy(normal, query->Field.str, len, false);                    \
+        strlist_copy(reverse, query->Field.str, len, true);                    \
         foreach (strlist_local_t *entry, config->locals) {                     \
             if ((!entry->partial && trie_lookup(*(entry->db),                  \
                                       entry->reverse ? reverse : normal))      \
@@ -699,8 +699,8 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
     }
 #define DNS(Flag, Field)                                                       \
     if (config->match_ ## Flag) {                                              \
-        const int len = m_strlen(query->Field);                                \
-        strlist_copy(normal, query->Field, len, false);                        \
+        const int len = query->Field.len;                                      \
+        strlist_copy(normal, query->Field.str, len, false);                    \
         for (uint32_t i = 0 ; len > 0 && i < config->host_offsets.len ; ++i) { \
             const char *rbl = array_ptr(config->hosts,                         \
                                         array_elt(config->host_offsets, i));   \

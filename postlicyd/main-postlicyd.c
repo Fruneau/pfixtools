@@ -167,7 +167,7 @@ static bool policy_process(client_t *pcy, const config_t *mconfig)
     const query_t* query = &context->query;
     const filter_t *filter;
     if (mconfig->entry_points[query->state] == -1) {
-        warn("no filter defined for current protocol_state (%s)", smtp_state_names[query->state]);
+        warn("no filter defined for current protocol_state (%s)", smtp_state_names[query->state].str);
         return false;
     }
     if (context->context.current_filter != NULL) {
@@ -225,9 +225,10 @@ static int policy_run(client_t *pcy, void* vconfig)
     query->eoq = eoq + strlen("\n\n");
 
     /* The instance changed => reset the static context */
-    if (query->instance == NULL || strcmp(context->context.instance, query->instance) != 0) {
+    if (query->instance.str == NULL || query->instance.len == 0
+        || strcmp(context->context.instance, query->instance.str) != 0) {
         filter_context_clean(&context->context);
-        m_strcat(context->context.instance, 64, query->instance);
+        m_strcat(context->context.instance, 64, query->instance.str);
     }
     client_io_none(pcy);
     return policy_process(pcy, mconfig) ? 0 : -1;

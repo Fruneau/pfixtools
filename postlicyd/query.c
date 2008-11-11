@@ -38,16 +38,19 @@
 #include "policy_tokens.h"
 #include "str.h"
 
-const char *smtp_state_names[SMTP_count] = {
-  "CONNECT",
-  "HELO",
-  "MAIL",
-  "RCPT",
-  "DATA",
-  "END-OF-MESSAGE",
-  "VRFY",
-  "ETRN",
+const static_str_t smtp_state_names[SMTP_count] = {
+  { "CONNECT", 7 },
+  { "HELO", 4 },
+  { "MAIL", 4 },
+  { "RCPT", 4 },
+  { "DATA", 4 },
+  { "END-OF-MESSAGE", 14 },
+  { "VRFY", 4 },
+  { "ETRN", 4 },
 };
+
+static const static_str_t static_ESMTP = { "ESMTP", 5 };
+static const static_str_t static_SMTP  = { "SMTP",  4 };
 
 bool query_parse(query_t *query, char *p)
 {
@@ -81,7 +84,7 @@ bool query_parse(query_t *query, char *p)
 
         vtk = policy_tokenize(v, vlen);
         switch (policy_tokenize(k, klen)) {
-#define CASE(up, low)  case PTK_##up: query->low = v; v[vlen] = '\0';  break;
+#define CASE(up, low)  case PTK_##up: query->low.str = v; query->low.len = vlen; v[vlen] = '\0';  break;
             CASE(HELO_NAME,           helo_name);
             CASE(QUEUE_ID,            queue_id);
             CASE(RECIPIENT_COUNT,     recipient_count);
@@ -104,20 +107,27 @@ bool query_parse(query_t *query, char *p)
 #undef CASE
 
           case PTK_SENDER:
-            query->sender = v;
+            query->sender.str = v;
+            query->sender.len = vlen;
             v[vlen] = '\0';
-            query->sender_domain = memchr(query->sender, '@', vlen);
-            if (query->sender_domain != NULL) {
-                ++query->sender_domain;
+            query->sender_domain.str = memchr(query->sender.str, '@', vlen);
+            if (query->sender_domain.str != NULL) {
+                ++query->sender_domain.str;
+                query->sender_domain.len = query->sender.len
+                                         - (query->sender_domain.str - query->sender.str);
             }
             break;
 
           case PTK_RECIPIENT:
-            query->recipient = v;
+            query->recipient.str = v;
+            query->recipient.len = vlen;
             v[vlen] = '\0';
-            query->recipient_domain = memchr(query->recipient, '@', vlen);
-            if (query->recipient_domain != NULL) {
-                ++query->recipient_domain;
+            query->recipient_domain.str = memchr(query->recipient.str, '@', vlen);
+            if (query->recipient_domain.str != NULL) {
+                ++query->recipient_domain.str;
+                query->recipient_domain.len = query->recipient.len
+                                         - (query->recipient_domain.str - query->recipient.str);
+
             }
             break;
 
@@ -161,11 +171,11 @@ bool query_parse(query_t *query, char *p)
 #undef PARSE_CHECK
 }
 
-const char *query_field_for_id(const query_t *query, postlicyd_token id)
+const static_str_t *query_field_for_id(const query_t *query, postlicyd_token id)
 {
     switch (id) {
 #define CASE(Up, Low)                                                          \
-      case PTK_ ## Up: return query->Low;
+      case PTK_ ## Up: return &query->Low;
       CASE(HELO_NAME, helo_name)
       CASE(QUEUE_ID, queue_id)
       CASE(SENDER, sender)
@@ -191,16 +201,16 @@ const char *query_field_for_id(const query_t *query, postlicyd_token id)
       CASE(STRESS, stress)
 #undef CASE
       case PTK_PROTOCOL_NAME:
-        return query->esmtp ? "ESMTP" : "SMTP";
+        return query->esmtp ? &static_ESMTP : &static_SMTP;
 
       case PTK_PROTOCOL_STATE:
-        return smtp_state_names[query->state];
+        return &smtp_state_names[query->state];
 
       default: return NULL;
     }
 }
 
-const char *query_field_for_name(const query_t *query, const char *name)
+const static_str_t *query_field_for_name(const query_t *query, const char *name)
 {
     postlicyd_token id = policy_tokenize(name, strlen(name));
     if (id == PTK_UNKNOWN) {
@@ -214,7 +224,6 @@ ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *que
 {
     size_t written = 0;
     size_t pos = 0;
-    const char *end = fmt + m_strlen(fmt);
 
 #define WRITE(Src, Len)                                                        \
     do {                                                                       \
@@ -227,9 +236,12 @@ ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *que
         pos += __len;                                                          \
     } while (0)
     while (*fmt != '\0') {
-        const char *next_format = strstr(fmt, "${");
+        const char *next_format = strchr(fmt, '$');
+        while (next_format != NULL && next_format[1] != '{') {
+            next_format = strchr(next_format + 1, '$');
+        }
         if (next_format == NULL) {
-            next_format = end;
+            next_format = fmt + m_strlen(fmt);
         }
         WRITE(fmt, next_format - fmt);
         fmt = next_format;
@@ -244,11 +256,12 @@ ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *que
             if (tok == PTK_UNKNOWN) {
                 warn("unknown field name \"%.*s\"", (int)(next_format - fmt), fmt);
             }
-            const char *field = query == NULL ? NULL : query_field_for_id(query, tok);
+            const static_str_t *field = query == NULL ? NULL
+                                                      : query_field_for_id(query, tok);
             if (field == NULL) {
                 WRITE("(null)", 6);
             } else {
-                WRITE(field, m_strlen(field));
+                WRITE(field->str, field->len);
             }
             fmt = next_format + 1;
         }

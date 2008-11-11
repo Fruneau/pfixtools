@@ -49,8 +49,7 @@ typedef struct match_condition_t {
         MATCH_EMPTY,
     } condition;
 
-    char *value;
-    ssize_t value_len;
+    static_str_t value;
 } match_condition_t;
 ARRAY(match_condition_t)
 
@@ -63,7 +62,7 @@ static const char *condition_names[] = {
   "is empty"
 };
 
-#define CONDITION_INIT { PTK_UNKNOWN, false, MATCH_UNKNOWN, NULL, 0 }
+#define CONDITION_INIT { PTK_UNKNOWN, false, MATCH_UNKNOWN, { NULL, 0 } }
 
 typedef struct match_config_t {
     A(match_condition_t) conditions;
@@ -77,8 +76,10 @@ static match_config_t *match_config_new(void)
 
 static inline void match_condition_wipe(match_condition_t *condition)
 {
-    p_delete(&condition->value);
-    condition->value_len = 0;
+    char *str = (char*)condition->value.str;
+    p_delete(&str);
+    condition->value.str = NULL;
+    condition->value.len = 0;
 }
 
 static void match_config_delete(match_config_t **config)
@@ -157,8 +158,8 @@ static bool match_filter_constructor(filter_t *filter)
             if (condition.condition != MATCH_EMPTY) {
                 p = skipspaces(n + 1);
                 PARSE_CHECK(*p, "no value defined to check the condition");
-                condition.value_len = param->value_len - (p - param->value);
-                condition.value     = p_dupstr(p, condition.value_len);
+                condition.value.len = param->value_len - (p - param->value);
+                condition.value.str = p_dupstr(p, condition.value.len);
             }
             array_add(config->conditions, condition);
           } break;
@@ -182,50 +183,50 @@ static void match_filter_destructor(filter_t *filter)
 
 static inline bool match_condition(const match_condition_t *cond, const query_t *query)
 {
-    const char *field = query_field_for_id(query, cond->field);
+    const static_str_t *field = query_field_for_id(query, cond->field);
     debug("running condition: \"%s\" %s %s\"%s\"",
-          field, condition_names[cond->condition],
+          field->str, condition_names[cond->condition],
           cond->case_sensitive ? "" : "(alternative) ",
-          cond->value ? cond->value : "(none)");
+          cond->value.str ? cond->value.str : "(none)");
     switch (cond->condition) {
       case MATCH_EQUAL:
       case MATCH_DIFFER:
-        if (field == NULL) {
+        if (field == NULL || field->str == NULL) {
             return cond->condition != MATCH_DIFFER;
         }
         if (cond->case_sensitive) {
-            return !!((strcmp(field, cond->value) == 0)
+            return !!((strcmp(field->str, cond->value.str) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         } else {
-            return !!((ascii_strcasecmp(field, cond->value) == 0)
+            return !!((ascii_strcasecmp(field->str, cond->value.str) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         }
         break;
 
       case MATCH_CONTAINS:
-        if (field == NULL) {
+        if (field == NULL || field->str == NULL) {
             return false;
         }
         if (cond->case_sensitive) {
-            return strstr(field, cond->value);
+            return strstr(field->str, cond->value.str);
         } else {
-            return m_stristrn(field, cond->value, cond->value_len);
+            return m_stristrn(field->str, cond->value.str, cond->value.len);
         }
         break;
 
       case MATCH_CONTAINED:
-        if (field == NULL) {
+        if (field == NULL || field->str == NULL) {
             return false;
         }
         if (cond->case_sensitive) {
-            return strstr(cond->value, field);
+            return strstr(cond->value.str, field->str);
         } else {
-            return m_stristr(cond->value, field);
+            return m_stristr(cond->value.str, field->str);
         }
         break;
 
       case MATCH_EMPTY:
-        return !!((field == NULL || *field == '\0') ^ (!cond->case_sensitive));
+        return !!((field == NULL || field->len == 0) ^ (!cond->case_sensitive));
 
       default:
         assert(false && "invalid condition type");

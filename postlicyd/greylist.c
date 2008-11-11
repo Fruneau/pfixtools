@@ -39,6 +39,7 @@
 #include "str.h"
 #include "resources.h"
 
+static const static_str_t static_cleanup = { "@@cleanup@@", 11 };
 
 typedef struct greylist_config_t {
     unsigned lookup_by_host : 1;
@@ -113,7 +114,7 @@ static inline bool greylist_db_need_cleanup(const greylist_config_t *config, TCB
 {
     int len = 0;
     time_t now = time(NULL);
-    const time_t *last_cleanup = tcbdbget3(db, "@@cleanup@@", strlen("@@cleanup@@"), &len);
+    const time_t *last_cleanup = tcbdbget3(db, static_cleanup.str, static_cleanup.len, &len);
     if (last_cleanup == NULL) {
         debug("No last cleanup time");
     } else {
@@ -193,7 +194,7 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
                         }
                         ++old_count;
                     } while (tcbdbcurnext(cur));
-                    tcbdbput(tmp_db, "@@cleanup@@", strlen("@@cleanup@@"), &now, sizeof(now));
+                    tcbdbput(tmp_db, static_cleanup.str, static_cleanup.len, &now, sizeof(now));
                 }
                 tcxstrdel(key);
                 tcxstrdel(value);
@@ -364,15 +365,15 @@ static const char *c_net(const greylist_config_t *config,
 
 
 static bool try_greylist(const greylist_config_t *config,
-                         const char *sender, const char *c_addr,
-                         const char *c_name, const char *rcpt)
+                         const static_str_t *sender, const static_str_t *c_addr,
+                         const static_str_t *c_name, const static_str_t *rcpt)
 {
 #define INCR_AWL                                              \
     aent.count++;                                             \
     aent.last = now;                                          \
     debug("whitelist entry for %.*s updated, count %d",       \
-          c_addrlen, c_addr, aent.count);                     \
-    tcbdbput(awl_db, c_addr, c_addrlen, &aent, sizeof(aent));
+          c_addr->len, c_addr->str, aent.count);                     \
+    tcbdbput(awl_db, c_addr->str, c_addr->len, &aent, sizeof(aent));
 
     char sbuf[BUFSIZ], cnet[64], key[BUFSIZ];
     const void *res;
@@ -381,31 +382,31 @@ static bool try_greylist(const greylist_config_t *config,
     struct obj_entry oent = { now, now };
     struct awl_entry aent = { 0, 0 };
 
-    int len, klen, c_addrlen = strlen(c_addr);
+    int len, klen;
     TCBDB * const awl_db = config->awl_db ? *(config->awl_db) : NULL;
     TCBDB * const obj_db = config->obj_db ? *(config->obj_db) : NULL;
 
     /* Auto whitelist clients.
      */
     if (config->client_awl) {
-        res = tcbdbget3(awl_db, c_addr, c_addrlen, &len);
+        res = tcbdbget3(awl_db, c_addr->str, c_addr->len, &len);
         if (res && len == sizeof(aent)) {
             memcpy(&aent, res, len);
             debug("client %.*s has a whitelist entry, count is %d",
-                  c_addrlen, c_addr, aent.count);
+                  c_addr->len, c_addr->str, aent.count);
         }
 
         if (!greylist_check_awlentry(config, &aent, now)) {
             aent.count = 0;
             aent.last  = 0;
             debug("client %.*s whitelist entry too old",
-                  c_addrlen, c_addr);
+                  c_addr->len, c_addr->str);
         }
 
         /* Whitelist if count is enough.
          */
         if (aent.count >= config->client_awl) {
-            debug("client %.*s whitelisted", c_addrlen, c_addr);
+            debug("client %.*s whitelisted", c_addr->len, c_addr->str);
             if (now < aent.last + 3600) {
                 INCR_AWL
             }
@@ -419,9 +420,9 @@ static bool try_greylist(const greylist_config_t *config,
     /* Lookup.
      */
     klen = snprintf(key, sizeof(key), "%s/%s/%s",
-                    c_net(config, c_addr, c_name, cnet, sizeof(cnet)),
-                    config->no_sender ? "" : sender_normalize(sender, sbuf, sizeof(sbuf)),
-                    config->no_recipient ? "" : rcpt);
+                    c_net(config, c_addr->str, c_name->str, cnet, sizeof(cnet)),
+                    config->no_sender ? "" : sender_normalize(sender->str, sbuf, sizeof(sbuf)),
+                    config->no_recipient ? "" : rcpt->str);
     klen = MIN(klen, ssizeof(key) - 1);
 
     res = tcbdbget3(obj_db, key, klen, &len);
@@ -550,8 +551,8 @@ static filter_result_t greylist_filter(const filter_t *filter,
         return HTK_ABORT;
     }
 
-    return try_greylist(config, query->sender, query->client_address,
-                        query->client_name, query->recipient) ?
+    return try_greylist(config, &query->sender, &query->client_address,
+                        &query->client_name, &query->recipient) ?
            HTK_WHITELIST : HTK_GREYLIST;
 }
 

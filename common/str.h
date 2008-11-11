@@ -371,5 +371,18 @@ m_stristr(const char *haystack, const char *needle) {
     return m_stristrn(haystack, needle, m_strlen(needle));
 }
 
+/****************************************************************************/
+/* static strings                                                           */
+/****************************************************************************/
+
+/** Store a pointer to a string with a pre-computed length.
+ * This intends to store pointers to a part of a longer string and to avoid
+ * useless strlen.
+ */
+typedef struct static_str_t {
+    const char *str;
+    ssize_t    len;
+} static_str_t;
+
 /*@}*/
 #endif /* PFIXTOOLS_STR_H */

@@ -36,7 +36,7 @@ GENERATED = policy_tokens.h policy_tokens.c \
 						filter_tokens.h filter_tokens.c \
 						hook_tokens.h hook_tokens.c \
 						param_tokens.h param_tokens.c
-TESTS     = tst-rbl tst-filters tst-greylist
+TESTS     = tst-rbl tst-filters tst-greylist tst-qf
 
 UB_LIBS   = -lunbound
 
@@ -54,9 +54,11 @@ tst-filters_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev
 tst-greylist_SOURCES = tst-greylist.c resources.c ../common/lib.a
 tst-greylist_LIBADD  = $(TC_LIBS)
 
-hook_tokens.h hook_tokens.c: $(FILTERS)
-param_tokens.c param_tokens.h: $(FILTERS) config.c
+tst-qf_SOURCES = tst-qf.c query.c ../common/lib.a $(GENERATED)
 
 all:
+
+hook_tokens.h hook_tokens.c: $(FILTERS)
+param_tokens.c param_tokens.h: $(FILTERS) config.c
 
 include ../mk/common.mk
