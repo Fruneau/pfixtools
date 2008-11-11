@@ -86,6 +86,7 @@ static trie_t *create_trie_from_file(const char *file)
     return db;
 }
 
+
 __attribute__((used))
 static void check_trie_with_file(const trie_t *db, const char *file)
 {
@@ -132,8 +133,105 @@ static void check_trie_with_file(const trie_t *db, const char *file)
 }
 
 
+static bool test_linear(const uint8_t *start, uint32_t len, uint8_t data) {
+    const uint8_t *end = start + len;
+    while (start < end) {
+        const uint8_t val = *start;
+        if (val == data) {
+            return true;
+        } else if (val > data) {
+            return false;
+        }
+        ++start;
+    }
+    return false;
+}
+
+static bool test_dicho(const uint8_t *start, uint32_t len, uint8_t data) {
+    const uint8_t *end = start + len;
+
+    while (start < end) {
+        const uint8_t *mid = start + ((end - start) >> 1);
+        const uint8_t val = *mid;
+
+        if (val == data) {
+            return true;
+        } else if (data < val) {
+            end = mid;
+        } else {
+            start = mid + 1;
+        }
+    }
+    return false;
+}
+
+static void test_lookup(void) {
+    bool set[64];
+    uint8_t data[64];
+
+    printf("size,dicho,linear\n");
+    for (int i = 1 ; i < 64 ; ++i) {
+        if (i > 32) {
+            int selected = 64;
+            memset(set, 1, 64 * sizeof(bool));
+            while (selected > i) {
+                int val = rand() % 64;
+                if (set[val]) {
+                    set[val] = false;
+                    --selected;
+                }
+            }
+        } else {
+            int selected = 0;
+            memset(set, 0, 64 * sizeof(bool));
+            while (selected < i) {
+                int val = rand() % 64;
+                if (!set[val]) {
+                    set[val] = true;
+                    ++selected;
+                }
+            }
+        }
+        int pos = 0;
+        for (int j = 0 ; j < 64 ; ++j) {
+            if (set[j]) {
+                data[pos] = j;
+                ++pos;
+            }
+        }
+
+        struct timeval start, end;
+        double diff_dicho, diff_linear;
+        const int iterations = 50000000;
+
+        gettimeofday(&start, NULL);
+        for (int k = 0 ; k < iterations ; ++k) {
+            for (int j = 0 ; j < 64 ; ++j) {
+                test_dicho(data, i, j);
+            }
+        }
+        gettimeofday(&end, NULL);
+        diff_dicho = ((end.tv_sec - start.tv_sec) * 10.0)
+             + (double)(end.tv_usec - start.tv_usec) / 10e5;
+
+        gettimeofday(&start, NULL);
+        for (int k = 0 ; k < iterations ; ++k) {
+            for (int j = 0 ; j < 64 ; ++j) {
+                test_linear(data, i, j);
+            }
+        }
+        gettimeofday(&end, NULL);
+        diff_linear = ((end.tv_sec - start.tv_sec) * 10.0)
+             + (double)(end.tv_usec - start.tv_usec) / 10e5;
+        printf("%d,%d,%d\n", i, (int)diff_dicho, (int)diff_linear);
+    }
+}
+
+
 int main(int argc, char *argv[])
 {
+    test_lookup();
+
     /* Trivial tests
      */
     trie_t *trie = trie_new();

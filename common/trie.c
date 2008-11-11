@@ -138,12 +138,12 @@ static inline const trie_entry_t* trie_entry_child(const trie_t *trie,
         const char c2 = str(trie, child)[0];
 
         if (c2 == c) {
-          return child;
+            return child;
         }
         if (c < c2) {
-          end = mid;
+            end = mid;
         } else {
-          start = mid + 1;
+            start = mid + 1;
         }
     }
     return NULL;

@@ -372,7 +372,7 @@ static bool try_greylist(const greylist_config_t *config,
     aent.count++;                                             \
     aent.last = now;                                          \
     debug("whitelist entry for %.*s updated, count %d",       \
-          c_addr->len, c_addr->str, aent.count);                     \
+          (int)c_addr->len, c_addr->str, aent.count);         \
     tcbdbput(awl_db, c_addr->str, c_addr->len, &aent, sizeof(aent));
 
     char sbuf[BUFSIZ], cnet[64], key[BUFSIZ];
@@ -393,20 +393,20 @@ static bool try_greylist(const greylist_config_t *config,
         if (res && len == sizeof(aent)) {
             memcpy(&aent, res, len);
             debug("client %.*s has a whitelist entry, count is %d",
-                  c_addr->len, c_addr->str, aent.count);
+                  (int)c_addr->len, c_addr->str, aent.count);
         }
 
         if (!greylist_check_awlentry(config, &aent, now)) {
             aent.count = 0;
             aent.last  = 0;
             debug("client %.*s whitelist entry too old",
-                  c_addr->len, c_addr->str);
+                  (int)c_addr->len, c_addr->str);
         }
 
         /* Whitelist if count is enough.
          */
         if (aent.count >= config->client_awl) {
-            debug("client %.*s whitelisted", c_addr->len, c_addr->str);
+            debug("client %.*s whitelisted", (int)c_addr->len, c_addr->str);
             if (now < aent.last + 3600) {
                 INCR_AWL
             }
