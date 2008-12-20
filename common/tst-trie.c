@@ -165,6 +165,7 @@ static bool test_dicho(const uint8_t *start, uint32_t len, uint8_t data) {
     return false;
 }
 
+__attribute__((used))
 static void test_lookup(void) {
     bool set[64];
     uint8_t data[64];
@@ -230,7 +231,7 @@ static void test_lookup(void) {
 
 int main(int argc, char *argv[])
 {
-    test_lookup();
+    /* test_lookup(); */
 
     /* Trivial tests
      */
