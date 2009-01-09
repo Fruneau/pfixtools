@@ -147,13 +147,13 @@ static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
         *ok = true;
         return NULL;
     } else if (hook->postfix) {
-        log_reply(INFO, "awswer %s from filter %s: \"%s\"",
+        log_reply(INFO, "answer %s from filter %s: \"%s\"",
                   htokens[hook->type], filter->name, hook->value);
         policy_answer(pcy, hook->value);
         *ok = true;
         return NULL;
     } else {
-        log_reply(DEBUG,  "awswer %s from filter %s: next filter %s",
+        log_reply(DEBUG, "answer %s from filter %s: next filter %s",
                   htokens[hook->type], filter->name,
                   (array_ptr(config->filters, hook->filter_id))->name);
         return array_ptr(config->filters, hook->filter_id);
