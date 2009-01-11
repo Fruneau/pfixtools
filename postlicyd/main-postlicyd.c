@@ -298,7 +298,7 @@ int main(int argc, char *argv[])
     bool port_from_cli = false;
     bool check_conf = false;
 
-    for (int c = 0; (c = getopt(argc, argv, "ufdc" "l:p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "hufdc" "l:p:")) >= 0; ) {
         switch (c) {
           case 'p':
             pidfile = optarg;

@@ -1,0 +1,61 @@
+postlicyd(8)
+============
+
+NAME
+----
+
+postlicyd - A postfix versatile Policy Daemon from the Postfix Tools Suite
+
+
+SYNOPSIS
+--------
+
+postlicyd [options] conf
+
+
+DESCRIPTION
+-----------
+
+TODO
+
+
+OPTIONS
+-------
+
+the `conf` argument shall be a path to a valid linkgit:postlicyd.conf[5] file.
+
+-h::
+    Show the help
+
+-c::
+    Only check the configuration and then exit.
+
+-d::
+    Change debug level (the more `-d` switches the higher the level is).
+
+-f::
+    Do not daemonize `postlicyd` on startup.
+
+-l <port>::
+    Change the port `postlicyd` will listen to. (Default: 10000).
+
+-p <path>::
+    Path to the pidfile where `pfix-srsd` will maintain its pid. Default is to
+    not use any pidfile.
+
+-u::
+    Work in unsafe mode: don't drop privileges when running as root.
+
+
+COPYRIGHT
+---------
+
+Copyright 2009 the Postfix Tools Suite Authors. License BSD.
+
+
+PFIXTOOLS
+---------
+
+`postlicyd` is part of the linkgit:pfixtools[7] suite.
+
+// vim:filetype=asciidoc:tw=78

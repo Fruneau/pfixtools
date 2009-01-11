@@ -35,6 +35,7 @@
 include ../mk/tc.mk
 
 PROGRAMS  = postlicyd
+DOCS      = postlicyd.8
 GENERATED = policy_tokens.h policy_tokens.c \
 						filter_tokens.h filter_tokens.c \
 						hook_tokens.h hook_tokens.c \
