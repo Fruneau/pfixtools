@@ -32,23 +32,45 @@
 #   see AUTHORS and source files for details                                 #
 ##############################################################################
 
+__DIR__:=$(realpath $(dir $(lastword $(MAKEFILE_LIST))))
+
 include ../mk/cflags.mk
 
 prefix ?= /usr/local
 LDFLAGSBASE += $(if $(DARWIN),-L/opt/local/lib,-Wl,-warn-common)
 CFLAGSBASE  += --std=gnu99 -I../ -I../common $(if $(DARWIN),-I/opt/local/include,)
+ASCIIDOC     = asciidoc -f $(__DIR__)/asciidoc.conf -d manpage \
+	       -apft_version=$(shell git-describe)
+XMLTO        = xmlto -m $(__DIR__)/callouts.xsl
+MAN_SECTIONS = 1 2 3 4 5 6 7 8 9
 
 INSTALL_PROGS = $(addprefix install-,$(PROGRAMS))
 
-all: $(GENERATED) $(LIBS) $(PROGRAMS) | $(GENERATED)
+all: $(GENERATED) $(LIBS) $(PROGRAMS)
 
-install: all $(INSTALL_PROGS)
+DOCS_SRC  = $(foreach s,$(MAN_SECTIONS),$(patsubst %.$(s),%.txt,$(filter %.$(s),$(DOCS))))
+DOCS_HTML = $(DOCS_SRC:.txt=.html)
+DOCS_XML  = $(DOCS_SRC:.txt=.xml)
+doc: $(DOCS) $(DOCS_HTML)
+
+install: all $(INSTALL_PROGS) install-doc
+
+install-doc: doc
+	$(if $(DOCS),\
+	    set -e\
+	    $(foreach s,$(MAN_SECTIONS),\
+		$(foreach m,$(filter %.$(s),$(DOCS)),\
+		    ; install -d $(DESTDIR)$(prefix)/share/man/man$(s)/ \
+		    ; install $(m) $(DESTDIR)$(prefix)/share/man/man$(s)/ \
+	)))
+	$(if $(DOCS_HTML),install $(DOCS_HTML) $(DESTDIR)$(prefix)/share/doc/pfixtools)
 
 $(INSTALL_PROGS): install-%:
 	install $* $(DESTDIR)$(prefix)/sbin
 
 clean:
 	$(RM) $(LIBS:=.a) $(PROGRAMS) $(TESTS) .*.o .*.dep
+	$(RM) $(DOCS) $(DOCS_XML) $(DOCS_HTML)
 
 distclean: clean
 	$(RM) $(GENERATED)
@@ -77,6 +99,15 @@ headers:
 
 $(LIBS): %: %.a
 
+$(DOCS_HTML): %.html: %.txt
+	$(ASCIIDOC) -b xhtml11 -o $@ $<
+
+$(DOCS_XML): %.xml: %.txt
+	$(ASCIIDOC) -b docbook -o $@ $<
+
+%.1 %.2 %.3 %.4 %.5 %.6 %.7 %.8 %.9: %.xml
+	$(XMLTO) man $<
+
 .SECONDEXPANSION:
 
 $(LIBS:=.a): $$(patsubst %.c,.%.o,$$($$(patsubst %.a,%,$$@)_SOURCES)) Makefile
@@ -86,6 +117,8 @@ $(LIBS:=.a): $$(patsubst %.c,.%.o,$$($$(patsubst %.a,%,$$@)_SOURCES)) Makefile
 $(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
 	$(CC) -o $@ $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
+$(DOCS):
+
 -include $(foreach p,$(PROGRAMS) $(TESTS),$(patsubst %.c,.%.dep,$(filter %.c,$($p_SOURCES))))
 
-.PHONY: install-dir $(INSTALL_PROGS)
+.PHONY: install-doc install-dir $(INSTALL_PROGS)
