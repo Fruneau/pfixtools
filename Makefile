@@ -38,38 +38,19 @@ PROGRAMS = postlicyd pfix-srsd
 LIBS     = common
 SUBDIRS  = $(LIBS) $(PROGRAMS)
 
-CLEAN_TARGETS     = $(addprefix clean-,$(SUBDIRS))
-DISTCLEAN_TARGETS = $(addprefix distclean-,$(SUBDIRS))
-INSTALL_TARGETS   = $(addprefix install-,$(SUBDIRS))
-
 # RULES ###################################################################{{{
 
-all: $(SUBDIRS)
+all clean distclean doc install: %: %-recurse
 
-clean: $(CLEAN_TARGETS)
+%-recurse:
+	@set -e $(foreach dir,$(SUBDIRS),; $(MAKE) -C $(dir) $*)
 
-distclean: $(DISTCLEAN_TARGETS)
-
-install: all $(INSTALL_TARGETS)
-
-$(PROGRAMS): $(LIBS)
-
-$(SUBDIRS): %:
-	make -C $@ all
-
-$(CLEAN_TARGETS): clean-%:
-	make -C $* clean
-
-$(DISTCLEAN_TARGETS): distclean-%:
-	make -C $* distclean
-
-$(INSTALL_TARGETS): install-%: % install-dir
-	make -C $* install
-
-install-postlicyd: install-postlicyd-tools install-postlicyd-conf
+install-recurse: install-dir
+install: install-postlicyd-tools install-postlicyd-conf
 install-dir:
 	install -d $(DESTDIR)$(prefix)/sbin
 	install -d $(DESTDIR)$(prefix)/bin
+	install -d $(DESTDIR)$(prefix)/share/doc/pfixtools
 	install -d $(DESTDIR)/etc/pfixtools
 
 install-postlicyd-tools:
@@ -81,8 +62,6 @@ install-postlicyd-conf:
 	install -m 640 example/postlicyd.conf $(DESTDIR)/etc/pfixtools/postlicyd.example.conf
 	install -m 640 example/postlicyd-rsyncrbl.conf $(DESTDIR)/etc/pfixtools/postlicyd-rsyncrbl.example.conf
 
-.PHONY: clean distclean install install-dir $(SUBDIRS) $(CLEAN_TARGETS) \
-				$(DISTCLEAN_TARGETS) $(INSTALL_TARGETS) install-postlicyd-tools \
-				install-postlicyd-conf
+.PHONY: clean distclean install install-% %-recurse
 
 ###########################################################################}}}
