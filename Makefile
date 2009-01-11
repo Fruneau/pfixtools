@@ -32,11 +32,9 @@
 #   see AUTHORS and source files for details                                 #
 ##############################################################################
 
-prefix ?= /usr/local
-
-PROGRAMS = postlicyd pfix-srsd
-LIBS     = common
-SUBDIRS  = $(LIBS) $(PROGRAMS)
+PROGDIRS = postlicyd pfix-srsd
+LIBDIRS  = common
+SUBDIRS  = $(LIBDIRS) $(PROGDIRS)
 
 # RULES ###################################################################{{{
 
@@ -65,3 +63,5 @@ install-postlicyd-conf:
 .PHONY: clean distclean install install-% %-recurse
 
 ###########################################################################}}}
+
+include mk/common.mk

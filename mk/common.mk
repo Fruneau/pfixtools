@@ -34,9 +34,9 @@
 
 __DIR__:=$(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
-include ../mk/cflags.mk
+include $(__DIR__)/cflags.mk
 
-prefix ?= /usr/local
+prefix      ?= /usr/local
 LDFLAGSBASE += $(if $(DARWIN),-L/opt/local/lib,-Wl,-warn-common)
 CFLAGSBASE  += --std=gnu99 -I../ -I../common $(if $(DARWIN),-I/opt/local/include,)
 ASCIIDOC     = asciidoc -f $(__DIR__)/asciidoc.conf -d manpage \
