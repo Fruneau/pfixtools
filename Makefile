@@ -36,6 +36,8 @@ PROGDIRS = postlicyd pfix-srsd
 LIBDIRS  = common
 SUBDIRS  = $(LIBDIRS) $(PROGDIRS)
 
+DOCS     = pfixtools.7
+
 # RULES ###################################################################{{{
 
 all clean distclean doc install: %: %-recurse
