@@ -1,0 +1,54 @@
+postlicyd.conf(5)
+=================
+
+NAME
+----
+postlicyd.conf - the postlicyd configuration file format.
+
+
+SYNOPSIS
+--------
+postlicyd.conf
+
+
+DESCRIPTION
+-----------
+
+TODO
+
+
+FILE FORMAT
+-----------
+
+Entry points
+~~~~~~~~~~~~
+TODO
+
+
+Filters
+~~~~~~~
+TODO
+
+
+
+SEE ALSO
+--------
+
+The builtin postlicyd modules are documented in the following manpages:
+
+* IP Lists in linkgit:postlicyd-iplist[5];
+
+* String Lists in linkgit:postlicyd-strlist[5];
+
+* Greylisting in linkgit:postlicyd-greylist[5];
+
+* Matching plugins in linkgit:postlicyd-match[5];
+
+* Counting plugin in linkgit:postlicyd-counter[5].
+
+
+COPYRIGHT
+---------
+Copyright 2009 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

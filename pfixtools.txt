@@ -30,6 +30,8 @@ This suite contains at the time of the writing, two major tools.
     fine grained schemes. It's for example quite easy to reject a mail just
     at the `SMTP` `DATA` command using results from filtering done at the
     `RCPT TO` or even the `MAIL FROM` commands.
++
+Its configuration file is described in linkgit:postlicyd.conf[5].
 
 
 SEE ALSO
