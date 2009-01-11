@@ -33,6 +33,7 @@
 ##############################################################################
 
 PROGRAMS  = pfix-srsd
+DOCS      = pfix-srsd.8
 
 pfix-srsd_SOURCES = main-srsd.c ../common/lib.a
 pfix-srsd_LIBADD  = -lsrs2 -lev

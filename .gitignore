@@ -7,6 +7,10 @@
 /pfix-srsd/pfix-srsd
 /postlicyd/data/*.db
 
+*.xml
+*.html
+*.[1-9]
+
 *.[ao]
 .tags
 .*.dep

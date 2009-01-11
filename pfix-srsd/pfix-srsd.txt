@@ -1,0 +1,76 @@
+pfix-srsd(8)
+============
+
+NAME
+----
+
+pfix-srsd - Postfix tcp_table(5) srsd lookup service
+
+
+SYNOPSIS
+--------
+
+pfix-srsd [options] domain secrets
+
+
+DESCRIPTION
+-----------
+
+pfix-srsd is designed to provide as a Postfix tcp_table(5), a way to rewrite
+addresses using the SRS (http://www.libsrs2.org/docs/index.html) scheme. It
+supports both encoding and decoding of such addresses.
+
+
+OPTIONS
+-------
+
+Mandatory arguments
+~~~~~~~~~~~~~~~~~~~
+
+domain::
+    The domain is the FQDN on which you want to use SRS.
+
+secrets::
+    The secrets argument is a path to the secrets used for SRS, one per line.
+    There is no comment possible in that file, every line is used, including
+    empty ones. The first line is used for encoding purposes, other lines as
+    possible fallbacks for decoding, which is useful when you want to change
+    your encoding secret.
+
+Command line switches
+~~~~~~~~~~~~~~~~~~~~~
+
+-h::
+    Show the help
+
+-d <port>::
+    Change the port `pfix-srsd` is listening to for SRS 'decoding' purposes
+    (default is 10002).
+
+-e <port>::
+    Change the port `pfix-srsd` is listening to for SRS 'encoding' purposes
+    (default is 10001).
+
+-f::
+    Do not daemonize `pfix-srsd` on startup.
+
+-p <path>::
+    Path to the pidfile where `pfix-srsd` will maintain its pid. Default is to
+    not use any pidfile.
+
+-u::
+    Work in unsafe mode: don't drop privileges when running as root.
+
+
+COPYRIGHT
+---------
+
+Copyright 2009 the Postfix Tools Suite Authors. License BSD.
+
+
+PFIXTOOLS
+---------
+
+pfix-srsd is part of the linkgit:pfixtools[7] suite.
+
+// vim:filetype=asciidoc:tw=78
