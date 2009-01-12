@@ -241,6 +241,7 @@ int main(int argc, char *argv[])
     trie_t *trie = trie_new();
     trie_insert(trie, "abcde123456789");
     trie_insert(trie, "abcde123654789");
+    trie_insert(trie, "abcde123654789");
     trie_insert(trie, "abcdefghi");
     trie_insert(trie, "coucou");
     trie_insert(trie, "coucou chez vous");

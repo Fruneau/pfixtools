@@ -257,6 +257,9 @@ static inline void trie_compile_aux(trie_t *trie, uint32_t id,
                 trie_entry_insert_child(trie, id, trie_add_leaf(trie, ckey));
                 forks[fork_pos++] = i;
                 current = c;
+            } else if (current == '\0') {
+                trie_compile_aux(trie, id, i, last_key, offset - (off_diff - initial_diff), initial_diff);
+                return;
             }
         }
         if (fork_pos == 0 && current == '\0') {
