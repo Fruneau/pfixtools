@@ -476,10 +476,10 @@ static bool strlist_filter_constructor(filter_t *filter)
                     PARSE_CHECK(strlist_create_from_rhbl(&trie_hosts, &trie_domains,
                                                          current, weight, lock),
                                 "cannot load string list from rhbl %s", current);
-                    if (trie_hosts.db != NULL) {
+                    if (*(trie_hosts.db) != NULL) {
                         array_add(config->locals, trie_hosts);
                     }
-                    if (trie_domains.db != NULL) {
+                    if (*(trie_domains.db) != NULL) {
                         array_add(config->locals, trie_domains);
                     }
                     config->is_hostname = true;

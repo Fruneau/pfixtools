@@ -146,7 +146,7 @@ static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
         *ok = false;
         return NULL;
     } else if (hook->async) {
-        log_reply(WARNING, "asynchronous filter from filter %s", filter->name);
+        log_reply(DEBUG, "asynchronous filter from filter %s", filter->name);
         *ok = true;
         return NULL;
     } else if (hook->postfix) {
