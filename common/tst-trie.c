@@ -292,6 +292,16 @@ int main(int argc, char *argv[])
             gettimeofday(&end, NULL);
             diff = (end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 10e6;
             printf("%u lookups per second\n", (int)(how_many / diff));
+
+            trie_match_t match;
+            gettimeofday(&start, NULL);
+            for (uint32_t i = 0 ; i < how_many ; ++i) {
+                trie_lookup_match(trie, argv[2], &match);
+            }
+            gettimeofday(&end, NULL);
+            diff = (end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 10e6;
+            printf("%u lookups per second\n", (int)(how_many / diff));
+
         }
         trie_delete(&trie);
     }

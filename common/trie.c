@@ -28,7 +28,7 @@
 /*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE           */
 /*  POSSIBILITY OF SUCH DAMAGE.                                               */
 /*                                                                            */
-/*   Copyright (c) 2006-2009 the Authors                                      */
+/*   Copyright (c) 2006-2008 the Authors                                      */
 /*   see AUTHORS and source files for details                                 */
 /******************************************************************************/
 
@@ -45,19 +45,26 @@ typedef struct trie_entry_t trie_entry_t;
 struct trie_entry_t {
     uint32_t c_offset;
     uint32_t children_offset;
+    int32_t resource_offset;
 
     uint16_t c_len;
     uint16_t children_len;
 };
-#define TRIE_ENTRY_INIT { 0, 0, 0, 0 }
+#define TRIE_ENTRY_INIT { 0, 0, -1, 0, 0 }
+
 ARRAY(trie_entry_t)
 
 #define str(trie, entry)  array_ptr((trie)->c, (entry)->c_offset)
-#define key(trie, id) array_ptr((trie)->keys, array_elt((trie)->keys_offset, (id)))
+#define key(trie, id)     array_ptr((trie)->keys, array_elt((trie)->keys_offset, (id)))
+#define res(trie, entry)  (entry)->resource_offset < 0 ? NULL \
+                              : array_elt((trie)->resources, (entry)->resource_offset)
 
 struct trie_t {
     A(trie_entry_t) entries;
     A(char)         c;
+    PA(void)        resources;
+
+    /* Build stuff */
     A(char)         keys;
     A(int)          keys_offset;
 
@@ -190,7 +197,7 @@ static inline void trie_entry_insert_child(trie_t *trie, uint32_t id, uint32_t p
         entry->children_offset = pchild;
         entry->children_len    = 1;
     } else {
-        if (entry->children_offset + entry->children_len != pchild) {
+        if ((uint32_t)(entry->children_offset + entry->children_len) != pchild) {
             printf("Inserting child %d while offset is %d[%d]\n",
                    pchild, entry->children_offset, entry->children_len);
             abort();
@@ -301,46 +308,79 @@ void trie_compile(trie_t *trie, bool memlock)
     }
 }
 
-bool trie_lookup(const trie_t *trie, const char *key)
+
+#define FILL_MATCH(LEN, ALL, PREFIX, RES)                                      \
+    if (match != NULL) {                                                       \
+        match->match_len = (LEN);                                              \
+        match->match_all = (ALL);                                              \
+        match->match_prefix = (PREFIX);                                        \
+        match->resource  = (RES);                                              \
+    }
+
+bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
 {
     assert(trie->keys.len == 0L && "Can't lookup: trie not compiled");
     if (trie->entries.len == 0) {
+        FILL_MATCH(0, false, false, NULL);
         return false;
     } else {
+        const char * const orig = key;
         const trie_entry_t *current = array_ptr(trie->entries, 0);
         while (true) {
             if (trie_entry_is_leaf(current)) {
-                return trie_entry_match(trie, current, key);
+                if (trie_entry_match(trie, current, key)) {
+                    FILL_MATCH(key - orig + current->c_len, true, true, res(trie, current));
+                    return true;
+                } else if (match && trie_entry_prefix(trie, current, key)) {
+                    FILL_MATCH(key - orig + current->c_len, false, true, res(trie, current));
+                    return false;
+                } else {
+                    FILL_MATCH(key - orig, false, false, NULL);
+                    return false;
+                }
             } else if (trie_entry_c_match(trie, current, key)) {
                 key += current->c_len;
                 current = trie_entry_child(trie, current, key);
                 if (current == NULL) {
+                    FILL_MATCH(key - orig, false, false, NULL);
                     return false;
                 }
             } else {
+                FILL_MATCH(key - orig, false, false, NULL);
                 return false;
             }
         }
     }
 }
 
-bool trie_prefix(const trie_t *trie, const char *key)
+bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match)
 {
     assert(trie->keys.len == 0L && "Can't lookup: trie not compiled");
     if (trie->entries.len == 0) {
+        FILL_MATCH(0, false, false, NULL);
         return false;
     } else {
+        const char * const orig = key;
         const trie_entry_t *current = array_ptr(trie->entries, 0);
         while (true) {
             if (trie_entry_is_leaf(current)) {
-                return trie_entry_prefix(trie, current, key);
+                if (trie_entry_prefix(trie, current, key)) {
+                    FILL_MATCH(key - orig + current->c_len, key[current->c_len - 1] == '\0',
+                               true, res(trie, current));
+                    return true;
+                } else {
+                    FILL_MATCH(key - orig, false, false, NULL);
+                    return false;
+                }
             } else if (trie_entry_c_match(trie, current, key)) {
                 key += current->c_len;
                 current = trie_entry_child(trie, current, key);
                 if (current == NULL) {
+                    FILL_MATCH(key - orig, false, false, NULL);
                     return false;
                 }
             } else {
+                FILL_MATCH(key - orig, false, false, NULL);
                 return false;
             }
         }

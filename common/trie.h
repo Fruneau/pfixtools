@@ -45,6 +45,13 @@
 typedef struct trie_t trie_t;
 PARRAY(trie_t)
 
+typedef struct trie_match_t {
+    void     *resource;
+    unsigned match_len    : 30;
+    bool     match_all    : 1;
+    bool     match_prefix : 1;
+} trie_match_t;
+
 trie_t *trie_new(void);
 void trie_delete(trie_t **trie);
 
@@ -89,12 +96,14 @@ void trie_unlock(trie_t *trie);
 /** Check if the trie contains \p key.
  */
 __attribute__((nonnull(1,2)))
-bool trie_lookup(const trie_t *trie, const char *key);
+bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match);
+#define trie_lookup(trie, key) (trie_lookup_match(trie, key, NULL))
 
 /** Check if the trie contains a prefix of \p key.
  */
 __attribute__((nonnull(1,2)))
-bool trie_prefix(const trie_t *trie, const char *key);
+bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match);
+#define trie_prefix(trie, key) (trie_prefix_match(trie, key, NULL))
 
 /** Show the content of the trie and computes statistics.
  */
