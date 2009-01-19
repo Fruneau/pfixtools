@@ -1,5 +1,6 @@
 *_tokens.[hc]
 
+/common/tst-regexp
 /common/tst-trie
 /postlicyd/postlicyd
 /postlicyd/tst-rbl
