@@ -41,12 +41,13 @@
 
 #include "common.h"
 #include "array.h"
+#include "regexp.h"
 
 typedef struct trie_t trie_t;
 PARRAY(trie_t)
 
 typedef struct trie_match_t {
-    void     *resource;
+    regexp_t *regexp;
     unsigned match_len    : 30;
     bool     match_all    : 1;
     bool     match_prefix : 1;
@@ -59,7 +60,15 @@ void trie_delete(trie_t **trie);
  * \ref trie_compile.
  */
 __attribute__((nonnull(1,2)))
-void trie_insert(trie_t *trie, const char *key);
+bool trie_insert(trie_t *trie, const char *key);
+
+/** Add a string followed with a regexp in the trie.
+ *
+ * \ref trie_compile
+ * \ref trie_insert
+ */
+__attribute__((nonnull(1,2)))
+bool trie_insert_regexp(trie_t *trie, const char *key, const char *regexp);
 
 /** Compile the trie.
  * A trie must be compiled before lookup is possible. Compiling the trie

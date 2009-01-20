@@ -45,28 +45,33 @@ typedef struct trie_entry_t trie_entry_t;
 struct trie_entry_t {
     uint32_t c_offset;
     uint32_t children_offset;
-    int32_t resource_offset;
+    int32_t  regexp_offset;
 
     uint16_t c_len;
     uint16_t children_len;
 };
 #define TRIE_ENTRY_INIT { 0, 0, -1, 0, 0 }
-
 ARRAY(trie_entry_t)
+#define str(trie, entry) array_ptr((trie)->c, (entry)->c_offset)
+#define rex(trie, entry) (entry)->regexp_offset < 0 ? NULL \
+                              : array_ptr((trie)->regexps, (entry)->regexp_offset)
 
-#define str(trie, entry)  array_ptr((trie)->c, (entry)->c_offset)
-#define key(trie, id)     array_ptr((trie)->keys, array_elt((trie)->keys_offset, (id)))
-#define res(trie, entry)  (entry)->resource_offset < 0 ? NULL \
-                              : array_elt((trie)->resources, (entry)->resource_offset)
+typedef struct trie_key_t {
+    int offset;
+    int regexp;
+} trie_key_t;
+ARRAY(trie_key_t)
+#define key(trie, id) array_ptr((trie)->keys, array_elt((trie)->keys_offset, (id)).offset)
+#define rek(trie, id) (array_elt((trie)->keys_offset, (id)).regexp)
 
 struct trie_t {
     A(trie_entry_t) entries;
     A(char)         c;
-    PA(void)        resources;
+    A(regexp_t)     regexps;
 
     /* Build stuff */
     A(char)         keys;
-    A(int)          keys_offset;
+    A(trie_key_t)   keys_offset;
 
     bool locked;
 };
@@ -89,6 +94,7 @@ void trie_delete(trie_t **trie)
         trie_unlock(*trie);
         array_wipe((*trie)->entries);
         array_wipe((*trie)->c);
+        array_deep_wipe((*trie)->regexps, regexp_wipe);
         p_delete(trie);
     }
 }
@@ -166,7 +172,7 @@ static inline uint32_t trie_entry_new(trie_t *trie)
     return trie->entries.len - 1;
 }
 
-static inline uint32_t trie_add_leaf(trie_t *trie, const char *key)
+static inline uint32_t trie_add_leaf(trie_t *trie, const char *key, int regexp)
 {
     trie_entry_t *entry;
     int len = m_strlen(key) + 1;
@@ -174,6 +180,7 @@ static inline uint32_t trie_add_leaf(trie_t *trie, const char *key)
     entry = array_ptr(trie->entries, id);
     entry->c_offset = trie->c.len;
     entry->c_len    = len;
+    entry->regexp_offset = regexp;
 #ifdef CHECK_INTEGRITY
     for (int i = 0 ; i < len - 1 ; ++i) {
         if (key[i] == '\0') {
@@ -225,19 +232,37 @@ static inline void trie_entry_split(trie_t *trie, uint32_t id, uint16_t pos)
     }
     child->children_offset = entry->children_offset;
     child->children_len    = entry->children_len;
+    child->regexp_offset   = entry->regexp_offset;
     entry->children_offset = trie->entries.len - 1;
     entry->children_len    = 1;
+    entry->regexp_offset   = -1;
 }
 
-void trie_insert(trie_t *trie, const char* key)
+bool trie_insert_regexp(trie_t *trie, const char *key, const char *regexp)
 {
     assert(trie->entries.len == 0 && "Trie already compiled");
 
     int len = m_strlen(key) + 1;
-    array_add(trie->keys_offset, trie->keys.len);
+    trie_key_t key_pos = { trie->keys.len, -1 };
+
+    if (regexp != NULL) {
+        key_pos.regexp = trie->regexps.len;
+
+        regexp_t re;
+        if (!regexp_compile(&re, regexp, false, false)) {
+            return false;
+        }
+        array_add(trie->regexps, re);
+    }
+    array_add(trie->keys_offset, key_pos);
     array_append(trie->keys, key, len);
+    return true;
 }
 
+bool trie_insert(trie_t *trie, const char *key)
+{
+    return trie_insert_regexp(trie, key, NULL);
+}
 
 static inline void trie_compile_aux(trie_t *trie, uint32_t id,
                                     uint32_t first_key, uint32_t last_key,
@@ -255,13 +280,14 @@ static inline void trie_compile_aux(trie_t *trie, uint32_t id,
         current = key(trie, first_key)[offset];
         for (uint32_t i = first_key + 1 ; i < last_key ; ++i) {
             const char *ckey = key(trie, i) + offset;
+            const int  reg   = rek(trie, i);
             const char c = *ckey;
             if (c != current) {
                 array_ensure_capacity_delta(trie->entries, 2);
                 if (fork_pos == 0) {
                     trie_entry_split(trie, id, off_diff);
                 }
-                trie_entry_insert_child(trie, id, trie_add_leaf(trie, ckey));
+                trie_entry_insert_child(trie, id, trie_add_leaf(trie, ckey, reg));
                 forks[fork_pos++] = i;
                 current = c;
             } else if (current == '\0') {
@@ -290,15 +316,15 @@ void trie_compile(trie_t *trie, bool memlock)
     assert(trie->entries.len == 0 && "Trie already compiled");
     assert(trie->keys.len != 0 && "Trying to compile an empty trie");
     {
-#       define QSORT_TYPE int
+#       define QSORT_TYPE trie_key_t
 #       define QSORT_BASE trie->keys_offset.data
 #       define QSORT_NELT trie->keys_offset.len
-#       define QSORT_LT(a,b) strcmp(trie->keys.data + *a, trie->keys.data + *b) < 0
+#       define QSORT_LT(a,b) strcmp(trie->keys.data + a->offset, trie->keys.data + b->offset) < 0
 #       include "qsort.c"
     }
 
     array_ensure_capacity(trie->entries, trie->keys_offset.len);
-    trie_compile_aux(trie, trie_add_leaf(trie, key(trie, 0)),
+    trie_compile_aux(trie, trie_add_leaf(trie, key(trie, 0), rek(trie, 0)),
                      0, trie->keys_offset.len, 0, 0);
     trie_cleanup_build_data(trie);
     array_adjust(trie->entries);
@@ -314,7 +340,7 @@ void trie_compile(trie_t *trie, bool memlock)
         match->match_len = (LEN);                                              \
         match->match_all = (ALL);                                              \
         match->match_prefix = (PREFIX);                                        \
-        match->resource  = (RES);                                              \
+        match->regexp  = (RES);                                              \
     }
 
 bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
@@ -329,10 +355,10 @@ bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
         while (true) {
             if (trie_entry_is_leaf(current)) {
                 if (trie_entry_match(trie, current, key)) {
-                    FILL_MATCH(key - orig + current->c_len, true, true, res(trie, current));
+                    FILL_MATCH(key - orig + current->c_len, true, true, rex(trie, current));
                     return true;
                 } else if (match && trie_entry_prefix(trie, current, key)) {
-                    FILL_MATCH(key - orig + current->c_len, false, true, res(trie, current));
+                    FILL_MATCH(key - orig + current->c_len, false, true, rex(trie, current));
                     return false;
                 } else {
                     FILL_MATCH(key - orig, false, false, NULL);
@@ -366,7 +392,7 @@ bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match)
             if (trie_entry_is_leaf(current)) {
                 if (trie_entry_prefix(trie, current, key)) {
                     FILL_MATCH(key - orig + current->c_len, key[current->c_len - 1] == '\0',
-                               true, res(trie, current));
+                               true, rex(trie, current));
                     return true;
                 } else {
                     FILL_MATCH(key - orig, false, false, NULL);

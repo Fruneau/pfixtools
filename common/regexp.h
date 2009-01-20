@@ -55,19 +55,23 @@ regexp_t *regexp_new(void);
 void regexp_wipe(regexp_t *re);
 void regexp_delete(regexp_t **re);
 
+/** Compile a regexp and fill the @c re structure.
+ */
 __attribute__((nonnull))
 bool regexp_compile(regexp_t *re, const char *str, bool cs, bool utf8);
 
+/** Match the given string against the regexp.
+ */
 __attribute__((nonnull))
 bool regexp_match_str(const regexp_t *re, const static_str_t *str);
 
+/** Match the given string against the regexp.
+ */
 __attribute__((nonnull))
 static inline bool regexp_match(const regexp_t *re, const char *str)
 {
     static_str_t s = { str, m_strlen(str) };
     return regexp_match_str(re, &s);
 }
-
-
 
 #endif
