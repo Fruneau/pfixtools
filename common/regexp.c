@@ -76,7 +76,27 @@ bool regexp_compile(regexp_t *re, const char *str, bool cs, bool utf8)
     return true;
 }
 
+bool regexp_compile_str(regexp_t* re, const static_str_t *str, bool cs, bool utf8)
+{
+    if (str->str[str->len + 1] == '\0') {
+        return regexp_compile(re, str->str, cs, utf8);
+    } else {
+        // TODO: Use a buffer to avoid stupid allocations
+        char *cpy = p_dupstr(str->str, str->len);
+        bool ok = regexp_compile(re, cpy, cs, utf8);
+        p_delete(&cpy);
+        return ok;
+    }
+}
+
 bool regexp_match_str(const regexp_t *re, const static_str_t *str)
 {
     return 0 == pcre_exec(re->re, re->extra, str->str, str->len, 0, 0, NULL, 0);
 }
+
+bool regexp_match(const regexp_t *re, const char *str)
+{
+    static_str_t s = { str, m_strlen(str) };
+    return regexp_match_str(re, &s);
+}
+

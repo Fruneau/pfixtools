@@ -37,6 +37,7 @@ TESTS = tst-trie tst-regexp
 
 lib_SOURCES = str.c buffer.c common.c server.c trie.c file.c rbl.c regexp.c
 tst-trie_SOURCES = tst-trie.c lib.a
+tst-trie_LIBADD = -lpcre
 tst-regexp_SOURCES = tst-regexp.c lib.a
 tst-regexp_LIBADD = -lpcre
 

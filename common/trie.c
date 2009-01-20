@@ -238,30 +238,42 @@ static inline void trie_entry_split(trie_t *trie, uint32_t id, uint16_t pos)
     entry->regexp_offset   = -1;
 }
 
-bool trie_insert_regexp(trie_t *trie, const char *key, const char *regexp)
+bool trie_insert_regexp_str(trie_t *trie, const static_str_t *key, const static_str_t *regexp)
 {
     assert(trie->entries.len == 0 && "Trie already compiled");
 
-    int len = m_strlen(key) + 1;
     trie_key_t key_pos = { trie->keys.len, -1 };
-
     if (regexp != NULL) {
         key_pos.regexp = trie->regexps.len;
 
         regexp_t re;
-        if (!regexp_compile(&re, regexp, false, false)) {
+        if (!regexp_compile_str(&re, regexp, false, false)) {
             return false;
         }
         array_add(trie->regexps, re);
     }
     array_add(trie->keys_offset, key_pos);
-    array_append(trie->keys, key, len);
+    array_append(trie->keys, key->str, key->len);
+    array_add(trie->keys, '\0');
     return true;
+}
+
+bool trie_insert_regexp(trie_t *trie, const char *key, const char *regexp)
+{
+    static_str_t skey = { key, m_strlen(key) };
+    static_str_t sreg = { regexp, m_strlen(regexp) };
+    return trie_insert_regexp_str(trie, &skey, &sreg);
+}
+
+bool trie_insert_str(trie_t *trie, const static_str_t *key)
+{
+    return trie_insert_regexp_str(trie, key, NULL);
 }
 
 bool trie_insert(trie_t *trie, const char *key)
 {
-    return trie_insert_regexp(trie, key, NULL);
+    static_str_t skey = { key, m_strlen(key) };
+    return trie_insert_regexp_str(trie, &skey, NULL);
 }
 
 static inline void trie_compile_aux(trie_t *trie, uint32_t id,
