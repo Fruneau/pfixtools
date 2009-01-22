@@ -38,34 +38,68 @@
 
 #include "filter.h"
 #include "str.h"
+#include "regexp.h"
 #include "policy_tokens.h"
+
+enum condition_t {
+    MATCH_UNKNOWN  = 0,
+    MATCH_EQUAL,
+    MATCH_DIFFER,
+    MATCH_CONTAINS,
+    MATCH_CONTAINED,
+    MATCH_EMPTY,
+    MATCH_MATCH,
+    MATCH_DONTMATCH,
+
+    MATCH_NUMBER
+};
 
 typedef struct match_condition_t {
     postlicyd_token field;
     bool case_sensitive;
-    enum {
-        MATCH_UNKNOWN  = 0,
-        MATCH_EQUAL,
-        MATCH_DIFFER,
-        MATCH_CONTAINS,
-        MATCH_CONTAINED,
-        MATCH_EMPTY,
-    } condition;
+    enum condition_t condition;
 
-    static_str_t value;
+    union {
+      static_str_t value;
+      regexp_t     regexp;
+    } data;
 } match_condition_t;
 ARRAY(match_condition_t)
+#define CONDITION_INIT { PTK_UNKNOWN, false, MATCH_UNKNOWN, { .value = { NULL, 0 } } }
 
-static const char *condition_names[] = {
-  "unknown",
-  "equals to",
-  "differs from",
-  "contains",
-  "is contained",
-  "is empty"
+struct match_operator_t {
+    const static_str_t short_name;
+    const static_str_t long_name;
+    enum condition_t condition;
+    bool             cs;
 };
 
-#define CONDITION_INIT { PTK_UNKNOWN, false, MATCH_UNKNOWN, { NULL, 0 } }
+static const struct match_operator_t operators[] = {
+    { {"=i", 2}, {"EQUALS_i", 8},    MATCH_EQUAL,     false },
+    { {"==", 2}, {"EQUALS", 6},      MATCH_EQUAL,     true },
+    { {"!i", 2}, {"DIFFERS_i", 9},   MATCH_DIFFER,    false },
+    { {"!=", 2}, {"DIFFERS", 7},     MATCH_DIFFER,    true },
+    { {">i", 2}, {"CONTAINS_i", 10},  MATCH_CONTAINS,  false },
+    { {">=", 2}, {"CONTAINS", 8},    MATCH_CONTAINS,  true },
+    { {"<i", 2}, {"CONTAINED_i", 11}, MATCH_CONTAINED, false },
+    { {"<=", 2}, {"CONTAINED", 9},   MATCH_CONTAINED, true },
+    { {"#=", 2}, {"EMPTY", 5},       MATCH_EMPTY,     true },
+    { {"#i", 2}, {"NOTEMPTY", 8},    MATCH_EMPTY,     false },
+    { {"=~", 2}, {"MATCH", 5},       MATCH_MATCH,     false },
+    { {"!~", 2}, {"DONTMATCH", 9},   MATCH_DONTMATCH, false },
+    { {NULL, 0}, {NULL, 0}, MATCH_UNKNOWN, false }
+};
+
+static const char *condition_names[] = {
+    "unknown",
+    "equals to",
+    "differs from",
+    "contains",
+    "is contained",
+    "is empty",
+    "matches",
+    "does not match"
+};
 
 typedef struct match_config_t {
     A(match_condition_t) conditions;
@@ -79,10 +113,14 @@ static match_config_t *match_config_new(void)
 
 static inline void match_condition_wipe(match_condition_t *condition)
 {
-    char *str = (char*)condition->value.str;
-    p_delete(&str);
-    condition->value.str = NULL;
-    condition->value.len = 0;
+    if (condition->condition == MATCH_MATCH || condition->condition == MATCH_DONTMATCH) {
+        regexp_wipe(&condition->data.regexp);
+    } else {
+        char *str = (char*)condition->data.value.str;
+        p_delete(&str);
+        condition->data.value.str = NULL;
+        condition->data.value.len = 0;
+    }
 }
 
 static void match_config_delete(match_config_t **config)
@@ -121,48 +159,64 @@ static bool match_filter_constructor(filter_t *filter)
            *    <i field_name is contained case insensitively
            *    #= field_name is empty or not set
            *    #i field_name is not empty
+           *    =~ /regexp/i? match regexp
+           *    !~ /regexp/i? does not match regexp
            */
           case ATK_CONDITION: {
-#define     IS_OP_START(N)                                                        \
-              ((N) == '=' || (N) == '!' || (N) == '>' || (N) == '<' || (N) == '#')
-#define     IS_OP_END(N)                                                          \
-              ((N) == '=' || (N) == 'i')
             match_condition_t condition = CONDITION_INIT;
             const char *p = skipspaces(param->value);
             const char *n = p + 1;
             PARSE_CHECK(isalnum(*p), "invalid field name");
             for (n = p + 1 ; *n && (isalnum(*n) || *n == '_') ; ++n);
-            PARSE_CHECK(*n && (isspace(*n) || IS_OP_START(*n)),
-                        "invalid condition, expected operator after field name");
             condition.field = policy_tokenize(p, n - p);
             PARSE_CHECK(condition.field >= PTK_HELO_NAME
                         && condition.field < PTK_SMTPD_ACCESS_POLICY,
                         "invalid field name %.*s", (int)(n - p), p);
             p = skipspaces(n);
-            n = p + 1;
-            PARSE_CHECK(IS_OP_START(*p) && IS_OP_END(*n),
-                        "invalid operator %2s", p);
-            switch (*p) {
-#define       CASE_OP(C, Value)                                                         \
-              case C:                                                                   \
-                condition.condition = MATCH_ ## Value;                                  \
-                PARSE_CHECK(*n == '=' || *n == 'i', "invalid operator modifier %c", *n);\
-                condition.case_sensitive = !!(*n == '=');                               \
-                break;
-              CASE_OP('=', EQUAL);
-              CASE_OP('!', DIFFER);
-              CASE_OP('>', CONTAINS);
-              CASE_OP('<', CONTAINED);
-              CASE_OP('#', EMPTY);
-#undef        CASE_OP
+
+            condition.condition = MATCH_UNKNOWN;
+            const struct match_operator_t *op = operators;
+            while (condition.condition == MATCH_UNKNOWN && op->condition != MATCH_UNKNOWN) {
+                if (strncmp(p, op->short_name.str, op->short_name.len) == 0) {
+                    condition.condition = op->condition;
+                    condition.case_sensitive = op->cs;
+                    p += op->short_name.len;
+                    break;
+                } else if (strncmp(p, op->long_name.str, op->long_name.len) == 0) {
+                    condition.condition = op->condition;
+                    condition.case_sensitive = op->cs;
+                    p += op->long_name.len;
+                    break;
+                }
+                ++op;
             }
-            PARSE_CHECK(condition.condition != MATCH_UNKNOWN,
+            PARSE_CHECK((*p == '\0' || isspace(*p)) && condition.condition != MATCH_UNKNOWN,
                         "invalid operator");
-            if (condition.condition != MATCH_EMPTY) {
-                p = skipspaces(n + 1);
+            p = skipspaces(p);
+            switch (condition.condition) {
+              case MATCH_EMPTY:
+                break;
+
+              case MATCH_MATCH:
+              case MATCH_DONTMATCH: {
                 PARSE_CHECK(*p, "no value defined to check the condition");
-                condition.value.len = param->value_len - (p - param->value);
-                condition.value.str = p_dupstr(p, condition.value.len);
+                const char delim = *p;
+                char *end = param->value + param->value_len - 1;
+                while (*end != delim) {
+                    --end;
+                }
+                PARSE_CHECK(p != end, "invalid regexp");
+                static_str_t reg = { p + 1, end - p - 1 };
+                condition.case_sensitive = (end[1] != 'i');
+                PARSE_CHECK(regexp_compile_str(&condition.data.regexp, &reg, condition.case_sensitive, false),
+                            "cannot compile regexp %c%.*s%c", delim, (int)reg.len, reg.str, delim);
+              } break;
+
+              default:
+                PARSE_CHECK(*p, "no value defined to check the condition");
+                condition.data.value.len = param->value_len - (p - param->value);
+                condition.data.value.str = p_dupstr(p, condition.data.value.len);
+                break;
             }
             array_add(config->conditions, condition);
           } break;
@@ -190,7 +244,8 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
     debug("running condition: \"%s\" %s %s\"%s\"",
           field->str, condition_names[cond->condition],
           cond->case_sensitive ? "" : "(alternative) ",
-          cond->value.str ? cond->value.str : "(none)");
+          cond->condition != MATCH_MATCH && cond->condition != MATCH_DONTMATCH 
+              && cond->data.value.str ? cond->data.value.str : "(none)");
     switch (cond->condition) {
       case MATCH_EQUAL:
       case MATCH_DIFFER:
@@ -198,10 +253,10 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return cond->condition != MATCH_DIFFER;
         }
         if (cond->case_sensitive) {
-            return !!((strcmp(field->str, cond->value.str) == 0)
+            return !!((strcmp(field->str, cond->data.value.str) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         } else {
-            return !!((ascii_strcasecmp(field->str, cond->value.str) == 0)
+            return !!((ascii_strcasecmp(field->str, cond->data.value.str) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         }
         break;
@@ -211,9 +266,9 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return false;
         }
         if (cond->case_sensitive) {
-            return strstr(field->str, cond->value.str);
+            return strstr(field->str, cond->data.value.str);
         } else {
-            return m_stristrn(field->str, cond->value.str, cond->value.len);
+            return m_stristrn(field->str, cond->data.value.str, cond->data.value.len);
         }
         break;
 
@@ -222,14 +277,26 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return false;
         }
         if (cond->case_sensitive) {
-            return strstr(cond->value.str, field->str);
+            return strstr(cond->data.value.str, field->str);
         } else {
-            return m_stristr(cond->value.str, field->str);
+            return m_stristr(cond->data.value.str, field->str);
         }
         break;
 
       case MATCH_EMPTY:
         return !!((field == NULL || field->len == 0) ^ (!cond->case_sensitive));
+
+      case MATCH_MATCH:
+        if (field == NULL || field->str == NULL) {
+            return false;
+        }
+        return regexp_match_str(&cond->data.regexp, field);
+
+      case MATCH_DONTMATCH:
+        if (field == NULL || field->str == NULL) {
+            return false;
+        }
+        return !regexp_match_str(&cond->data.regexp, field);
 
       default:
         assert(false && "invalid condition type");

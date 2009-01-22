@@ -47,13 +47,13 @@ UB_LIBS   = -lunbound
 FILTERS		= iplist.c greylist.c strlist.c match.c counters.c
 
 postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c resources.c $(FILTERS) $(GENERATED)
-postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev
+postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev -lpcre
 
 tst-rbl_SOURCES   = tst-rbl.c ../common/lib.a filter.c config.c query.c iplist.c resources.c $(GENERATED)
-tst-rbl_LIBADD    = $(UB_LIBS) -lev
+tst-rbl_LIBADD    = $(UB_LIBS) -lev -lpcre
 
 tst-filters_SOURCES = tst-filters.c ../common/lib.a config.c filter.c query.c resources.c $(FILTERS) $(GENERATED)
-tst-filters_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev
+tst-filters_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev -lpcre
 
 tst-greylist_SOURCES = tst-greylist.c resources.c ../common/lib.a
 tst-greylist_LIBADD  = $(TC_LIBS)

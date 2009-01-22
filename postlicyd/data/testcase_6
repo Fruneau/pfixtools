@@ -18,13 +18,14 @@ ccert_subject=solaris9.porcupine.org
 ccert_issuer=Wietse+20Venema
 ccert_fingerprint=C2:9D:F4:87:71:73:73:D9:18:E7:C2:F3:C1:DA:6E:04
 encryption_protocol=TLSv1/SSLv3
-encryption_cipher=DHE-RSA-AES256-sha
+encryption_cipher=DHE-RSAAES256-sha
 encryption_keysize=256
 etrn_domain=
 stress=yEs
 
 match1=match
 match2=fail
+match3=fail
 hostnames1=fail
 hostnames2=hard_match
 hostnames3=hard_match

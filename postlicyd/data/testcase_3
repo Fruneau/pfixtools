@@ -25,6 +25,7 @@ stress=yEs
 
 match1=match
 match2=match
+match3=match
 hostnames1=fail
 hostnames2=hard_match
 hostnames3=hard_match
