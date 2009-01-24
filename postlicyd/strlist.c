@@ -144,13 +144,16 @@ static inline void strlist_copy(char *dest, const char *str, ssize_t str_len,
 
 static bool strlist_create(strlist_local_t *local,
                            const char *file, int weight,
-                           bool reverse, bool partial, bool lock)
+                           bool reverse, bool partial, bool lock,
+                           bool allowregexp)
 {
     file_map_t map;
     const char *p, *end;
     char line[BUFSIZ];
     uint32_t count = 0;
     time_t now = time(0);
+    buffer_t anchor = ARRAY_INIT; /* prefix or suffix */
+    buffer_t regexp = ARRAY_INIT;
 
     if (!file_map_open(&map, file, false)) {
         return false;
@@ -191,18 +194,23 @@ static bool strlist_create(strlist_local_t *local,
     res->size  = map.st.st_size;
     res->mtime = map.st.st_mtime;
 
+  #define CHECK_DATA(cond, message, ...)                                       \
+    if (!(cond)) {                                                             \
+        err(message, __VA_ARGS__);                                             \
+        file_map_close(&map);                                                  \
+        trie_delete(&res->trie1);                                              \
+        strlist_local_wipe(local);                                             \
+        buffer_wipe(&anchor);                                                  \
+        buffer_wipe(&regexp);                                                  \
+        return false;                                                          \
+    }
+
     while (p < end && p != NULL) {
         const char *eol = (char *)memchr(p, '\n', end - p);
         if (eol == NULL) {
             eol = end;
         }
-        if (eol - p >= BUFSIZ) {
-            err("%s not loaded: unreasonnable long line", file);
-            file_map_close(&map);
-            trie_delete(&res->trie1);
-            strlist_local_wipe(local);
-            return false;
-        }
+        CHECK_DATA(eol - p < BUFSIZ, "%s not loaded: unreasonnable long line", file);
         if (*p != '#') {
             const char *eos = eol;
             while (p < eos && isspace(*p)) {
@@ -212,8 +220,22 @@ static bool strlist_create(strlist_local_t *local,
                 --eos;
             }
             if (p < eos) {
-                strlist_copy(line, p, eos - p, reverse);
-                trie_insert(res->trie1, line);
+                static_str_t substr = { p, eos - p };
+                if (allowregexp && *p == '/') {
+                    CHECK_DATA(regexp_parse_str(&substr, reverse ? NULL : &anchor,
+                                                &regexp, reverse ? &anchor : NULL, NULL),
+                               "cannot parse regexp %.*s", (int)substr.len, substr.str);
+                    strlist_copy(line, anchor.data, anchor.len, reverse);
+                    substr.str = line;
+                    substr.len = anchor.len;
+                    static_str_t restr = buffer_tostr(&regexp);
+                    CHECK_DATA(trie_insert_regexp_str(res->trie1, &substr, &restr),
+                               "connot insert regexp %.*s in the trie", (int)(eos - p), p);
+                } else {
+                    strlist_copy(line, substr.str, substr.len, reverse);
+                    CHECK_DATA(trie_insert(res->trie1, line),
+                               "connot insert string \"%.*s\" in the trie", (int)(eos - p), p);
+                }
                 ++count;
             }
         }
@@ -221,6 +243,8 @@ static bool strlist_create(strlist_local_t *local,
     }
     file_map_close(&map);
     trie_compile(res->trie1, lock);
+    buffer_wipe(&anchor);
+    buffer_wipe(&regexp);
     info("%s loaded: done in %us, %u entries", file, (uint32_t)(time(0) - now), count);
     return true;
 }
@@ -421,7 +445,7 @@ static bool strlist_filter_constructor(filter_t *filter)
                   case 3: {
                     strlist_local_t entry;
                     PARSE_CHECK(strlist_create(&entry, current, weight,
-                                               reverse, partial, lock),
+                                               reverse, partial, lock, true),
                                 "cannot load string list from %s", current);
                     array_add(config->locals, entry);
                   } break;
@@ -655,11 +679,67 @@ static void strlist_filter_async(rbl_result_t *result, void *arg)
 }
 
 
+static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_context_t *context,
+                                       strlist_async_data_t *async, int *result_pos,
+                                       const static_str_t *str, const char *fieldname) {
+    char reverse[BUFSIZ];
+    char normal[BUFSIZ];
+
+    const int len = str->len;
+    trie_match_t match;
+    strlist_copy(normal, str->str, len, false);
+    strlist_copy(reverse, str->str, len, true);
+    foreach (strlist_local_t *entry, config->locals) {
+        bool matched = false;
+        if (!entry->partial) {
+            matched = trie_lookup_match(*(entry->db),
+                               entry->reverse ? reverse : normal, &match);
+        } else {
+            matched = trie_prefix_match(*(entry->db),
+                               entry->reverse ? reverse : normal, &match);
+        }
+        if (matched && match.regexp == NULL) {
+            async->sum += entry->weight;
+        } else if (match.regexp != NULL) {
+            static_str_t substr;
+            substr.str = normal + match.match_len;
+            substr.len = len - match.match_len;
+            if (regexp_match_str(match.regexp, &substr)) {
+                async->sum += entry->weight;
+            }
+        }
+        if (async->sum >= (uint32_t)config->hard_threshold) {
+            return true;
+        }
+        async->error = false;
+    }}
+    return false;
+}
+
+static inline bool strlist_rhbl_lookup(const strlist_config_t *config, filter_context_t *context,
+                                       strlist_async_data_t *async, int *result_pos,
+                                       const static_str_t *str, const char* fieldname) {
+    char normal[BUFSIZ];
+
+    const int len = str->len;
+    strlist_copy(normal, str->str, len, false);
+    for (uint32_t i = 0 ; len > 0 && i < config->host_offsets.len ; ++i) {
+        const char *rbl = array_ptr(config->hosts,
+                                    array_elt(config->host_offsets, i));
+        debug("running check of field %s (%s) against %s", fieldname, normal, rbl);
+        if (rhbl_check(rbl, normal, array_ptr(async->results, *result_pos),
+                       strlist_filter_async, context)) {
+            async->error = false;
+            ++async->awaited;
+        }
+        ++(*result_pos);
+    }
+    return false;
+}
+
 static filter_result_t strlist_filter(const filter_t *filter, const query_t *query,
                                       filter_context_t *context)
 {
-    char reverse[BUFSIZ];
-    char normal[BUFSIZ];
     const strlist_config_t *config = filter->data;
     strlist_async_data_t *async = context->contexts[filter_type];
     int result_pos = 0;
@@ -682,61 +762,33 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
         warn("trying to match hostname against helo before helo is received");
         return HTK_ABORT;
     }
-#define LOOKUP(Flag, Field)                                                    \
-    if (config->match_ ## Flag) {                                              \
-        const int len = query->Field.len;                                      \
-        strlist_copy(normal, query->Field.str, len, false);                    \
-        strlist_copy(reverse, query->Field.str, len, true);                    \
-        foreach (strlist_local_t *entry, config->locals) {                     \
-            if ((!entry->partial && trie_lookup(*(entry->db),                  \
-                                      entry->reverse ? reverse : normal))      \
-                || (entry->partial && trie_prefix(*(entry->db),                \
-                                                  entry->reverse ? reverse : normal))) {      \
-                async->sum += entry->weight;                                   \
-                if (async->sum >= (uint32_t)config->hard_threshold) {          \
-                    return HTK_HARD_MATCH;                                     \
-                }                                                              \
-            }                                                                  \
-            async->error = false;                                              \
-        }}                                                                     \
-    }
-#define DNS(Flag, Field)                                                       \
-    if (config->match_ ## Flag) {                                              \
-        const int len = query->Field.len;                                      \
-        strlist_copy(normal, query->Field.str, len, false);                    \
-        for (uint32_t i = 0 ; len > 0 && i < config->host_offsets.len ; ++i) { \
-            const char *rbl = array_ptr(config->hosts,                         \
-                                        array_elt(config->host_offsets, i));   \
-            debug("running check of field %s (%s) against %s", STR(Field),     \
-                  normal, rbl);                                                \
-            if (rhbl_check(rbl, normal, array_ptr(async->results, result_pos), \
-                           strlist_filter_async, context)) {                   \
-                async->error = false;                                          \
-                ++async->awaited;                                              \
-            }                                                                  \
-            ++result_pos;                                                      \
-        }                                                                      \
-    }
 
-    if (config->is_email) {
-        LOOKUP(sender, sender);
-        LOOKUP(recipient, recipient);
-        DNS(sender, sender);
-        DNS(recipient, recipient);
-    } else if (config->is_hostname) {
-        LOOKUP(helo, helo_name);
-        LOOKUP(client, client_name);
-        LOOKUP(reverse, reverse_client_name);
-        LOOKUP(recipient, recipient_domain);
-        LOOKUP(sender, sender_domain);
-        DNS(helo, helo_name);
-        DNS(client, client_name);
-        DNS(reverse, reverse_client_name);
-        DNS(recipient, recipient_domain);
-        DNS(sender, sender_domain);
+#define LOOKUP(Flag, Field, Method)                                                   \
+    if (config->match_ ## Flag) {                                                     \
+        if (strlist_ ## Method ## _lookup(config, context, async, &result_pos,        \
+                                          &query->Field, STR(Field))) {               \
+            return HTK_HARD_MATCH;                                                    \
+        }                                                                             \
     }
-#undef  DNS
+    if (config->is_email) {
+        LOOKUP(sender, sender, trie);
+        LOOKUP(recipient, recipient, trie);
+        LOOKUP(sender, sender, rhbl);
+        LOOKUP(recipient, recipient, rhbl);
+    } else if (config->is_hostname) {
+        LOOKUP(helo, helo_name, trie);
+        LOOKUP(client, client_name, trie);
+        LOOKUP(reverse, reverse_client_name, trie);
+        LOOKUP(recipient, recipient_domain, trie);
+        LOOKUP(sender, sender_domain, trie);
+        LOOKUP(helo, helo_name, rhbl);
+        LOOKUP(client, client_name, rhbl);
+        LOOKUP(reverse, reverse_client_name, rhbl);
+        LOOKUP(recipient, recipient_domain, rhbl);
+        LOOKUP(sender, sender_domain, rhbl);
+    }
 #undef  LOOKUP
+
     if (async->awaited > 0) {
         return HTK_ASYNC;
     }

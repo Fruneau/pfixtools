@@ -68,6 +68,11 @@ static inline char *buffer_unwrap(buffer_t **buf) {
     return res;
 }
 
+static inline static_str_t buffer_tostr(buffer_t *buf) {
+    static_str_t str = { buf->data, buf->len };
+    return str;
+}
+
 #define buffer_resize(buffer, newsize)                                         \
   array_ensure_exact_capacity(*(buffer), (newsize) + 1)
 
