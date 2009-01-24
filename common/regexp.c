@@ -124,6 +124,12 @@ static inline bool is_special(const char c) {
         || c == 'w' || c == 'W' || c == 'b' || c == 'B';
 }
 
+/** Return true if the character is a valid regexp delimiter.
+ */
+static inline bool is_valid_delimiter(const char c) {
+    return !isspace(c) && !isalnum(c) && isascii(c);
+}
+
 bool regexp_parse_str(const static_str_t *str, buffer_t *prefix,
                       buffer_t *re, buffer_t *suffix, bool *cs) {
     if (str == NULL || re == NULL || str->len < 2) {
@@ -134,6 +140,10 @@ bool regexp_parse_str(const static_str_t *str, buffer_t *prefix,
     const char *p   = str->str;
     const char *end = str->str + str->len;
     char delim = *(p++);
+    if (!is_valid_delimiter(delim)) {
+        err("Invalid delimiter %c", delim);
+        return false;
+    }
 
     buffer_reset(re);
     /* Read literal prefix */
