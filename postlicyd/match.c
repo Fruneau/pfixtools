@@ -134,11 +134,14 @@ static void match_config_delete(match_config_t **config)
 static bool match_filter_constructor(filter_t *filter)
 {
     match_config_t *config = match_config_new();
+    buffer_t regexp = ARRAY_INIT;
+    buffer_addch(&regexp, '\0');
 
 #define PARSE_CHECK(Expr, Str, ...)                                            \
     if (!(Expr)) {                                                             \
         err(Str, ##__VA_ARGS__);                                               \
         match_config_delete(&config);                                          \
+        buffer_wipe(&regexp);                                                  \
         return false;                                                          \
     }
 
@@ -200,16 +203,14 @@ static bool match_filter_constructor(filter_t *filter)
               case MATCH_MATCH:
               case MATCH_DONTMATCH: {
                 PARSE_CHECK(*p, "no value defined to check the condition");
-                const char delim = *p;
-                char *end = param->value + param->value_len - 1;
-                while (*end != delim) {
-                    --end;
-                }
-                PARSE_CHECK(p != end, "invalid regexp");
-                static_str_t reg = { p + 1, end - p - 1 };
-                condition.case_sensitive = (end[1] != 'i');
+                const char * const end = param->value + param->value_len;
+                static_str_t reg = { p, end - p };
+                PARSE_CHECK(regexp_parse_str(&reg, NULL, &regexp, NULL, &condition.case_sensitive),
+                            "invalid regexp");
+                reg.str = regexp.data;
+                reg.len = regexp.len;
                 PARSE_CHECK(regexp_compile_str(&condition.data.regexp, &reg, condition.case_sensitive),
-                            "cannot compile regexp %c%.*s%c", delim, (int)reg.len, reg.str, delim);
+                            "cannot compile regexp %.*s", (int)(end - p), p);
               } break;
 
               default:
@@ -228,6 +229,7 @@ static bool match_filter_constructor(filter_t *filter)
     PARSE_CHECK(config->conditions.len > 0,
                 "no condition defined");
     filter->data = config;
+    buffer_wipe(&regexp);
     return true;
 }
 
