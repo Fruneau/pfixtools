@@ -85,7 +85,7 @@ static regexp_t *create_regex_from_file(const char *file)
     file_map_close(&map);
 
     regexp_t *re = regexp_new();
-    if (!regexp_compile(re, array_start(buffer), false, false)) {
+    if (!regexp_compile(re, array_start(buffer), false)) {
         array_wipe(buffer);
         regexp_delete(&re);
         return NULL;
@@ -94,9 +94,73 @@ static regexp_t *create_regex_from_file(const char *file)
     return re;
 }
 
+static bool check_parse(const char *str, const char *prefix, const char *suffix,
+                        const char *wildcard, bool cs) {
+    buffer_t reprefix = ARRAY_INIT;
+    buffer_t resuffix = ARRAY_INIT;
+    buffer_t restr  = ARRAY_INIT;
+    bool recs = false;
+    bool res  = true;
+
+    buffer_addch(&reprefix, '\0');
+    buffer_addch(&resuffix, '\0');
+    buffer_addch(&restr, '\0');
+
+    if (regexp_parse(str, prefix ? &reprefix : NULL,
+                     &restr,
+                     suffix ? &resuffix : NULL,
+                     &recs)) {
+        printf("%s -> \"%s\" + /%s/ + \"%s\": ", str, reprefix.data, restr.data, resuffix.data);
+        res = (cs == recs);
+        if (prefix) {
+            res = res && strcmp(reprefix.data, prefix) == 0;
+        }
+        if (suffix) {
+            res = res && strcmp(resuffix.data, suffix) == 0;
+        }
+        res = res && strcmp(restr.data, wildcard) == 0;
+    } else {
+        printf("%s: ", str);
+        res = false;
+    }
+    printf("%s\n", res ? "OK" : "FAILED");
+
+    buffer_wipe(&reprefix);
+    buffer_wipe(&resuffix);
+    buffer_wipe(&restr);
+
+    return res;
+}
 
 int main(int argc, char *argv[])
 {
+    /* Read prefixes and suffixes
+     */
+#define CHECK(str, prefix, suffix, content, cs)                                \
+    if (!check_parse(str, prefix, suffix, content, cs)) {                      \
+        return -1;                                                             \
+    }
+    CHECK("/^coucou/", "coucou", NULL, "^", true);
+    CHECK("/^coucou\\.machin/", "coucou.machin", NULL, "^", true);
+    CHECK("/^coucou.machin/", "coucou", NULL, "^.machin", true);
+    CHECK("/^coucou\\.machin$/", "coucou.machin", NULL, "^$", true);
+
+    CHECK("/coucou$/", "", "coucou", "$", true);
+    CHECK("/coucou\\.machin$/", NULL, "coucou.machin", "$", true);
+    CHECK("/coucou.machin$/", NULL, "machin", "coucou.$", true);
+    CHECK("/coucou\\$/", NULL, "", "coucou\\$", true);
+    CHECK("/\\\\$/", NULL, "\\", "$", true);
+    CHECK("/\\\\\\$/", NULL, "", "\\\\\\$", true);
+    CHECK("/\\\\\\\\$/i", NULL, "\\\\", "$", false);
+    CHECK("/coucou.machin$/", NULL, NULL, "coucou.machin$", true);
+
+    CHECK("/coucou\\/machin/", "", "", "coucou/machin", true);
+
+    CHECK("/^s[cv]\\d+pub\\.verizon\\.net$/", NULL, "pub.verizon.net", "^s[cv]\\d+$", true);
+    CHECK("/^mail\\d+\\.telekom\\.de$/", NULL, ".telekom.de", "^mail\\d+$", true);
+    CHECK("/^mail\\d+\\.telekom\\.de$/", "mail", NULL, "^\\d+\\.telekom\\.de$", true);
+    CHECK("/\\dmachin$/", NULL, "machin", "\\d$", true);
+
     /* Perf test
      */
     if (argc > 1) {

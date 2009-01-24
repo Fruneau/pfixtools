@@ -208,7 +208,7 @@ static bool match_filter_constructor(filter_t *filter)
                 PARSE_CHECK(p != end, "invalid regexp");
                 static_str_t reg = { p + 1, end - p - 1 };
                 condition.case_sensitive = (end[1] != 'i');
-                PARSE_CHECK(regexp_compile_str(&condition.data.regexp, &reg, condition.case_sensitive, false),
+                PARSE_CHECK(regexp_compile_str(&condition.data.regexp, &reg, condition.case_sensitive),
                             "cannot compile regexp %c%.*s%c", delim, (int)reg.len, reg.str, delim);
               } break;
 

@@ -247,7 +247,7 @@ bool trie_insert_regexp_str(trie_t *trie, const static_str_t *key, const static_
         key_pos.regexp = trie->regexps.len;
 
         regexp_t re;
-        if (!regexp_compile_str(&re, regexp, false, false)) {
+        if (!regexp_compile_str(&re, regexp, false)) {
             return false;
         }
         array_add(trie->regexps, re);
