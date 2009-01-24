@@ -56,7 +56,9 @@ DO_NEW(buffer_t, buffer);
 DO_DELETE(buffer_t, buffer);
 
 static inline void buffer_reset(buffer_t *buf) {
-    buf->data[buf->len = 0] = '\0';
+    if (buf->data) {
+        buf->data[buf->len = 0] = '\0';
+    }
 }
 
 static inline char *buffer_unwrap(buffer_t **buf) {
