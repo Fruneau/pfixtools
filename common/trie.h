@@ -98,7 +98,7 @@ bool trie_insert_regexp_str(trie_t *trie, const static_str_t *key, const static_
  *   trie_lookup(trie, ...);
  */
 __attribute__((nonnull(1)))
-void trie_compile(trie_t *trie, bool memlock);
+bool trie_compile(trie_t *trie, bool memlock);
 
 /** Lock the trie into memory.
  * \ref trie_unlock

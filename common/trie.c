@@ -276,7 +276,7 @@ bool trie_insert(trie_t *trie, const char *key)
     return trie_insert_regexp_str(trie, &skey, NULL);
 }
 
-static inline void trie_compile_aux(trie_t *trie, uint32_t id,
+static inline bool trie_compile_aux(trie_t *trie, uint32_t id,
                                     uint32_t first_key, uint32_t last_key,
                                     int offset, int initial_diff)
 {
@@ -303,12 +303,19 @@ static inline void trie_compile_aux(trie_t *trie, uint32_t id,
                 forks[fork_pos++] = i;
                 current = c;
             } else if (current == '\0') {
-                trie_compile_aux(trie, id, i, last_key, offset - (off_diff - initial_diff), initial_diff);
-                return;
+                if (rek(trie, first_key) != reg) {
+                    err("duplicate entry in the trie with different associated regexps: %s",
+                        key(trie, i));
+                    return false;
+                } else {
+                    debug("dropping duplicate for key %s", key(trie, i));
+                }
+                return trie_compile_aux(trie, id, i, last_key,
+                                        offset - (off_diff - initial_diff), initial_diff);
             }
         }
         if (fork_pos == 0 && current == '\0') {
-            return;
+            return true;
         }
     }
     forks[fork_pos] = last_key;
@@ -317,13 +324,16 @@ static inline void trie_compile_aux(trie_t *trie, uint32_t id,
     for (uint16_t i = 0 ; i < children_len ; ++i) {
         int child = array_elt(trie->entries, id).children_offset + i;
         if (forks[i] - 1 > first_key) {
-            trie_compile_aux(trie, child, first_key, forks[i], offset, 1);
+            if (!trie_compile_aux(trie, child, first_key, forks[i], offset, 1)) {
+                return false;
+            }
         }
         first_key = forks[i];
     }
+    return true;
 }
 
-void trie_compile(trie_t *trie, bool memlock)
+bool trie_compile(trie_t *trie, bool memlock)
 {
     assert(trie->entries.len == 0 && "Trie already compiled");
     assert(trie->keys.len != 0 && "Trying to compile an empty trie");
@@ -336,14 +346,17 @@ void trie_compile(trie_t *trie, bool memlock)
     }
 
     array_ensure_capacity(trie->entries, trie->keys_offset.len);
-    trie_compile_aux(trie, trie_add_leaf(trie, key(trie, 0), rek(trie, 0)),
-                     0, trie->keys_offset.len, 0, 0);
+    if (!trie_compile_aux(trie, trie_add_leaf(trie, key(trie, 0), rek(trie, 0)),
+                          0, trie->keys_offset.len, 0, 0)) {
+        return false;
+    }
     trie_cleanup_build_data(trie);
     array_adjust(trie->entries);
     array_adjust(trie->c);
     if (memlock) {
         trie_lock(trie);
     }
+    return true;
 }
 
 

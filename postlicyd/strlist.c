@@ -244,9 +244,13 @@ static bool strlist_create(strlist_local_t *local,
         p = eol + 1;
     }
     file_map_close(&map);
-    trie_compile(res->trie1, lock);
     buffer_wipe(&anchor);
     buffer_wipe(&regexp);
+
+    if (!trie_compile(res->trie1, lock)) {
+        err("%s not loaded: invalid data", file);
+        return false;
+    }
     info("%s loaded: done in %us, %u entries", file, (uint32_t)(time(0) - now), count);
     return true;
 }
@@ -350,12 +354,20 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
     }
     file_map_close(&map);
     if (host_count > 0) {
-        trie_compile(res->trie1, lock);
+        if (!trie_compile(res->trie1, lock)) {
+            err("%s not loaded: invalid data", file);
+            strlist_local_wipe(hosts);
+            return false;
+        }
     } else {
         trie_delete(&res->trie1);
     }
     if (domain_count > 0) {
-        trie_compile(res->trie2, lock);
+        if (!trie_compile(res->trie2, lock)) {
+            err("%s not loaded: invalid data", file);
+            strlist_local_wipe(hosts);
+            return false;
+        }
     } else {
         trie_delete(&res->trie2);
     }
