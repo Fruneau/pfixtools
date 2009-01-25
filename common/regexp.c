@@ -106,14 +106,14 @@ bool regexp_match(const regexp_t *re, const char *str)
 static inline bool is_wildcard(const char c) {
     return c == '.' || c == '$' || c == '^'
         || c == '?' || c == '+' || c == '*' || c == '|'
-        || c == '(' || c == ')' || c == '[' || c == ']';
+        || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
 }
 
 /** Returns true if the character affects the previous character behaviour in a regexp
  * when non escaped.
  */
 static inline bool is_modifier(const char c) {
-    return c == '?' || c == '+' || c == '*';
+    return c == '?' || c == '+' || c == '*' || c == '{';
 }
 
 /** Returns true if the character has a special in regexp when espaced.
@@ -128,7 +128,7 @@ static inline bool is_special(const char c) {
 /** Return true if the character is a valid regexp delimiter.
  */
 static inline bool is_valid_delimiter(const char c) {
-    return !isspace(c) && !isalnum(c) && isascii(c);
+    return !isspace(c) && !isalnum(c) && isascii(c) && !is_wildcard(c);
 }
 
 bool regexp_parse_str(const static_str_t *str, buffer_t *prefix,
