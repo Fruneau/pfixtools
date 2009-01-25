@@ -64,6 +64,7 @@ bool regexp_compile(regexp_t *re, const char *str, bool cs)
 
     int flags = (cs ? 0 : PCRE_CASELESS);
 
+    debug("compiling regexp: %s", str);
     re->re = pcre_compile(str, flags, &error, &erroffset, NULL);
     if (re->re == NULL) {
         err("cannot compile regexp: %s (at %d)", error, erroffset);

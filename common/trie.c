@@ -367,10 +367,12 @@ bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
         while (true) {
             if (trie_entry_is_leaf(current)) {
                 if (trie_entry_match(trie, current, key)) {
-                    FILL_MATCH(key - orig + current->c_len, true, true, rex(trie, current));
+                    FILL_MATCH(key - orig + current->c_len - 1,
+                               true, true, rex(trie, current));
                     return true;
                 } else if (match && trie_entry_prefix(trie, current, key)) {
-                    FILL_MATCH(key - orig + current->c_len, false, true, rex(trie, current));
+                    FILL_MATCH(key - orig + current->c_len - 1,
+                               false, true, rex(trie, current));
                     return false;
                 } else {
                     FILL_MATCH(key - orig, false, false, NULL);
@@ -403,7 +405,8 @@ bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match)
         while (true) {
             if (trie_entry_is_leaf(current)) {
                 if (trie_entry_prefix(trie, current, key)) {
-                    FILL_MATCH(key - orig + current->c_len, key[current->c_len - 1] == '\0',
+                    FILL_MATCH(key - orig + current->c_len - 1,
+                               key[current->c_len - 1] == '\0',
                                true, rex(trie, current));
                     return true;
                 } else {

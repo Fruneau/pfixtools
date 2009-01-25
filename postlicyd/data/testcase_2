@@ -29,6 +29,7 @@ match3=match
 hostnames1=soft_match
 hostnames2=hard_match
 hostnames3=hard_match
+hostnames4=hard_match
 emails1=soft_match
 emails2=hard_match
 emails3=hard_match

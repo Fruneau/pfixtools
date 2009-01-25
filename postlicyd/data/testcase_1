@@ -29,6 +29,7 @@ match3=match
 hostnames1=fail
 hostnames2=fail
 hostnames3=fail
+hostnames4=hard_match
 emails1=fail
 emails2=fail
 emails3=fail
