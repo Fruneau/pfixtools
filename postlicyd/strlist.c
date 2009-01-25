@@ -226,7 +226,7 @@ static bool strlist_create(strlist_local_t *local,
                                                 &regexp, reverse ? &anchor : NULL, NULL),
                                "cannot parse regexp %.*s", (int)substr.len, substr.str);
                     strlist_copy(line, anchor.data, anchor.len, reverse);
-                    CHECK_DATA(anchor.len > 0, "not fix %s found in %.*s",
+                    CHECK_DATA(anchor.len > 0, "no fix %s found in %.*s",
                                reverse ? "suffix" : "prefix", (int)substr.len, substr.str);
                     substr.str = line;
                     substr.len = anchor.len;
