@@ -1,4 +1,17 @@
 ------------------------------------------------------------------------------
+version 0.6
+
+  * common:
+    NEW: add support for regexp                                            FRU
+    NEW: documentation target and man page                                  MC
+    CHA: fix copyright and licensing                                        MC
+    FIX: fix build of tries with duplicated keys                           FRU
+
+  * postlicyd:
+    NEW: support for regexp in strlist and match filters                   FRU
+    FIX: crash when using rbldns strlist                                   FRU
+
+------------------------------------------------------------------------------
 version 0.5                                                       Nov 11, 2008
 
   * common:
