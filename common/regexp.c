@@ -79,7 +79,7 @@ bool regexp_compile(regexp_t *re, const char *str, bool cs)
 
 bool regexp_compile_str(regexp_t* re, const static_str_t *str, bool cs)
 {
-    if (str->str[str->len + 1] == '\0') {
+    if (str->str[str->len] == '\0') {
         return regexp_compile(re, str->str, cs);
     } else {
         // TODO: Use a buffer to avoid stupid allocations

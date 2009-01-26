@@ -204,7 +204,7 @@ static bool match_filter_constructor(filter_t *filter)
                 PARSE_CHECK(*p, "no value defined to check the condition");
                 const char * const end = param->value + param->value_len;
                 static_str_t reg = { p, end - p };
-                buffer_addch(&regexp, '\0');
+                buffer_addstr(&regexp, "");
                 PARSE_CHECK(regexp_parse_str(&reg, NULL, &regexp, NULL, &condition.case_sensitive),
                             "invalid regexp");
                 reg.str = regexp.data;
