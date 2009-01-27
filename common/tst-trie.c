@@ -72,16 +72,18 @@ static trie_t *create_trie_from_file(const char *file)
             p = eol - BUFSIZ;
         }
         int i = 0;
+        if (*p != '#' && p != eol) {
 #if 1
-        for (const char *s = eol - 1 ; s >= p ; --s) {
-            line[i++] = ascii_tolower(*s);
-        }
+          for (const char *s = eol - 1 ; s >= p ; --s) {
+              line[i++] = ascii_tolower(*s);
+          }
 #else
-        memcpy(line, p, eol - p);
-        i = eol - p;
+          memcpy(line, p, eol - p);
+          i = eol - p;
 #endif
-        line[i] = '\0';
-        trie_insert(db, line);
+          line[i] = '\0';
+          trie_insert(db, line);
+        }
         p = eol + 1;
     }
     file_map_close(&map);
@@ -118,17 +120,26 @@ static void check_trie_with_file(const trie_t *db, const char *file)
             p = eol - BUFSIZ;
         }
         int i = 0;
+        if (*p != '#' && p != eol) {
 #if 1
-        for (const char *s = eol - 1 ; s >= p ; --s) {
-            line[i++] = ascii_tolower(*s);
-        }
+          for (const char *s = eol - 1 ; s >= p ; --s) {
+              line[i++] = ascii_tolower(*s);
+          }
 #else
-        memcpy(line, p, eol - p);
-        i = eol - p;
+          memcpy(line, p, eol - p);
+          i = eol - p;
 #endif
-        line[i] = '\0';
-        if (!trie_lookup(db, line)) {
-          warn("'%s' not found in the trie", line);
+          line[i] = '\0';
+          if (!trie_lookup(db, line)) {
+            warn("'%s' not found in the trie", line);
+          }
+          strcat(line, "coucou");
+          if (trie_lookup(db, line)) {
+            warn("'%s' found in trie", line);
+          }
+          if (!trie_prefix(db, line)) {
+            warn("'%s' has no prefix in trie", line);
+          }
         }
         p = eol + 1;
     }
@@ -278,7 +289,7 @@ int main(int argc, char *argv[])
      */
     if (argc > 1) {
         trie = create_trie_from_file(argv[1]);
-        trie_inspect(trie, false);
+        trie_inspect(trie, true);
         check_trie_with_file(trie, argv[1]);
         if (argc > 2) {
             const uint32_t how_many = 8 * 1000 * 1000;

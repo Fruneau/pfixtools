@@ -142,11 +142,10 @@ static inline bool trie_entry_is_leaf(const trie_entry_t *entry)
  */
 static inline const trie_entry_t* trie_entry_child(const trie_t *trie,
                                                    const trie_entry_t* entry,
-                                                   const char *key)
+                                                   const char c)
 {
     uint32_t start = entry->children_offset;
     uint32_t end   = start + entry->children_len;
-    const char c = *key;
 
     while (start < end) {
         uint32_t mid = (start + end) >> 1;
@@ -393,11 +392,19 @@ bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
                 }
             } else if (trie_entry_c_match(trie, current, key)) {
                 key += current->c_len;
-                current = trie_entry_child(trie, current, key);
-                if (current == NULL) {
+                const trie_entry_t* nexte = trie_entry_child(trie, current, key[0]);
+                if (nexte == NULL) {
+                    if (match) {
+                      nexte = trie_entry_child(trie, current, '\0');
+                      if (nexte != NULL) {
+                        FILL_MATCH(key - orig, false, true, rex(trie, nexte));
+                        return false;
+                      }
+                    }
                     FILL_MATCH(key - orig, false, false, NULL);
                     return false;
                 }
+                current = nexte;
             } else {
                 FILL_MATCH(key - orig, false, false, NULL);
                 return false;
@@ -428,11 +435,17 @@ bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match)
                 }
             } else if (trie_entry_c_match(trie, current, key)) {
                 key += current->c_len;
-                current = trie_entry_child(trie, current, key);
-                if (current == NULL) {
+                const trie_entry_t* nexte = trie_entry_child(trie, current, key[0]);
+                if (nexte == NULL) {
+                    nexte = trie_entry_child(trie, current, '\0');
+                    if (nexte != NULL) {
+                      FILL_MATCH(key - orig, false, true, rex(trie, nexte));
+                      return true;
+                    }
                     FILL_MATCH(key - orig, false, false, NULL);
                     return false;
                 }
+                current = nexte;
             } else {
                 FILL_MATCH(key - orig, false, false, NULL);
                 return false;
