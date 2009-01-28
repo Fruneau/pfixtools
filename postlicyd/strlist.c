@@ -281,11 +281,6 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
     if (res == NULL) {
         res = p_new(strlist_resource_t, 1);
         resource_set("strlist", file, res, (resource_destructor_t)strlist_resource_wipe);
-    } else if (res->trie2 == NULL) {
-        err("%s not loaded: the file is already used as a strlist-file parameter", file);
-        resource_release("strlist", file);
-        file_map_close(&map);
-        return false;
     }
 
     p_clear(hosts, 1);
