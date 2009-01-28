@@ -1,7 +1,7 @@
 Installation instruction for pfixtools
 
 1)  Install dependencies; you will need at least the following packages:
-        gperf, libbz2-dev, libsrs2-dev, libev-dev, libunbound-dev, pkg-config
+        gperf, libbz2-dev, libsrs2-dev, libev-dev, libunbound-dev, libpcre3-dev, pkg-config
     For the documentation, you'll need:
         xmlto, docbook-xsl and asciidoc
 
