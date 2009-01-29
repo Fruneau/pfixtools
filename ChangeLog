@@ -10,6 +10,7 @@ version 0.6
   * postlicyd:
     NEW: support for regexp in strlist and match filters                   FRU
     FIX: crash when using rbldns strlist                                   FRU
+    FIX: mem leak when reloading an iplist from disk                       FRU
 
 ------------------------------------------------------------------------------
 version 0.5                                                       Nov 11, 2008
