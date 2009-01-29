@@ -175,6 +175,13 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         warn("%s: final \\n missing, ignoring last line", file);
     }
 
+    /* Initialize the length of array (can be reused).
+     */
+    for (int i = 0 ; i < 1 << 16 ; ++i) {
+        array_unlock(res->ips[i]);
+        array_len(res->ips[i]) = 0;
+    }
+
     while (p < end) {
         uint32_t ip;
 

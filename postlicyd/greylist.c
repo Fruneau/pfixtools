@@ -121,8 +121,9 @@ static inline bool greylist_db_need_cleanup(const greylist_config_t *config, TCB
     if (last_cleanup == NULL) {
         debug("No last cleanup time");
     } else {
-        debug("Last cleanup time %u, (ie %us ago)",
-              (uint32_t)*last_cleanup, (uint32_t)(now - *last_cleanup));
+        debug("Last cleanup time %u, (ie %us ago) max %us",
+              (uint32_t)*last_cleanup, (uint32_t)(now - *last_cleanup),
+              config->cleanup_period);
     }
     return last_cleanup == NULL
         || len != sizeof(*last_cleanup)
