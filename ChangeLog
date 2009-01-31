@@ -9,6 +9,7 @@ version 0.6
 
   * postlicyd:
     NEW: support for regexp in strlist and match filters                   FRU
+    NEW: match operator can compare query fields together                  FRU
     FIX: crash when using rbldns strlist                                   FRU
     FIX: mem leak when reloading an iplist from disk                       FRU
 
