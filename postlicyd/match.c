@@ -106,6 +106,8 @@ typedef struct match_config_t {
     bool match_all;
 } match_config_t;
 
+static buffer_t match_buffer = BUFFER_INIT;
+
 static match_config_t *match_config_new(void)
 {
     return p_new(match_config_t, 1);
@@ -217,6 +219,8 @@ static bool match_filter_constructor(filter_t *filter)
                 PARSE_CHECK(*p, "no value defined to check the condition");
                 condition.data.value.len = param->value_len - (p - param->value);
                 condition.data.value.str = p_dupstr(p, condition.data.value.len);
+                PARSE_CHECK(query_format_check(condition.data.value.str),
+                            "invalid condition right hand expression \"%s\"", condition.data.value.str);
                 break;
             }
             array_add(config->conditions, condition);
@@ -243,11 +247,16 @@ static void match_filter_destructor(filter_t *filter)
 static inline bool match_condition(const match_condition_t *cond, const query_t *query)
 {
     const static_str_t *field = query_field_for_id(query, cond->field);
+    if (cond->condition != MATCH_EMPTY && cond->condition != MATCH_MATCH
+        && cond->condition != MATCH_DONTMATCH) {
+        buffer_reset(&match_buffer);
+        query_format_buffer(&match_buffer, cond->data.value.str, query);
+    }
     debug("running condition: \"%s\" %s %s\"%s\"",
           field->str, condition_names[cond->condition],
           cond->case_sensitive ? "" : "(alternative) ",
           cond->condition != MATCH_MATCH && cond->condition != MATCH_DONTMATCH 
-              && cond->data.value.str ? cond->data.value.str : "(none)");
+              && cond->data.value.str ? match_buffer.data : "(none)");
     switch (cond->condition) {
       case MATCH_EQUAL:
       case MATCH_DIFFER:
@@ -255,10 +264,10 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return cond->condition != MATCH_DIFFER;
         }
         if (cond->case_sensitive) {
-            return !!((strcmp(field->str, cond->data.value.str) == 0)
+            return !!((strcmp(field->str, match_buffer.data) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         } else {
-            return !!((ascii_strcasecmp(field->str, cond->data.value.str) == 0)
+            return !!((ascii_strcasecmp(field->str, match_buffer.data) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         }
         break;
@@ -268,9 +277,9 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return false;
         }
         if (cond->case_sensitive) {
-            return strstr(field->str, cond->data.value.str);
+            return strstr(field->str, match_buffer.data);
         } else {
-            return m_stristrn(field->str, cond->data.value.str, cond->data.value.len);
+            return m_stristrn(field->str, match_buffer.data, match_buffer.len);
         }
         break;
 
@@ -279,9 +288,9 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return false;
         }
         if (cond->case_sensitive) {
-            return strstr(cond->data.value.str, field->str);
+            return strstr(match_buffer.data, field->str);
         } else {
-            return m_stristr(cond->data.value.str, field->str);
+            return m_stristr(match_buffer.data, field->str);
         }
         break;
 
@@ -348,3 +357,9 @@ static int match_init(void)
     return 0;
 }
 module_init(match_init);
+
+static void match_exit(void)
+{
+    buffer_wipe(&match_buffer);
+}
+module_exit(match_exit);
