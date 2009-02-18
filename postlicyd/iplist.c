@@ -47,7 +47,7 @@
 #include "file.h"
 #include "array.h"
 #include "resources.h"
-#include "rbl.h"
+#include "dns.h"
 
 #define IPv4_BITS        5
 #define IPv4_PREFIX(ip)  ((uint32_t)(ip) >> IPv4_BITS)
@@ -279,7 +279,7 @@ typedef struct iplist_filter_t {
 } iplist_filter_t;
 
 typedef struct iplist_async_data_t {
-    A(rbl_result_t) results;
+    A(dns_result_t) results;
     int awaited;
     uint32_t sum;
     bool error;
@@ -442,7 +442,7 @@ static void iplist_filter_destructor(filter_t *filter)
     filter->data = data;
 }
 
-static void iplist_filter_async(rbl_result_t *result, void *arg)
+static void iplist_filter_async(dns_result_t *result, void *arg)
 {
     filter_context_t   *context = arg;
     const filter_t      *filter = context->current_filter;
@@ -450,7 +450,7 @@ static void iplist_filter_async(rbl_result_t *result, void *arg)
     iplist_async_data_t  *async = context->contexts[filter_type];
 
 
-    if (*result != RBL_ERROR) {
+    if (*result != DNS_ERROR) {
         async->error = false;
     }
     --async->awaited;
@@ -467,10 +467,10 @@ static void iplist_filter_async(rbl_result_t *result, void *arg)
                 int weight = array_elt(data->host_weights, i);
 
                 switch (array_elt(async->results, i)) {
-                  case RBL_ASYNC:
+                  case DNS_ASYNC:
                     crit("no more awaited answer but result is ASYNC");
                     abort();
-                  case RBL_FOUND:
+                  case DNS_FOUND:
                     async->sum += weight;
                     break;
                   default:
@@ -524,8 +524,8 @@ static filter_result_t iplist_filter(const filter_t *filter, const query_t *quer
         async->awaited = 0;
         for (uint32_t i = 0 ; i < data->host_offsets.len ; ++i) {
             const char *rbl = array_ptr(data->hosts, array_elt(data->host_offsets, i));
-            if (rbl_check(rbl, ip, array_ptr(async->results, i),
-                          iplist_filter_async, context)) {
+            if (dns_rbl_check(rbl, ip, array_ptr(async->results, i),
+                             iplist_filter_async, context)) {
                 error = false;
                 ++async->awaited;
             }

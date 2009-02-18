@@ -33,34 +33,52 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2008 Florent Bruneau
+ * Copyright © 2008-2009 Florent Bruneau
  */
 
-#ifndef PFIXTOOLS_RBL_H
-#define PFIXTOOLS_RBL_H
+#ifndef PFIXTOOLS_DNS_H
+#define PFIXTOOLS_DNS_H
 
 #include "common.h"
 
 typedef enum {
-  RBL_ASYNC,
-  RBL_ERROR,
-  RBL_FOUND,
-  RBL_NOTFOUND,
-} rbl_result_t;
-ARRAY(rbl_result_t);
+    DNS_ASYNC,
+    DNS_ERROR,
+    DNS_FOUND,
+    DNS_NOTFOUND,
+} dns_result_t;
+ARRAY(dns_result_t);
 
-typedef void (*rbl_result_callback_t)(rbl_result_t *result, void *data);
+typedef enum {
+    DNS_RRT_A     = 1,
+    DNS_RRT_NS    = 2,
+    DNS_RRT_CNAME = 5,
+    DNS_RRT_SOA   = 6,
+    DNS_RRT_PTR   = 12,
+    DNS_RRT_MX    = 15,
+    DNS_RRT_TXT   = 16,
+    DNS_RRT_AAAA  = 28,
+    DNS_RRT_SRV   = 33
+} dns_rrtype_t;
+
+typedef void (*dns_result_callback_t)(dns_result_t *result, void *data);
+
+/** Fetch the DNS record of the given type.
+ */
+__attribute__((nonnull(1,4)))
+bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
+               dns_result_callback_t callback, void *data);
 
 /** Check the presence of the given IP in the given rbl.
  */
 __attribute__((nonnull(1,3)))
-bool rbl_check(const char *rbl, uint32_t ip, rbl_result_t *result,
-               rbl_result_callback_t callback, void *data);
+bool dns_rbl_check(const char *rbl, uint32_t ip, dns_result_t *result,
+                  dns_result_callback_t callback, void *data);
 
 /** Check the presence of the given hostname in the given rhbl.
  */
 __attribute__((nonnull(1,2,3)))
-bool rhbl_check(const char *rhbl, const char *hostname, rbl_result_t *result,
-                rbl_result_callback_t callback, void *data);
+bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result,
+                   dns_result_callback_t callback, void *data);
 
 #endif

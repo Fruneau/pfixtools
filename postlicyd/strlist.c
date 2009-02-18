@@ -40,7 +40,7 @@
 #include "trie.h"
 #include "file.h"
 #include "str.h"
-#include "rbl.h"
+#include "dns.h"
 #include "policy_tokens.h"
 #include "resources.h"
 
@@ -82,7 +82,7 @@ typedef struct strlist_config_t {
 } strlist_config_t;
 
 typedef struct strlist_async_data_t {
-    A(rbl_result_t) results;
+    A(dns_result_t) results;
     int awaited;
     uint32_t sum;
     bool error;
@@ -630,14 +630,14 @@ static void strlist_filter_destructor(filter_t *filter)
     filter->data = config;
 }
 
-static void strlist_filter_async(rbl_result_t *result, void *arg)
+static void strlist_filter_async(dns_result_t *result, void *arg)
 {
     filter_context_t   *context = arg;
     const filter_t      *filter = context->current_filter;
     const strlist_config_t *data = filter->data;
     strlist_async_data_t  *async = context->contexts[filter_type];
 
-    if (*result != RBL_ERROR) {
+    if (*result != DNS_ERROR) {
         async->error = false;
     }
     --async->awaited;
@@ -657,10 +657,10 @@ static void strlist_filter_async(rbl_result_t *result, void *arg)
                 int weight = array_elt(data->host_weights, i);                 \
                                                                                \
                 switch (array_elt(async->results, j)) {                        \
-                  case RBL_ASYNC:                                              \
+                  case DNS_ASYNC:                                              \
                     crit("no more awaited answer but result is ASYNC");        \
                     abort();                                                   \
-                  case RBL_FOUND:                                              \
+                  case DNS_FOUND:                                              \
                     async->sum += weight;                                      \
                     break;                                                     \
                   default:                                                     \
@@ -736,8 +736,8 @@ static inline bool strlist_rhbl_lookup(const strlist_config_t *config, filter_co
         const char *rbl = array_ptr(config->hosts,
                                     array_elt(config->host_offsets, i));
         debug("running check of field %s (%s) against %s", fieldname, normal, rbl);
-        if (rhbl_check(rbl, normal, array_ptr(async->results, *result_pos),
-                       strlist_filter_async, context)) {
+        if (dns_rhbl_check(rbl, normal, array_ptr(async->results, *result_pos),
+                           strlist_filter_async, context)) {
             async->error = false;
             ++async->awaited;
         }

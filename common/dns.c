@@ -33,60 +33,60 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2008 Florent Bruneau
+ * Copyright © 2008-2009 Florent Bruneau
  */
 
 #include <unbound.h>
 #include <netdb.h>
 #include "array.h"
 #include "server.h"
-#include "rbl.h"
+#include "dns.h"
 
 
-typedef struct rbl_context_t {
-    rbl_result_t *result;
-    rbl_result_callback_t call;
+typedef struct dns_context_t {
+    dns_result_t *result;
+    dns_result_callback_t call;
     void *data;
-} rbl_context_t;
-ARRAY(rbl_context_t);
+} dns_context_t;
+ARRAY(dns_context_t);
 
 static struct ub_ctx *ctx = NULL;
 static client_t *async_event = NULL;
-static PA(rbl_context_t) ctx_pool = ARRAY_INIT;
+static PA(dns_context_t) ctx_pool = ARRAY_INIT;
 
-static rbl_context_t *rbl_context_new(void)
+static dns_context_t *dns_context_new(void)
 {
-    return p_new(rbl_context_t, 1);
+    return p_new(dns_context_t, 1);
 }
 
-static void rbl_context_delete(rbl_context_t **context)
+static void dns_context_delete(dns_context_t **context)
 {
     if (*context) {
         p_delete(context);
     }
 }
 
-static void rbl_context_wipe(rbl_context_t *context)
+static void dns_context_wipe(dns_context_t *context)
 {
     p_clear(context, 1);
 }
 
-static rbl_context_t *rbl_context_acquire(void)
+static dns_context_t *dns_context_acquire(void)
 {
     if (array_len(ctx_pool) > 0) {
         return array_pop_last(ctx_pool);
     } else {
-        return rbl_context_new();
+        return dns_context_new();
     }
 }
 
-static void rbl_context_release(rbl_context_t *context)
+static void dns_context_release(dns_context_t *context)
 {
-    rbl_context_wipe(context);
+    dns_context_wipe(context);
     array_add(ctx_pool, context);
 }
 
-static void rbl_exit(void)
+static void dns_exit(void)
 {
     if (ctx != NULL) {
         ub_ctx_delete(ctx);
@@ -96,34 +96,34 @@ static void rbl_exit(void)
         client_release(async_event);
         async_event = NULL;
     }
-    array_deep_wipe(ctx_pool, rbl_context_delete);
+    array_deep_wipe(ctx_pool, dns_context_delete);
 }
-module_exit(rbl_exit);
+module_exit(dns_exit);
 
-static void rbl_callback(void *arg, int err, struct ub_result *result)
+static void dns_callback(void *arg, int err, struct ub_result *result)
 {
-    rbl_context_t *context = arg;
+    dns_context_t *context = arg;
     if (err != 0) {
         debug("asynchronous request led to an error");
-        *context->result = RBL_ERROR;
+        *context->result = DNS_ERROR;
     } else if (result->nxdomain) {
         debug("asynchronous request done, %s NOT FOUND", result->qname);
-        *context->result = RBL_NOTFOUND;
+        *context->result = DNS_NOTFOUND;
     } else {
         debug("asynchronous request done, %s FOUND", result->qname);
-        *context->result = RBL_FOUND;
+        *context->result = DNS_FOUND;
     }
     if (context->call != NULL) {
         context->call(context->result, context->data);
     }
     ub_resolve_free(result);
-    rbl_context_release(context);
+    dns_context_release(context);
 }
 
-static int rbl_handler(client_t *event, void *config)
+static int dns_handler(client_t *event, void *config)
 {
     int retval = 0;
-    debug("rbl_handler called: ub_fd triggered");
+    debug("dns_handler called: ub_fd triggered");
     client_io_none(event);
     if ((retval = ub_process(ctx)) != 0) {
         err("error in DNS resolution: %s", ub_strerror(retval));
@@ -132,34 +132,35 @@ static int rbl_handler(client_t *event, void *config)
     return 0;
 }
 
-static inline bool rbl_dns_check(const char *hostname, rbl_result_t *result,
-                                 rbl_result_callback_t callback, void *data)
+bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
+               dns_result_callback_t callback, void *data)
 {
     if (ctx == NULL) {
         ctx = ub_ctx_create();
         ub_ctx_async(ctx, true);
-        if ((async_event = client_register(ub_fd(ctx), rbl_handler, NULL)) == NULL) {
+        if ((async_event = client_register(ub_fd(ctx), dns_handler, NULL)) == NULL) {
             crit("cannot register asynchronous DNS event handler");
             abort();
         }
     }
-    rbl_context_t *context = rbl_context_acquire();
+    dns_context_t *context = dns_context_acquire();
     context->result = result;
     context->call   = callback;
     context->data   = data;
     debug("running dns resolution on %s", hostname);
-    if (ub_resolve_async(ctx, (char*)hostname, 1, 1, context, rbl_callback, NULL) == 0) {
-        *result = RBL_ASYNC;
+    if (ub_resolve_async(ctx, (char*)hostname, type, 1,
+                         context, dns_callback, NULL) == 0) {
+        *result = DNS_ASYNC;
         return true;
     } else {
-        *result = RBL_ERROR;
-        rbl_context_release(context);
+        *result = DNS_ERROR;
+        dns_context_release(context);
         return false;
     }
 }
 
-bool rbl_check(const char *rbl, uint32_t ip, rbl_result_t *result,
-               rbl_result_callback_t callback, void *data)
+bool dns_rbl_check(const char *rbl, uint32_t ip, dns_result_t *result,
+                   dns_result_callback_t callback, void *data)
 {
     char host[257];
     int len;
@@ -168,22 +169,22 @@ bool rbl_check(const char *rbl, uint32_t ip, rbl_result_t *result,
                    ip & 0xff, (ip >> 8) & 0xff, (ip >> 16) & 0xff, (ip >> 24) & 0xff,
                    rbl);
     if (len >= (int)sizeof(host))
-        return RBL_ERROR;
+        return DNS_ERROR;
     if (host[len - 2] == '.')
         host[len - 1] = '\0';
-    return rbl_dns_check(host, result, callback, data);
+    return dns_check(host, DNS_RRT_A, result, callback, data);
 }
 
-bool rhbl_check(const char *rhbl, const char *hostname, rbl_result_t *result,
-                rbl_result_callback_t callback, void *data)
+bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result,
+                    dns_result_callback_t callback, void *data)
 {
     char host[257];
     int len;
 
     len = snprintf(host, 257, "%s.%s.", hostname, rhbl);
     if (len >= (int)sizeof(host))
-        return RBL_ERROR;
+        return DNS_ERROR;
     if (host[len - 2] == '.')
         host[len - 1] = '\0';
-    return rbl_dns_check(host, result, callback, data);
+    return dns_check(host, DNS_RRT_A, result, callback, data);
 }
