@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------------
-version 0.6
+version 0.6                                                       Feb 26, 2009
 
   * common:
     NEW: add support for regexp                                            FRU
