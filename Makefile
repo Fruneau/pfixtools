@@ -55,8 +55,6 @@ install-dir:
 
 install-postlicyd-tools:
 	install tools/postlicyd-rsyncrbl $(DESTDIR)$(prefix)/bin/postlicyd-rsyncrbl
-	install tools/postgrey2postlicyd $(DESTDIR)$(prefix)/bin/postgrey2postlicyd
-	install tools/rbldns2postlicyd	 $(DESTDIR)$(prefix)/bin/rbldns2postlicyd
 
 install-postlicyd-conf:
 	install -m 640 example/postlicyd.conf $(DESTDIR)/etc/pfixtools/postlicyd.example.conf
