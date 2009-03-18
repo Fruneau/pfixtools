@@ -711,7 +711,7 @@ static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_co
             async->sum += entry->weight;
         } else if (match.regexp != NULL) {
             static_str_t substr;
-            substr.str = reverse ? normal : normal + match.match_len;
+            substr.str = entry->reverse ? normal : normal + match.match_len;
             substr.len = len - match.match_len;
             if (regexp_match_str(match.regexp, &substr)) {
                 async->sum += entry->weight;
