@@ -40,7 +40,7 @@ the `conf` argument shall be a path to a valid linkgit:postlicyd.conf[5] file.
     Change the port `postlicyd` will listen to. (Default: 10000).
 
 -p <path>::
-    Path to the pidfile where `pfix-srsd` will maintain its pid. Default is to
+    Path to the pidfile where `postlicyd` will maintain its pid. Default is to
     not use any pidfile.
 
 -u::
