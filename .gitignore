@@ -2,11 +2,13 @@
 
 /common/tst-regexp
 /common/tst-trie
-/postlicyd/postlicyd
-/postlicyd/tst-rbl
-/postlicyd/tst-filters
 /pfix-srsd/pfix-srsd
+/postlicyd/postlicyd
 /postlicyd/data/*.db
+/postlicyd/tst-filters
+/postlicyd/tst-greylist
+/postlicyd/tst-qf
+/postlicyd/tst-rbl
 
 *.xml
 *.html
