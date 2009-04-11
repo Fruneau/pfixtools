@@ -87,6 +87,8 @@ void common_init(void);
 #define likely(expr)    __builtin_expect((expr) != 0, 1)
 #define unlikely(expr)  __builtin_expect((expr) != 0, 0)
 
+#define unused(expr)    { size_t t __attribute__((unused)) = expr; }
+
 #define __level_name(L)                                            \
   ( (L) == LOG_DEBUG   ? "debug "                                  \
   : (L) == LOG_NOTICE  ? "notice"                                  \

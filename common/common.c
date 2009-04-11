@@ -243,7 +243,7 @@ int pidfile_refresh(void)
 {
     if (pidfile) {
         rewind(pidfile);
-        ftruncate(fileno(pidfile), 0);
+        unused(ftruncate(fileno(pidfile), 0));
         fprintf(pidfile, "%d\n", getpid());
         return fflush(pidfile);
     }
@@ -255,7 +255,7 @@ static void pidfile_close(void)
     if (pidfile) {
         if (daemon_process) {
             rewind(pidfile);
-            ftruncate(fileno(pidfile), 0);
+            unused(ftruncate(fileno(pidfile), 0));
         }
         fclose(pidfile);
         pidfile = NULL;
