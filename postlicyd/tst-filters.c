@@ -116,7 +116,7 @@ static bool run_testcase(const config_t *config, const char *basepath,
         ++sep;
         filter_result_t result = hook_tokenize(sep, neol - sep);
         if (result == HTK_UNKNOWN) {
-            err("Unknown filter result %.*s", neol - sep, sep);
+            err("Unknown filter result %.*s", (int) (neol - sep), sep);
             eol = neol + 1;
             continue;
         }
@@ -204,7 +204,7 @@ int main(int argc, char *argv[])
     } else {
         ++p;
     }
-    snprintf(basepath, FILENAME_MAX, "%.*sdata/", p - argv[0], argv[0]);
+    snprintf(basepath, FILENAME_MAX, "%.*sdata/", (int) (p - argv[0]), argv[0]);
 
     /* Cleanup */
     {

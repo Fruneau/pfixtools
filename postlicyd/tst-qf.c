@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
     } else {
         ++p;
     }
-    snprintf(basepath, FILENAME_MAX, "%.*sdata/", p - argv[0], argv[0]);
+    snprintf(basepath, FILENAME_MAX, "%.*sdata/", (int) (p - argv[0]), argv[0]);
 
     query_t q;
     if (!read_query(basepath, "testcase_1", &q, buff)) {
