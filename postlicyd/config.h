@@ -90,3 +90,5 @@ bool config_reload(config_t *config);
 void config_delete(config_t **config);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

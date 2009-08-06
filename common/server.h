@@ -72,3 +72,5 @@ int server_loop(start_client_t starter, delete_client_t deleter,
                 run_client_t runner, refresh_t refresh, void *config);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

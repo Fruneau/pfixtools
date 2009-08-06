@@ -102,3 +102,5 @@ void file_map_close(file_map_t *map)
     map->end = NULL;
     map->locked = false;
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

@@ -39,7 +39,9 @@
 #ifndef PFIXTOOLS_DNS_H
 #define PFIXTOOLS_DNS_H
 
+#include <unbound.h>
 #include "common.h"
+#include "array.h"
 
 typedef enum {
     DNS_ASYNC,
@@ -58,10 +60,17 @@ typedef enum {
     DNS_RRT_MX    = 15,
     DNS_RRT_TXT   = 16,
     DNS_RRT_AAAA  = 28,
-    DNS_RRT_SRV   = 33
+    DNS_RRT_SRV   = 33,
+    DNS_RRT_SPF   = 99
 } dns_rrtype_t;
 
 typedef void (*dns_result_callback_t)(dns_result_t *result, void *data);
+
+/** Run a DNS resolution for the given host with the given host and RRT
+ */
+__attribute__((nonnull(1,3,4)))
+bool dns_resolve(const char *hostname, dns_rrtype_t type,
+                 ub_callback_t callback, void *data);
 
 /** Fetch the DNS record of the given type.
  */
@@ -82,3 +91,5 @@ bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result
                    dns_result_callback_t callback, void *data);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

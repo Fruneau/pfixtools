@@ -363,3 +363,5 @@ static void match_exit(void)
     buffer_wipe(&match_buffer);
 }
 module_exit(match_exit);
+
+/* vim:set et sw=4 sts=4 sws=4: */

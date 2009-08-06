@@ -373,3 +373,5 @@ int main(int argc, char *argv[])
                            policy_run, config_refresh, config);
     }
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

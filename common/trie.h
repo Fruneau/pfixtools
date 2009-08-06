@@ -130,3 +130,5 @@ __attribute__((nonnull(1)))
 void trie_inspect(const trie_t *trie, bool show_content);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

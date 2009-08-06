@@ -389,3 +389,5 @@ typedef struct static_str_t {
 
 /*@}*/
 #endif /* PFIXTOOLS_STR_H */
+
+/* vim:set et sw=4 sts=4 sws=4: */

@@ -320,3 +320,5 @@ int main(int argc, char *argv[])
     }
     return server_loop(srsd_starter, NULL, process_srs, NULL, &config);
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

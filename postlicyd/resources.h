@@ -56,3 +56,5 @@ void resource_release(const char *ns, const char *key);
 void resource_garbage_collect(void);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

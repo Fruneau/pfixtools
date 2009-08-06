@@ -296,3 +296,5 @@ ARRAY(uint32_t)
 PARRAY(void)
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

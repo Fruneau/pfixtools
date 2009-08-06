@@ -94,3 +94,5 @@ __attribute__((nonnull(1,3)))
 bool regexp_parse(const char *str, buffer_t *prefix, buffer_t *re, buffer_t *suffix, bool *cs);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

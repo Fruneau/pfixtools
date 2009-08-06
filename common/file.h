@@ -65,3 +65,5 @@ __attribute__((nonnull(1)))
 void file_map_close(file_map_t *map);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

@@ -296,3 +296,5 @@ bool query_format_buffer(buffer_t *buf, const char *fmt, const query_t *query)
     }
     return true;
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

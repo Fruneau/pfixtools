@@ -587,3 +587,5 @@ static int greylist_init(void)
     return 0;
 }
 module_init(greylist_init)
+
+/* vim:set et sw=4 sts=4 sws=4: */

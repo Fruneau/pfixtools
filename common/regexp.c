@@ -282,3 +282,5 @@ bool regexp_parse(const char *str, buffer_t *prefix, buffer_t *re, buffer_t *suf
     static_str_t s = { str, m_strlen(str) };
     return regexp_parse_str(&s, prefix, re, suffix, cs);
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

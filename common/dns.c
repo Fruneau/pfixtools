@@ -36,7 +36,6 @@
  * Copyright © 2008-2009 Florent Bruneau
  */
 
-#include <unbound.h>
 #include <netdb.h>
 #include "array.h"
 #include "server.h"
@@ -132,8 +131,7 @@ static int dns_handler(client_t *event, void *config)
     return 0;
 }
 
-bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
-               dns_result_callback_t callback, void *data)
+bool dns_resolve(const char *hostname, dns_rrtype_t type, ub_callback_t callback, void *data)
 {
     if (ctx == NULL) {
         ctx = ub_ctx_create();
@@ -143,13 +141,18 @@ bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
             abort();
         }
     }
+    debug("running dns resolution on %s", hostname);
+    return (ub_resolve_async(ctx, (char*)hostname, type, 1, data, callback, NULL) == 0);
+}
+
+bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
+               dns_result_callback_t callback, void *data)
+{
     dns_context_t *context = dns_context_acquire();
     context->result = result;
     context->call   = callback;
     context->data   = data;
-    debug("running dns resolution on %s", hostname);
-    if (ub_resolve_async(ctx, (char*)hostname, type, 1,
-                         context, dns_callback, NULL) == 0) {
+    if (dns_resolve(hostname, type, dns_callback, context)) {
         *result = DNS_ASYNC;
         return true;
     } else {
@@ -188,3 +191,5 @@ bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result
         host[len - 1] = '\0';
     return dns_check(host, DNS_RRT_A, result, callback, data);
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

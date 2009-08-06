@@ -322,3 +322,5 @@ void common_init(void)
     __ran = true;
 }
 
+
+/* vim:set et sw=4 sts=4 sws=4: */

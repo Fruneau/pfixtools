@@ -162,3 +162,5 @@ int main(void)
 
     return 0;
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

@@ -40,5 +40,23 @@
 #define PFIXTOOLS_SPF_H
 
 #include "common.h"
+#include "dns.h"
+
+typedef struct spf_t spf_t;
+
+typedef enum {
+    SPF_NONE,
+    SPF_NEUTRAL,
+    SPF_PASS,
+    SPF_FAIL,
+    SPF_SOFTFAIL,
+    SPF_TEMPERROR,
+    SPF_PERMERROR,
+    SPF_ASYNC
+} spf_code_t;
+
+bool spf_check(const char *ip, const char *domain, const char *sender);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

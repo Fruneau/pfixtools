@@ -168,3 +168,5 @@ static inline void common_startup(void)
     module_exit(main_shutdown);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

@@ -131,3 +131,5 @@ int buffer_read(buffer_t *buf, int fd, int count);
 int buffer_write(buffer_t *buf, int fd);
 
 #endif /* PFIXTOOLS_BUFFER_H */
+
+/* vim:set et sw=4 sts=4 sws=4: */

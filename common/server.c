@@ -365,3 +365,5 @@ int server_loop(start_client_t starter, delete_client_t deleter,
     info("exit requested");
     return EXIT_SUCCESS;
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

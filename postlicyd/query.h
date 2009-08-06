@@ -136,3 +136,5 @@ bool query_format_buffer(buffer_t *buf, const char *fmt, const query_t *query);
 #define query_format_check(fmt) (query_format(NULL, 0, fmt, NULL) >= 0)
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

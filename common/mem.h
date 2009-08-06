@@ -156,3 +156,5 @@ static inline void *xmemdupstr(const void *src, ssize_t len) {
     }
 
 #endif /* PFIXTOOLS_MEM_H */
+
+/* vim:set et sw=4 sts=4 sws=4: */

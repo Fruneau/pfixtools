@@ -49,3 +49,5 @@ uint32_t rbldb_stats(const rbldb_t *rbl);
 bool rbldb_ipv4_lookup(const rbldb_t *rbl, uint32_t ip);
 
 #endif
+
+/* vim:set et sw=4 sts=4 sws=4: */

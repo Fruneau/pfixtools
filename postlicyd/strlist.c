@@ -851,3 +851,5 @@ static int strlist_init(void)
     return 0;
 }
 module_init(strlist_init);
+
+/* vim:set et sw=4 sts=4 sws=4: */

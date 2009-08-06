@@ -374,3 +374,5 @@ void filter_post_async_result(filter_context_t *context, filter_result_t result)
     hook = filter_hook_for_result(filter, result);
     async_handler(context, hook);
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

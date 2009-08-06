@@ -104,3 +104,5 @@ int buffer_write(buffer_t *buf, int fd)
     buffer_consume(buf, res);
     return res;
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

@@ -147,3 +147,5 @@ static void resources_exit(void)
     array_deep_wipe(resources, resource_wipe);
 }
 module_exit(resources_exit);
+
+/* vim:set et sw=4 sts=4 sws=4: */

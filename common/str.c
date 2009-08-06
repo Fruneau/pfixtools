@@ -240,3 +240,5 @@ int ascii_strncasecmp(const char *a, const char *b, ssize_t n)
 }
 
 /*@}*/
+
+/* vim:set et sw=4 sts=4 sws=4: */

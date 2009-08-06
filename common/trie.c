@@ -544,3 +544,5 @@ void trie_inspect(const trie_t *trie, bool show_content)
 {
     trie_entry_inspect(trie, show_content, trie->entries.data, 0);
 }
+
+/* vim:set et sw=4 sts=4 sws=4: */

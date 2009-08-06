@@ -129,3 +129,5 @@ static int counter_init(void)
     return 0;
 }
 module_init(counter_init);
+
+/* vim:set et sw=4 sts=4 sws=4: */
