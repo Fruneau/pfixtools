@@ -90,7 +90,8 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
     }
 }
 
-bool spf_check(const char *ip, const char *domain, const char *sender) {
+bool spf_check(const char *ip, const char *domain, const char *sender)
+{
     spf_t *spf = spf_new();
     return dns_resolve(domain, DNS_RRT_TXT, spf_line_callback, spf);
 }
