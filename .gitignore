@@ -2,6 +2,7 @@
 
 /common/tst-regexp
 /common/tst-trie
+/common/tst-spf
 /pfix-srsd/pfix-srsd
 /postlicyd/postlicyd
 /postlicyd/data/*.db

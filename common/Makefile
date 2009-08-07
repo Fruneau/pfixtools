@@ -33,13 +33,15 @@
 ##############################################################################
 
 LIBS  = lib
-TESTS = tst-trie tst-regexp
+TESTS = tst-trie tst-regexp tst-spf
 
 lib_SOURCES = str.c buffer.c common.c server.c trie.c file.c dns.c spf.c regexp.c
 tst-trie_SOURCES = tst-trie.c lib.a
 tst-trie_LIBADD = -lpcre
 tst-regexp_SOURCES = tst-regexp.c lib.a
 tst-regexp_LIBADD = -lpcre
+tst-spf_SOURCES = tst-spf.c lib.a
+tst-spf_LIBADD = -lunbound -lev
 
 all:
 

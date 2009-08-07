@@ -70,7 +70,9 @@ static void spf_wipe(spf_t *context)
 static void spf_line_callback(void *arg, int err, struct ub_result *result)
 {
     spf_t *spf = arg;
-    if (spf->spf_record == NULL) {
+    info("Coucou %d", result->qtype);
+    if (spf->spf_record != NULL) {
+        info("record already found");
         return;
     }
     if (result->qtype == DNS_RRT_SPF) {
@@ -84,7 +86,22 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
     if (result->rcode == 0) {
         int i = 0;
         while (result->data[i] != NULL) {
-            printf("%.*s\n", result->len[i], result->data[i]);
+            const char* str = result->data[i] + 1;
+            const int len   = result->len[i];
+            assert(len == result->data[i][0] + 1);
+            if (len < 6) {
+                info("record too short to be a spf record");
+            } else {
+                if (strncmp(str, "v=spf1", 6) != 0) {
+                    info("not a spf record: \"%.*s\"", len, str);
+                } else if (len == 6 || str[6] == ' ') {
+                    info("spf record: \"%.*s\"", len, str);
+                    spf->spf_record = p_dupstr(str, len);
+                    break;
+                } else {
+                    info("version is ok, but not finished by a space: \"%.*s\"", len, str);
+                }
+            }
             ++i;
         }
     }
@@ -93,7 +110,9 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
 bool spf_check(const char *ip, const char *domain, const char *sender)
 {
     spf_t *spf = spf_new();
-    return dns_resolve(domain, DNS_RRT_TXT, spf_line_callback, spf);
+    dns_resolve(domain, DNS_RRT_SPF, spf_line_callback, spf);
+    dns_resolve(domain, DNS_RRT_TXT, spf_line_callback, spf);
+    return true;
 }
 
 /* vim:set et sw=4 sts=4 sws=4: */
