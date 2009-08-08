@@ -34,8 +34,9 @@
 
 LIBS  = lib
 TESTS = tst-trie tst-regexp tst-spf
+GENERATED = spf_tokens.h spf_tokens.c
 
-lib_SOURCES = str.c buffer.c common.c server.c trie.c file.c dns.c spf.c regexp.c
+lib_SOURCES = str.c buffer.c common.c server.c trie.c file.c dns.c spf.c regexp.c $(GENERATED)
 tst-trie_SOURCES = tst-trie.c lib.a
 tst-trie_LIBADD = -lpcre
 tst-regexp_SOURCES = tst-regexp.c lib.a

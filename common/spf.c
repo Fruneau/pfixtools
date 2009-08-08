@@ -37,26 +37,11 @@
  */
 
 #include "spf.h"
+#include "spf_tokens.h"
 
-typedef enum spf_ruleid_t {
-    /* Mechanisms */
-    SPF_RULE_ALL,
-    SPF_RULE_INCLUDE,
-    SPF_RULE_A,
-    SPF_RULE_MX,
-    SPF_RULE_PTR,
-    SPF_RULE_IP4,
-    SPF_RULE_IP6,
-    SPF_RULE_EXISTS,
-
-    /* Modifiers */
-    SPF_RULE_REDIRECT,
-    SPF_RULE_EXPLANATION,
-    SPF_RULE_UNKNOWN
-} spf_ruleid_t;
 
 typedef struct spf_rule_t {
-    spf_code_t modifier;
+    spf_code_t qualifier;
     spf_ruleid_t rule;
     char* content;
 } spf_rule_t;
@@ -153,13 +138,67 @@ static void spf_next(spf_t* spf)
     if (spf->current_rule >= array_len(spf->rules)) {
         spf_exit(spf, SPF_NEUTRAL);
     }
+    spf_exit(spf, SPF_SOFTFAIL);
+}
+
+static spf_code_t spf_qualifier(const char** str)
+{
+    switch (**str) {
+      case '+':
+        ++(*str);
+        return SPF_PASS;
+      case '-':
+        ++(*str);
+        return SPF_FAIL;
+      case '~':
+        ++(*str);
+        return SPF_SOFTFAIL;
+      case '?':
+        ++(*str);
+        return SPF_NEUTRAL;
+      default:
+        return SPF_NEUTRAL;
+    }
 }
 
 static bool spf_parse(spf_t* spf) {
-    return false;
+    const char* pos = spf->record + 6;
+    do {
+        while (*pos == ' ') {
+            ++pos;
+        }
+        if (*pos == '\0') {
+            return true;
+        }
+        const char* rule_start = pos;
+        const char* name_end = NULL;
+        while (*pos != ' ' && *pos != '\0') {
+            if (name_end == NULL && (*pos == ':' || *pos == '=')) {
+                name_end = pos;
+            }
+            ++pos;
+        }
+        if (name_end == NULL) {
+            name_end = pos;
+        }
+        spf_code_t qual = spf_qualifier(&rule_start);
+        if (name_end - rule_start == 0) {
+            return false;
+        }
+        spf_ruleid_t id = spf_rule_tokenize(rule_start, name_end - rule_start);
+
+        info("rule found: %.*s -> %s", (int)(name_end - rule_start), rule_start,
+                                       id != SPF_RULE_UNKNOWN ? spftokens[id] : "unknown");
+        spf_rule_t rule;
+        rule.qualifier = qual;
+        rule.rule = id;
+        rule.content = NULL;
+        array_add(spf->rules, rule);
+    } while (true);
+    return true;
 }
 
-static void spf_line_callback(void *arg, int err, struct ub_result *result)
+static void spf_line_callback(void *arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
     info("Coucou %d", result->qtype);
@@ -207,12 +246,8 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
     }
     if (spf->txt_inerror && spf->spf_inerror) {
         spf_exit(spf, SPF_TEMPERROR);
-    } else if (spf->spf_received && spf->txt_received) {
-        if (spf->record == NULL) {
-            spf_exit(spf, SPF_NONE);
-        } else {
-            spf_exit(spf, SPF_NONE);
-        }
+    } else if (spf->spf_received && spf->txt_received && spf->record == NULL) {
+        spf_exit(spf, SPF_NONE);
     } else if (spf->record != NULL) {
         if (!spf_parse(spf)) {
             spf_exit(spf, SPF_PERMERROR);
