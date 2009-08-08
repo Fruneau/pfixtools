@@ -43,8 +43,13 @@ struct spf_t {
     unsigned txt_inerror  : 1;
     unsigned spf_received : 1;
     unsigned spf_inerror  : 1;
+    unsigned canceled     : 1;
 
     char *spf_record;
+
+    uint8_t queries;
+    spf_result_t exit;
+    void* data;
 };
 
 static spf_t *spf_new(void)
@@ -66,11 +71,43 @@ static void spf_wipe(spf_t *context)
     p_clear(context, 1);
 }
 
+static bool spf_release(spf_t* spf, bool decrement)
+{
+    if (decrement) {
+        --spf->queries;
+    }
+    if (spf->canceled && spf->queries == 0) {
+        spf_delete(&spf);
+        return true;
+    }
+    return false;
+}
+
+static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_callback_t cb)
+{
+    if (dns_resolve(query, rtype, cb, spf)) {
+        ++spf->queries;
+        return true;
+    }
+    return false;
+}
+
+static void spf_exit(spf_t* spf, spf_code_t code)
+{
+    if (spf->exit) {
+        spf->exit(code, spf->data);
+    }
+    spf_cancel(spf);
+}
 
 static void spf_line_callback(void *arg, int err, struct ub_result *result)
 {
     spf_t *spf = arg;
     info("Coucou %d", result->qtype);
+    if (spf_release(spf, true)) {
+        info("processing already finished");
+        return;
+    }
     if (spf->spf_record != NULL) {
         info("record already found");
         return;
@@ -87,8 +124,8 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
         int i = 0;
         while (result->data[i] != NULL) {
             const char* str = result->data[i] + 1;
-            const int len   = result->len[i];
-            assert(len == result->data[i][0] + 1);
+            const int len   = result->len[i] - 1;
+            assert(len == result->data[i][0]);
             if (len < 6) {
                 info("record too short to be a spf record");
             } else {
@@ -96,8 +133,12 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
                     info("not a spf record: \"%.*s\"", len, str);
                 } else if (len == 6 || str[6] == ' ') {
                     info("spf record: \"%.*s\"", len, str);
+                    if (spf->spf_record != NULL) {
+                        info("too many spf records");
+                        spf_exit(spf, SPF_PERMERROR);
+                        return;
+                    }
                     spf->spf_record = p_dupstr(str, len);
-                    break;
                 } else {
                     info("version is ok, but not finished by a space: \"%.*s\"", len, str);
                 }
@@ -105,14 +146,38 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
             ++i;
         }
     }
+    if (spf->txt_inerror && spf->spf_inerror) {
+        spf_exit(spf, SPF_TEMPERROR);
+    } else if (spf->spf_received && spf->txt_received) {
+        if (spf->spf_record == NULL) {
+            spf_exit(spf, SPF_NONE);
+        } else {
+            spf_exit(spf, SPF_NONE);
+        }
+    } else if (spf->spf_record != NULL) {
+        spf_exit(spf, SPF_NONE);
+    }
 }
 
-bool spf_check(const char *ip, const char *domain, const char *sender)
+spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_result_t resultcb, void *data)
 {
-    spf_t *spf = spf_new();
-    dns_resolve(domain, DNS_RRT_SPF, spf_line_callback, spf);
-    dns_resolve(domain, DNS_RRT_TXT, spf_line_callback, spf);
-    return true;
+    spf_t* spf = spf_new();
+    spf->exit = resultcb;
+    spf->data = data;
+    spf_query(spf, domain, DNS_RRT_SPF, spf_line_callback);
+    spf_query(spf, domain, DNS_RRT_TXT, spf_line_callback);
+    if (spf->queries == 0) {
+        spf_delete(&spf);
+        return NULL;
+    } else {
+        return spf;
+    }
+}
+
+void spf_cancel(spf_t* spf)
+{
+    spf->canceled = true;
+    spf_release(spf, false);
 }
 
 /* vim:set et sw=4 sts=4 sws=4: */

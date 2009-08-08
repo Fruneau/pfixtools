@@ -55,7 +55,10 @@ typedef enum {
     SPF_ASYNC
 } spf_code_t;
 
-bool spf_check(const char *ip, const char *domain, const char *sender);
+typedef void (*spf_result_t)(spf_code_t result, void *arg);
+
+spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_result_t cb, void* arg);
+void spf_cancel(spf_t* spf);
 
 #endif
 
