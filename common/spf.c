@@ -38,6 +38,30 @@
 
 #include "spf.h"
 
+typedef enum spf_ruleid_t {
+    /* Mechanisms */
+    SPF_RULE_ALL,
+    SPF_RULE_INCLUDE,
+    SPF_RULE_A,
+    SPF_RULE_MX,
+    SPF_RULE_PTR,
+    SPF_RULE_IP4,
+    SPF_RULE_IP6,
+    SPF_RULE_EXISTS,
+
+    /* Modifiers */
+    SPF_RULE_REDIRECT,
+    SPF_RULE_EXPLANATION,
+    SPF_RULE_UNKNOWN
+} spf_ruleid_t;
+
+typedef struct spf_rule_t {
+    spf_code_t modifier;
+    spf_ruleid_t rule;
+    char* content;
+} spf_rule_t;
+ARRAY(spf_rule_t);
+
 struct spf_t {
     unsigned txt_received : 1;
     unsigned txt_inerror  : 1;
@@ -45,31 +69,53 @@ struct spf_t {
     unsigned spf_inerror  : 1;
     unsigned canceled     : 1;
 
-    char *spf_record;
+    const char* ip;
+    const char* domain;
+    const char* sender;
+
+    char *record;
+    A(spf_rule_t) rules;
+    uint8_t current_rule;
 
     uint8_t queries;
     spf_result_t exit;
     void* data;
 };
 
-static spf_t *spf_new(void)
+static PA(spf_t) spf_pool = ARRAY_INIT;
+
+static spf_t* spf_new(void)
 {
     return p_new(spf_t, 1);
 }
 
-__attribute__((used))
-static void spf_delete(spf_t **context)
+static void spf_wipe(spf_t* spf)
 {
-    if (*context) {
-        p_delete(context);
+    p_delete(&spf->record);
+    p_clear(spf, 1);
+}
+
+static void spf_delete(spf_t **spf)
+{
+    if (*spf) {
+        spf_wipe(*spf);
+        p_delete(spf);
     }
 }
 
-__attribute__((used))
-static void spf_wipe(spf_t *context)
+static spf_t* spf_acquire(void)
 {
-    p_clear(context, 1);
+    if (array_len(spf_pool)) {
+        return array_pop_last(spf_pool);
+    }
+    return spf_new();
 }
+
+static void spf_module_exit(void)
+{
+    array_deep_wipe(spf_pool, spf_delete);
+}
+module_exit(spf_module_exit);
 
 static bool spf_release(spf_t* spf, bool decrement)
 {
@@ -77,7 +123,8 @@ static bool spf_release(spf_t* spf, bool decrement)
         --spf->queries;
     }
     if (spf->canceled && spf->queries == 0) {
-        spf_delete(&spf);
+        spf_wipe(spf);
+        array_add(spf_pool, spf);
         return true;
     }
     return false;
@@ -100,15 +147,27 @@ static void spf_exit(spf_t* spf, spf_code_t code)
     spf_cancel(spf);
 }
 
+static void spf_next(spf_t* spf)
+{
+    ++spf->current_rule;
+    if (spf->current_rule >= array_len(spf->rules)) {
+        spf_exit(spf, SPF_NEUTRAL);
+    }
+}
+
+static bool spf_parse(spf_t* spf) {
+    return false;
+}
+
 static void spf_line_callback(void *arg, int err, struct ub_result *result)
 {
-    spf_t *spf = arg;
+    spf_t* spf = arg;
     info("Coucou %d", result->qtype);
     if (spf_release(spf, true)) {
         info("processing already finished");
         return;
     }
-    if (spf->spf_record != NULL) {
+    if (spf->record != NULL) {
         info("record already found");
         return;
     }
@@ -133,12 +192,12 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
                     info("not a spf record: \"%.*s\"", len, str);
                 } else if (len == 6 || str[6] == ' ') {
                     info("spf record: \"%.*s\"", len, str);
-                    if (spf->spf_record != NULL) {
+                    if (spf->record != NULL) {
                         info("too many spf records");
                         spf_exit(spf, SPF_PERMERROR);
                         return;
                     }
-                    spf->spf_record = p_dupstr(str, len);
+                    spf->record = p_dupstr(str, len);
                 } else {
                     info("version is ok, but not finished by a space: \"%.*s\"", len, str);
                 }
@@ -149,19 +208,26 @@ static void spf_line_callback(void *arg, int err, struct ub_result *result)
     if (spf->txt_inerror && spf->spf_inerror) {
         spf_exit(spf, SPF_TEMPERROR);
     } else if (spf->spf_received && spf->txt_received) {
-        if (spf->spf_record == NULL) {
+        if (spf->record == NULL) {
             spf_exit(spf, SPF_NONE);
         } else {
             spf_exit(spf, SPF_NONE);
         }
-    } else if (spf->spf_record != NULL) {
-        spf_exit(spf, SPF_NONE);
+    } else if (spf->record != NULL) {
+        if (!spf_parse(spf)) {
+            spf_exit(spf, SPF_PERMERROR);
+        } else {
+            spf_next(spf);
+        }
     }
 }
 
 spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_result_t resultcb, void *data)
 {
-    spf_t* spf = spf_new();
+    spf_t* spf = spf_acquire();
+    spf->ip = ip;
+    spf->domain = domain;
+    spf->sender = sender;
     spf->exit = resultcb;
     spf->data = data;
     spf_query(spf, domain, DNS_RRT_SPF, spf_line_callback);

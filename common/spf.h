@@ -40,9 +40,11 @@
 #define PFIXTOOLS_SPF_H
 
 #include "common.h"
+#include "array.h"
 #include "dns.h"
 
 typedef struct spf_t spf_t;
+PARRAY(spf_t);
 
 typedef enum {
     SPF_NONE,

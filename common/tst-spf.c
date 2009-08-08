@@ -3,7 +3,18 @@
 
 static void spf_done(spf_code_t code, void* data)
 {
-    info("SPF result: %d", code);
+    const char* str = "";
+    switch (code) {
+      case SPF_NONE: str = "NONE"; break;
+      case SPF_NEUTRAL: str = "NEUTRAL"; break;
+      case SPF_PASS: str = "PASS"; break;
+      case SPF_FAIL: str = "FAIL"; break;
+      case SPF_SOFTFAIL: str = "SOFTFAIL"; break;
+      case SPF_TEMPERROR: str = "TEMPERROR"; break;
+      case SPF_PERMERROR: str = "PERMERROR"; break;
+      case SPF_ASYNC: str = "ASYNC"; break;
+    }
+    info("SPF result: %s", str);
     exit(0);
 }
 
