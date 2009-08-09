@@ -36,6 +36,8 @@
  * Copyright © 2008-2009 Florent Bruneau
  */
 
+#include <ctype.h>
+
 #include "spf.h"
 #include "spf_tokens.h"
 
@@ -134,11 +136,25 @@ static void spf_exit(spf_t* spf, spf_code_t code)
 
 static void spf_next(spf_t* spf)
 {
-    ++spf->current_rule;
-    if (spf->current_rule >= array_len(spf->rules)) {
-        spf_exit(spf, SPF_NEUTRAL);
+    while (true) {
+        ++spf->current_rule;
+        if (spf->current_rule >= array_len(spf->rules)) {
+            spf_exit(spf, SPF_NEUTRAL);
+            return;
+        }
+        spf_rule_t* rule = array_ptr(spf->rules, spf->current_rule);
+        switch (rule->rule) {
+          case SPF_RULE_ALL:
+            spf_exit(spf, rule->qualifier);
+            return;
+
+          case SPF_RULE_UNKNOWN:
+            break;
+
+          default:
+            break;
+        }
     }
-    spf_exit(spf, SPF_SOFTFAIL);
 }
 
 static spf_code_t spf_qualifier(const char** str)
@@ -181,11 +197,67 @@ static bool spf_parse(spf_t* spf) {
         if (name_end == NULL) {
             name_end = pos;
         }
-        spf_code_t qual = spf_qualifier(&rule_start);
+        bool is_mechanism = (*name_end == '\0' || *name_end == ' ' || *name_end == ':');
+        spf_code_t qual = SPF_NEUTRAL;
+        if (is_mechanism) {
+            qual = spf_qualifier(&rule_start);
+        }
         if (name_end - rule_start == 0) {
             return false;
         }
         spf_ruleid_t id = spf_rule_tokenize(rule_start, name_end - rule_start);
+        if (is_mechanism) {
+            switch (id) {
+              case SPF_RULE_ALL:
+                if (*name_end == ':') {
+                    return false;
+                }
+                break;
+
+              case SPF_RULE_INCLUDE:
+                if (*name_end != ':') {
+                    return false;
+                }
+                break;
+
+              case SPF_RULE_A:
+              case SPF_RULE_MX:
+              case SPF_RULE_PTR:
+              case SPF_RULE_IP4:
+              case SPF_RULE_IP6:
+              case SPF_RULE_EXISTS:
+                break;
+
+              default:
+                return false;
+            }
+        } else {
+            if (*name_end != '=') {
+                return false;
+            }
+            switch (id) {
+              case SPF_RULE_REDIRECT:
+              case SPF_RULE_EXPLANATION:
+                break;
+
+              case SPF_RULE_UNKNOWN: {
+                const char* p = rule_start;
+                if (!isalpha(*p)) {
+                    return false;
+                }
+                ++p;
+                while (p < name_end) {
+                    if (!isalnum(*p) && *p != '-' && *p != '_' && *p != '.') {
+                        return false;
+                    }
+                    ++p;
+                }
+              } break;
+
+              default:
+                return false;
+            }
+        }
 
         info("rule found: %.*s -> %s", (int)(name_end - rule_start), rule_start,
                                        id != SPF_RULE_UNKNOWN ? spftokens[id] : "unknown");
