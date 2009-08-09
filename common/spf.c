@@ -134,15 +134,19 @@ static void spf_exit(spf_t* spf, spf_code_t code)
     spf_cancel(spf);
 }
 
-static void spf_next(spf_t* spf)
+static void spf_next(spf_t* spf, bool start)
 {
     while (true) {
-        ++spf->current_rule;
+        if (!start) {
+            ++spf->current_rule;
+        }
+        start = false;
         if (spf->current_rule >= array_len(spf->rules)) {
             spf_exit(spf, SPF_NEUTRAL);
             return;
         }
         spf_rule_t* rule = array_ptr(spf->rules, spf->current_rule);
+        info("Testing rule: %s = %s", spftokens[rule->rule], rule->content == NULL ? "(empty)" : rule->content);
         switch (rule->rule) {
           case SPF_RULE_ALL:
             spf_exit(spf, rule->qualifier);
@@ -225,6 +229,13 @@ static bool spf_check_domainspec(const char* pos, const char* end, bool with_cid
     }
 
     bool can_be_end = allow_empty;
+    if (pos >= end) {
+        return can_be_end;
+    }
+    if (*pos == ':' || *pos == '=') {
+        can_be_end = false;
+    }
+    READ_NEXT;
     while (pos < end) {
         can_be_end = false;
 
@@ -349,20 +360,20 @@ static bool spf_parse(spf_t* spf) {
                 if (*name_end != ':') {
                     return false;
                 }
-                if (!spf_check_domainspec(name_end + 1, pos, false, false)) {
+                if (!spf_check_domainspec(name_end, pos, false, false)) {
                     return false;
                 }
                 break;
 
               case SPF_RULE_A:
               case SPF_RULE_MX:
-                if (!spf_check_domainspec(name_end + 1, pos, true, true)) {
+                if (!spf_check_domainspec(name_end, pos, true, true)) {
                     return false;
                 }
                 break;
 
               case SPF_RULE_PTR:
-                if (!spf_check_domainspec(name_end + 1, pos, false, true)) {
+                if (!spf_check_domainspec(name_end, pos, false, true)) {
                     return false;
                 }
                 break;
@@ -381,7 +392,7 @@ static bool spf_parse(spf_t* spf) {
             switch (id) {
               case SPF_RULE_REDIRECT:
               case SPF_RULE_EXPLANATION:
-                if (!spf_check_domainspec(name_end + 1, pos, false, true)) {
+                if (!spf_check_domainspec(name_end, pos, false, true)) {
                     return false;
                 }
                 break;
@@ -410,7 +421,11 @@ static bool spf_parse(spf_t* spf) {
         spf_rule_t rule;
         rule.qualifier = qual;
         rule.rule = id;
-        rule.content = NULL;
+        if (name_end == pos) {
+            rule.content = NULL;
+        } else {
+            rule.content = p_dupstr(name_end, pos - name_end);
+        }
         array_add(spf->rules, rule);
     } while (true);
     return true;
@@ -470,7 +485,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
         if (!spf_parse(spf)) {
             spf_exit(spf, SPF_PERMERROR);
         } else {
-            spf_next(spf);
+            spf_next(spf, true);
         }
     }
 }
