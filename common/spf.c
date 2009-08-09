@@ -129,7 +129,7 @@ static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_call
 static void spf_exit(spf_t* spf, spf_code_t code)
 {
     if (spf->exit) {
-        spf->exit(code, spf->data);
+        spf->exit(code, NULL, spf->data);
     }
     spf_cancel(spf);
 }
@@ -177,6 +177,139 @@ static spf_code_t spf_qualifier(const char** str)
     }
 }
 
+static bool spf_check_domainspec(const char* spec, const char* end, bool with_cidr_length, bool allow_empty)
+{
+    const char* pos = spec;
+    bool can_be_end = allow_empty;
+
+    while (pos < end) {
+        can_be_end = false;
+
+        /* cidr length parsing */
+        if (*pos == '/') {
+            if (!with_cidr_length || !can_be_end) {
+                return false;
+            }
+            ++pos;
+            if (pos >= end) {
+                return false;
+            }
+            if (*pos != '/') {
+                while (pos < end) {
+                    if (*pos == '/') {
+                        break;
+                    }
+                    if (!isdigit(*pos) && *pos != '/') {
+                        return false;
+                    }
+                    ++pos;
+                }
+                if (pos == end) {
+                    return true;
+                }
+                assert(*pos == '/');
+            }
+            ++pos;
+            if (pos >= end) {
+                return false;
+            }
+            while (pos < end) {
+                if (!isdigit(*pos)) {
+                    return false;
+                }
+                ++pos;
+            }
+            return true;
+
+        /* final dot */
+        } else if (*pos == '.') {
+            bool has_dash = false;
+            bool has_alpha = false;
+            can_be_end = true;
+            ++pos;
+            if (pos == end) {
+                break;
+            }
+            if (!isalnum(*pos)) {
+                continue;
+            }
+            while (pos < end) {
+                if (*pos == '-') {
+                    has_dash = true;
+                    can_be_end = false;
+                } else if (isalpha(*pos)) {
+                    has_alpha = true;
+                    can_be_end = true;
+                } else if (isdigit(*pos)) {
+                    can_be_end = (has_dash || has_alpha);
+                } else if (*pos == '.') {
+                    has_dash = false;
+                    has_alpha = false;
+                    if (!can_be_end) {
+                        return false;
+                    }
+                    can_be_end = true;
+                } else {
+                    --pos;
+                    break;
+                }
+                ++pos;
+            }
+
+        /* macro expand */
+        } else if (*pos == '%') {
+            ++pos;
+            if (pos == end) {
+                return false;
+            }
+            if (*pos == '%' || *pos == '_' || *pos == '-') {
+                can_be_end = true;
+            } else if (*pos == '{') {
+                ++pos;
+                if (pos == end) {
+                    return false;
+                }
+                if (*pos != 's' && *pos != 'l' && *pos != 'o' && *pos != 'd'
+                    && *pos != 'i' && *pos != 'p' && *pos != 'h' && *pos != 'c'
+                    && *pos != 'r' && *pos != 't') {
+                    return false;
+                }
+                ++pos;
+                while (pos < end && isdigit(*pos)) {
+                    ++pos;
+                }
+                if (pos == end) {
+                    return false;
+                }
+                if (*pos == 'r') {
+                    ++pos;
+                    if (pos == end) {
+                        return false;
+                    }
+                }
+                while (pos < end && (*pos == '.' || *pos == '-' || *pos == '+' || *pos == ','
+                                     || *pos == '/' || *pos == '_' || *pos == '=')) {
+                    ++pos;
+                }
+                if (pos == end) {
+                    return false;
+                }
+                ++pos;
+                if (pos == end || *pos != '}') {
+                    return false;
+                }
+                can_be_end = true;
+
+            /* Other caracters */
+            } else if (*pos < 0x21 || *pos > 0x7e) {
+                return false;
+            }
+        }
+        ++pos;
+    }
+    return can_be_end;
+}
+
 static bool spf_parse(spf_t* spf) {
     const char* pos = spf->record + 6;
     do {
@@ -215,17 +348,30 @@ static bool spf_parse(spf_t* spf) {
                 break;
 
               case SPF_RULE_INCLUDE:
+              case SPF_RULE_EXISTS:
                 if (*name_end != ':') {
+                    return false;
+                }
+                if (!spf_check_domainspec(name_end + 1, pos, false, false)) {
                     return false;
                 }
                 break;
 
               case SPF_RULE_A:
               case SPF_RULE_MX:
+                if (!spf_check_domainspec(name_end + 1, pos, true, true)) {
+                    return false;
+                }
+                break;
+
               case SPF_RULE_PTR:
+                if (!spf_check_domainspec(name_end + 1, pos, false, true)) {
+                    return false;
+                }
+                break;
+
               case SPF_RULE_IP4:
               case SPF_RULE_IP6:
-              case SPF_RULE_EXISTS:
                 break;
 
               default:
@@ -238,6 +384,9 @@ static bool spf_parse(spf_t* spf) {
             switch (id) {
               case SPF_RULE_REDIRECT:
               case SPF_RULE_EXPLANATION:
+                if (!spf_check_domainspec(name_end + 1, pos, false, true)) {
+                    return false;
+                }
                 break;
 
               case SPF_RULE_UNKNOWN: {

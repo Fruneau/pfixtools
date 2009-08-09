@@ -1,7 +1,7 @@
 #include "spf.h"
 #include "server.h"
 
-static void spf_done(spf_code_t code, void* data)
+static void spf_done(spf_code_t code, const char* explanation, void* data)
 {
     const char* str = "";
     switch (code) {
@@ -14,7 +14,7 @@ static void spf_done(spf_code_t code, void* data)
       case SPF_PERMERROR: str = "PERMERROR"; break;
       case SPF_ASYNC: str = "ASYNC"; break;
     }
-    info("SPF result: %s", str);
+    info("SPF result: %s with %s", str, explanation != NULL ? explanation : "(no explanation)");
     exit(0);
 }
 
