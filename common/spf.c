@@ -177,11 +177,54 @@ static spf_code_t spf_qualifier(const char** str)
     }
 }
 
-static bool spf_check_domainspec(const char* spec, const char* end, bool with_cidr_length, bool allow_empty)
+static bool spf_check_cidrlength(const char* pos, const char* end)
 {
-    const char* pos = spec;
-    bool can_be_end = allow_empty;
+#define READ_NEXT(CanBeEnd)                                                    \
+    ++pos;                                                                     \
+    if (pos == end) {                                                          \
+        return CanBeEnd;                                                       \
+    }
 
+    if (*pos != '/') {
+        return false;
+    }
+    READ_NEXT(false);
+    if (*pos != '/') {
+        if (!isdigit(*pos)) {
+            return false;
+        }
+        READ_NEXT(true);
+        while (pos < end) {
+            if (*pos == '/') {
+                break;
+            }
+            if (!isdigit(*pos) && *pos != '/') {
+                return false;
+            }
+            READ_NEXT(true);
+        }
+        assert(*pos == '/');
+    }
+    READ_NEXT(false);
+    do {
+        if (!isdigit(*pos)) {
+            return false;
+        }
+        READ_NEXT(true);
+    } while (true);
+
+#undef READ_NEXT
+}
+
+static bool spf_check_domainspec(const char* pos, const char* end, bool with_cidr_length, bool allow_empty)
+{
+#define READ_NEXT                                                              \
+    ++pos;                                                                     \
+    if (pos == end) {                                                          \
+        return can_be_end;                                                     \
+    }
+
+    bool can_be_end = allow_empty;
     while (pos < end) {
         can_be_end = false;
 
@@ -190,46 +233,14 @@ static bool spf_check_domainspec(const char* spec, const char* end, bool with_ci
             if (!with_cidr_length || !can_be_end) {
                 return false;
             }
-            ++pos;
-            if (pos >= end) {
-                return false;
-            }
-            if (*pos != '/') {
-                while (pos < end) {
-                    if (*pos == '/') {
-                        break;
-                    }
-                    if (!isdigit(*pos) && *pos != '/') {
-                        return false;
-                    }
-                    ++pos;
-                }
-                if (pos == end) {
-                    return true;
-                }
-                assert(*pos == '/');
-            }
-            ++pos;
-            if (pos >= end) {
-                return false;
-            }
-            while (pos < end) {
-                if (!isdigit(*pos)) {
-                    return false;
-                }
-                ++pos;
-            }
-            return true;
+            return spf_check_cidrlength(pos, end);
 
         /* final dot */
         } else if (*pos == '.') {
             bool has_dash = false;
             bool has_alpha = false;
             can_be_end = true;
-            ++pos;
-            if (pos == end) {
-                break;
-            }
+            READ_NEXT;
             if (!isalnum(*pos)) {
                 continue;
             }
@@ -253,49 +264,33 @@ static bool spf_check_domainspec(const char* spec, const char* end, bool with_ci
                     --pos;
                     break;
                 }
-                ++pos;
+                READ_NEXT;
             }
 
         /* macro expand */
         } else if (*pos == '%') {
-            ++pos;
-            if (pos == end) {
-                return false;
-            }
+            READ_NEXT;
             if (*pos == '%' || *pos == '_' || *pos == '-') {
                 can_be_end = true;
             } else if (*pos == '{') {
-                ++pos;
-                if (pos == end) {
-                    return false;
-                }
+                READ_NEXT;
                 if (*pos != 's' && *pos != 'l' && *pos != 'o' && *pos != 'd'
                     && *pos != 'i' && *pos != 'p' && *pos != 'h' && *pos != 'c'
                     && *pos != 'r' && *pos != 't') {
                     return false;
                 }
-                ++pos;
-                while (pos < end && isdigit(*pos)) {
-                    ++pos;
-                }
-                if (pos == end) {
-                    return false;
+                READ_NEXT;
+                while (isdigit(*pos)) {
+                    READ_NEXT;
                 }
                 if (*pos == 'r') {
-                    ++pos;
-                    if (pos == end) {
-                        return false;
-                    }
+                    READ_NEXT;
                 }
-                while (pos < end && (*pos == '.' || *pos == '-' || *pos == '+' || *pos == ','
-                                     || *pos == '/' || *pos == '_' || *pos == '=')) {
-                    ++pos;
+                while (*pos == '.' || *pos == '-' || *pos == '+' || *pos == ','
+                       || *pos == '/' || *pos == '_' || *pos == '=') {
+                    READ_NEXT;
                 }
-                if (pos == end) {
-                    return false;
-                }
-                ++pos;
-                if (pos == end || *pos != '}') {
+                if (*pos != '}') {
                     return false;
                 }
                 can_be_end = true;
@@ -305,9 +300,11 @@ static bool spf_check_domainspec(const char* spec, const char* end, bool with_ci
                 return false;
             }
         }
-        ++pos;
+        READ_NEXT;
     }
     return can_be_end;
+
+#undef READ_NEXT
 }
 
 static bool spf_parse(spf_t* spf) {
