@@ -40,6 +40,7 @@
 
 #include "spf.h"
 #include "spf_tokens.h"
+#include "buffer.h"
 
 
 typedef struct spf_rule_t {
@@ -56,9 +57,9 @@ struct spf_t {
     unsigned spf_inerror  : 1;
     unsigned canceled     : 1;
 
-    const char* ip;
-    const char* domain;
-    const char* sender;
+    char* ip;
+    char* domain;
+    char* sender;
 
     char *record;
     A(spf_rule_t) rules;
@@ -70,6 +71,7 @@ struct spf_t {
 };
 
 static PA(spf_t) spf_pool = ARRAY_INIT;
+static buffer_t buffer = ARRAY_INIT;
 
 static spf_t* spf_new(void)
 {
@@ -78,6 +80,9 @@ static spf_t* spf_new(void)
 
 static void spf_wipe(spf_t* spf)
 {
+    p_delete(&spf->domain);
+    p_delete(&spf->ip);
+    p_delete(&spf->sender);
     p_delete(&spf->record);
     p_clear(spf, 1);
 }
@@ -101,6 +106,7 @@ static spf_t* spf_acquire(void)
 static void spf_module_exit(void)
 {
     array_deep_wipe(spf_pool, spf_delete);
+    buffer_wipe(&buffer);
 }
 module_exit(spf_module_exit);
 
@@ -134,6 +140,91 @@ static void spf_exit(spf_t* spf, spf_code_t code)
     spf_cancel(spf);
 }
 
+__attribute__((used))
+static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, int* cidr6)
+{
+    bool getCidr = false;
+    if (cidr4 != NULL) {
+        getCidr = true;
+        *cidr4 = -1;
+    }
+    if (cidr6 != NULL) {
+        getCidr = true;
+        *cidr6 = -1;
+    }
+    const char* cidrStart = m_strchrnul(macrostring, '/');
+    if (*cidrStart != '\0' && !getCidr) {
+        info("CIDR length found, but no cidr requested");
+        return NULL;
+    }
+    array_len(buffer) = 0;
+    buffer_add(&buffer, macrostring, cidrStart - macrostring);
+    if (*cidrStart != '\0') {
+        char* end;
+        ++cidrStart;
+        if (*cidrStart == '/') {
+            if (cidr4 == NULL || cidr6 == NULL) {
+                info("Invalid CIDR (line %d)", __LINE__);
+                return NULL;
+            }
+            ++cidrStart;
+            *cidr6 = strtol(cidrStart, &end, 10);
+            if (end == cidrStart || *end != '\0' || *cidr6 < 0 || *cidr6 > 128) {
+                info("Invalid CIDR (line %d)", __LINE__);
+                return NULL;
+            }
+        } else {
+            int count = strtol(cidrStart, &end, 10);
+            if (end == cidrStart) {
+                info("Invalid CIDR (line %d)", __LINE__);
+                return NULL;
+            }
+            cidrStart = end;
+            if (cidr4 != NULL) {
+                if (count < 0 || count > 32) {
+                    info("Invalid CIDR (line %d)", __LINE__);
+                    return NULL;
+                }
+                *cidr4 = count;
+                if (*cidrStart == '/') {
+                    ++cidrStart;
+                    if (cidr6 == NULL || *cidrStart != '/') {
+                        info("Invalid CIDR (line %d)", __LINE__);
+                        return NULL;
+                    }
+                    ++cidrStart;
+                    *cidr6 = strtol(cidrStart, &end, 10);
+                    if (end == cidrStart || *end != '\0' || *cidr6 < 0 || *cidr6 > 128) {
+                        info("Invalid CIDR (line %d)", __LINE__);
+                        return NULL;
+                    }
+                }
+            } else {
+                if (count < 0 || count > 128 || *cidrStart != '\0') {
+                    info("Invalid CIDR (line %d)", __LINE__);
+                    return NULL;
+                }
+                *cidr6 = count;
+            }
+        }
+    }
+    if (cidr4 != NULL) {
+        if (cidr6 != NULL) {
+            info("String parsed: %s with cidr4=%d cidr6=%d", array_start(buffer), *cidr4, *cidr6);
+        } else {
+            info("String parsed: %s with cidr4=%d", array_start(buffer), *cidr4);
+        }
+    } else if (cidr6 != NULL) {
+        info("String parsed: %s with cidr6=%d", array_start(buffer), *cidr6);
+    } else {
+        info("String parsed: %s", array_start(buffer));
+    }
+    return array_start(buffer);
+}
+
+static void spf_include_exit(spf_code_t result, const char* exp, void* arg);
+static void spf_redirect_exit(spf_code_t result, const char* exp, void* arg);
+
 static void spf_next(spf_t* spf, bool start)
 {
     while (true) {
@@ -152,12 +243,94 @@ static void spf_next(spf_t* spf, bool start)
             spf_exit(spf, rule->qualifier);
             return;
 
+          case SPF_RULE_INCLUDE: {
+            const char* domain = spf_expand(spf, rule->content, NULL, NULL);
+            if (domain == NULL) {
+                spf_exit(spf, SPF_PERMERROR);
+                return;
+            }
+            ++domain;
+            info("Result: %s", domain);
+            spf_check(spf->ip, domain, spf->sender, spf_include_exit, spf);
+            return;
+          } break;
+
+          case SPF_RULE_REDIRECT: {
+            const char* domain = spf_expand(spf, rule->content, NULL, NULL);
+            if (domain == NULL) {
+                spf_exit(spf, SPF_PERMERROR);
+                return;
+            }
+            ++domain;
+            info("Result: %s", domain);
+            spf_check(spf->ip, domain, spf->sender, spf_redirect_exit, spf);
+            return;
+          } break;
+ 
+          case SPF_RULE_MX:
+          case SPF_RULE_A: {
+            int cidr4 = -1;
+            int cidr6 = -1;
+            const char* domain = NULL;
+            if (rule->content != NULL) {
+                domain = spf_expand(spf, rule->content, &cidr4, &cidr6);
+                if (domain == NULL) {
+                    spf_exit(spf, SPF_PERMERROR);
+                    return;
+                }
+                if (*domain != ':') {
+                    domain = spf->domain;
+                } else {
+                    ++domain;
+                }
+            } else {
+                domain = spf->domain;
+            }
+            info("Result: %s", domain);
+          } break;
+
           case SPF_RULE_UNKNOWN:
             break;
 
           default:
             break;
         }
+    }
+}
+
+static void spf_include_exit(spf_code_t result, const char* exp, void* arg)
+{
+    spf_t* spf = arg;
+    switch (result) {
+      case SPF_PASS:
+        spf_exit(spf, array_elt(spf->rules, spf->current_rule).qualifier);
+        return;
+
+      case SPF_FAIL:
+      case SPF_SOFTFAIL:
+      case SPF_NEUTRAL:
+        spf_next(spf, false);
+        return;
+
+      case SPF_TEMPERROR:
+        spf_exit(spf, SPF_TEMPERROR);
+        return;
+
+      case SPF_PERMERROR:
+      case SPF_NONE:
+      default:
+        spf_exit(spf, SPF_PERMERROR);
+        return;
+    }
+}
+
+static void spf_redirect_exit(spf_code_t result, const char* exp, void* arg)
+{
+    spf_t* spf = arg;
+    if (result == SPF_NONE) {
+        spf_exit(spf, SPF_PERMERROR);
+    } else {
+        spf_exit(spf, result);
     }
 }
 
@@ -493,9 +666,9 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
 spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_result_t resultcb, void *data)
 {
     spf_t* spf = spf_acquire();
-    spf->ip = ip;
-    spf->domain = domain;
-    spf->sender = sender;
+    spf->ip = m_strdup(ip);
+    spf->domain = m_strdup(domain);
+    spf->sender = m_strdup(sender);
     spf->exit = resultcb;
     spf->data = data;
     spf_query(spf, domain, DNS_RRT_SPF, spf_line_callback);
