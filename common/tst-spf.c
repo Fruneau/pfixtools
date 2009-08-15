@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     if (argc < 2) {
         return -1;
     }
-    spf_check(NULL, argv[1], NULL, spf_done, NULL);
+    spf_check("127.0.0.1", argv[1], NULL, spf_done, NULL);
     return server_loop(NULL, NULL, NULL, NULL, NULL);
 }
 
