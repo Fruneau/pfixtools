@@ -260,8 +260,30 @@ static bool spf_subquery(spf_t* spf, const char* domain, spf_result_t cb)
     }
 }
 
+static bool parse_ip4(uint32_t* result, const char* txt)
+{
+#define READ_COMPONENT(End)                                                    \
+    val = strtol(txt, &end, 10);                                               \
+    if (val < 0 || val > 255 || end == txt || *end != End) {                   \
+        return false;                                                          \
+    }                                                                          \
+    txt = end + 1
 
-__attribute__((used))
+    char* end = NULL;
+    int val = 0;
+    *result = 0;
+    READ_COMPONENT('.');
+    *result = val;
+    READ_COMPONENT('.');
+    *result = (*result << 8) + val;
+    READ_COMPONENT('.');
+    *result = (*result << 8) + val;
+    READ_COMPONENT('\0');
+    *result = (*result << 8) + val;
+    return true;
+#undef READ_COMPONENT
+}
+
 static bool spf_checkip4(spf_t* spf, uint32_t ip, int cidr)
 {
     uint32_t mask = 0xffffffff;
@@ -273,6 +295,11 @@ static bool spf_checkip4(spf_t* spf, uint32_t ip, int cidr)
     }
     info("Comparison between %x and %x (mask %x == /%d)", spf->ip4, ip, mask, cidr);
     return (spf->ip4 & mask) == (ip & mask);
+}
+
+static void spf_match(spf_t* spf)
+{
+    spf_exit(spf, array_elt(spf->rules, spf->current_rule).qualifier);
 }
 
 static void spf_next(spf_t* spf, bool start)
@@ -357,6 +384,20 @@ static void spf_next(spf_t* spf, bool start)
             return;
           } break;
 
+          case SPF_RULE_IP4: {
+            const char* ip = spf_expand(spf, rule->content + 1, &spf->cidr4, NULL);
+            uint32_t val;
+            if (ip == NULL || !parse_ip4(&val, ip)) {
+                spf_exit(spf, SPF_PERMERROR);
+                return;
+            }
+            if (spf_checkip4(spf, val, spf->cidr4)) {
+                spf_match(spf);
+                return;
+            }
+          } break;
+
+
           case SPF_RULE_UNKNOWN:
             break;
 
@@ -375,19 +416,24 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result)
         info("processing already finished");
         return;
     }
-
-    info("Reply received for A(%s)", result->qname);
-    for (i = 0 ; result->data[i] != NULL ; ++i) {
-        uint32_t ip = (((uint8_t)result->data[i][0]) << 24)
-                    | (((uint8_t)result->data[i][1]) << 16)
-                    | (((uint8_t)result->data[i][2]) << 8)
-                    | (((uint8_t)result->data[i][3]));
-        info("Got IP: %d.%d.%d.%d", result->data[i][0],
-             result->data[i][1], result->data[i][2], result->data[i][3]);
-        if (spf_checkip4(spf, ip, spf->cidr4)) {
-            info("IP matched");
-            spf_exit(spf, array_elt(spf->rules, spf->current_rule).qualifier);
-            return;
+    if (err != 0 && err != 3) {
+        spf_exit(spf, SPF_TEMPERROR);
+        return;
+    }
+    if (err == 0) {
+        info("Reply received for A(%s)", result->qname);
+        for (i = 0 ; result->data[i] != NULL ; ++i) {
+            uint32_t ip = (((uint8_t)result->data[i][0]) << 24)
+                        | (((uint8_t)result->data[i][1]) << 16)
+                        | (((uint8_t)result->data[i][2]) << 8)
+                        | (((uint8_t)result->data[i][3]));
+            info("Got IP: %d.%d.%d.%d", result->data[i][0],
+                 result->data[i][1], result->data[i][2], result->data[i][3]);
+            if (spf_checkip4(spf, ip, spf->cidr4)) {
+                info("IP matched");
+                spf_match(spf);
+                return;
+            }
         }
     }
     if (spf->a_resolutions == 0) {
@@ -407,28 +453,25 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
         spf_exit(spf, SPF_TEMPERROR);
         return;
     }
-    if (err == 3) {
-        spf_next(spf, false);
-        return;
-    }
-
-    info("Reply received for MX(%s) -> %s", result->qname, result->canonname);
-    for (i = 0 ; result->data[i] != NULL ; ++i) {
-        const char* pos = result->data[i] + 2;
-        array_len(dns_buffer) = 0;
-        if (i >= 10) {
-            warn("Too many MX entries for %s", result->qname);
-            break;
+    if (err == 0) {
+        info("Reply received for MX(%s) -> %s", result->qname, result->canonname);
+        for (i = 0 ; result->data[i] != NULL ; ++i) {
+            const char* pos = result->data[i] + 2;
+            array_len(dns_buffer) = 0;
+            if (i >= 10) {
+                warn("Too many MX entries for %s", result->qname);
+                break;
+            }
+            while (*pos != '\0') {
+                uint8_t count = *pos;
+                ++pos;
+                buffer_add(&dns_buffer, pos, count);
+                buffer_addch(&dns_buffer, '.');
+                pos += count;
+            }
+            info("Entry found: %s", array_start(dns_buffer));
+            spf_query(spf, array_start(dns_buffer), DNS_RRT_A, spf_a_receive);
         }
-        while (*pos != '\0') {
-            uint8_t count = *pos;
-            ++pos;
-            buffer_add(&dns_buffer, pos, count);
-            buffer_addch(&dns_buffer, '.');
-            pos += count;
-        }
-        info("Entry found: %s", array_start(dns_buffer));
-        spf_query(spf, array_start(dns_buffer), DNS_RRT_A, spf_a_receive);
     }
     if (spf->a_resolutions == 0) {
         warn("No MX entry for %s", result->qname);
@@ -442,7 +485,7 @@ static void spf_include_exit(spf_code_t result, const char* exp, void* arg)
     spf->subquery = NULL;
     switch (result) {
       case SPF_PASS:
-        spf_exit(spf, array_elt(spf->rules, spf->current_rule).qualifier);
+        spf_match(spf);
         return;
 
       case SPF_FAIL:
@@ -490,7 +533,7 @@ static spf_code_t spf_qualifier(const char** str)
         ++(*str);
         return SPF_NEUTRAL;
       default:
-        return SPF_NEUTRAL;
+        return SPF_PASS;
     }
 }
 
@@ -801,30 +844,6 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
             spf_next(spf, true);
         }
     }
-}
-
-static bool parse_ip4(uint32_t* result, const char* txt)
-{
-#define READ_COMPONENT(End)                                                    \
-    val = strtol(txt, &end, 10);                                               \
-    if (val < 0 || val > 255 || end == txt || *end != End) {                   \
-        return false;                                                          \
-    }                                                                          \
-    txt = end + 1
-
-    char* end = NULL;
-    int val = 0;
-    *result = 0;
-    READ_COMPONENT('.');
-    *result = val;
-    READ_COMPONENT('.');
-    *result = (*result << 8) + val;
-    READ_COMPONENT('.');
-    *result = (*result << 8) + val;
-    READ_COMPONENT('\0');
-    *result = (*result << 8) + val;
-    return true;
-#undef READ_COMPONENT
 }
 
 spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_result_t resultcb, void *data)
