@@ -165,7 +165,84 @@ static void spf_exit(spf_t* spf, spf_code_t code)
     spf_cancel(spf);
 }
 
-static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, int* cidr6)
+static bool spf_expand_pattern(spf_t* spf, buffer_t* buffer, char identifier, int parts, bool reverse,
+                               const char* delimiters, int delimiters_count) {
+    static_str_t sections[256];
+    static_str_t* pos = sections;
+    switch (identifier) {
+      case 's':
+        pos->str = spf->sender;
+        pos->len = m_strlen(pos->str);
+        break;
+      case 'l':
+        pos->str = spf->sender;
+        pos->len = strchr(pos->str, '@') - pos->str;
+        break;
+      case 'o':
+        pos->str = strchr(pos->str, '@') + 1;
+        pos->len = m_strlen(pos->str);
+        break;
+      case 'd':
+        pos->str = spf->domain;
+        pos->len = m_strlen(pos->str);
+        break;
+      case 'i':
+        pos->str = spf->ip;
+        pos->len = m_strlen(pos->str);
+        break;
+      case 'p':
+        warn("Macrostring expansion for 'p' not yet supported");
+        pos->str = "unknown";
+        pos->len = m_strlen(pos->str);
+        break;
+      case 'v':
+        pos->str = spf->is_ip6 ? "ip6" : "in_addr";
+        pos->len = m_strlen(pos->str);
+        break;
+      case 'h':
+        warn("EHLO/HELO domain not yet supported");
+        return false;
+      default:
+        return false;
+    }
+    const char* c = pos->str;
+    const char* end = pos->str + pos->len;
+    const char* delim_end = delimiters + delimiters_count;
+    pos->len = 0;
+    while (c < end) {
+        const char* delim = delimiters;
+        bool is_delim = false;
+        while (delim < delim_end) {
+            if (*c == *delim) {
+                ++pos;
+                is_delim = true;
+                pos->str = c + 1;
+                pos->len = 0;
+                break;
+            }
+        }
+        if (!is_delim) {
+            ++(pos->len);
+        }
+    }
+    if (parts > pos - sections + 1) {
+        parts = pos - sections + 1;
+    }
+    int i = 0;
+    for (i = 0 ; i < parts ; ++i) {
+        if (i != 0) {
+            buffer_addch(buffer, '.');
+        }
+        if (reverse) {
+            buffer_add(buffer, sections[i].str, sections[i].len);
+        } else {
+            buffer_add(buffer, pos[-i].str, pos[-i].len);
+        }
+    }
+    return true;
+}
+
+static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, int* cidr6, bool expand)
 {
     bool getCidr = false;
     if (cidr4 != NULL) {
@@ -182,7 +259,67 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
         return NULL;
     }
     array_len(expand_buffer) = 0;
-    buffer_add(&expand_buffer, macrostring, cidrStart - macrostring);
+    if (expand) {
+        while (macrostring < cidrStart) {
+            const char* next_format = strchr(macrostring, '%');
+            if (next_format == NULL || next_format >= cidrStart) {
+                next_format = cidrStart;
+            }
+            buffer_add(&expand_buffer, macrostring, next_format - macrostring);
+            macrostring = next_format;
+            if (macrostring < cidrStart) {
+                ++macrostring;
+                switch (*macrostring) {
+                  case '%':
+                    buffer_addch(&expand_buffer, '%');
+                    break;
+                  case '_':
+                    buffer_addch(&expand_buffer, ' ');
+                    break;
+                  case '-':
+                    buffer_addstr(&expand_buffer, "%20");
+                    break;
+                  case '{': {
+                    ++macrostring;
+                    next_format = strchr(macrostring, '}');
+                    if (next_format == NULL || next_format >= cidrStart) {
+                        return NULL;
+                    }
+                    char* end;
+                    char entity = *macrostring;
+                    int parts = 256;
+                    bool reverse = false;
+                    const char* delimiters = ".";
+                    int delimiters_count = 1;
+                    ++macrostring;
+                    if (isdigit(*macrostring)) {
+                        parts = strtol(macrostring, &end, 10);
+                        if (parts < 0) {
+                            return NULL;
+                        }
+                        macrostring = end;
+                    }
+                    if (*macrostring == 'r') {
+                        reverse = true;
+                        ++macrostring;
+                    }
+                    if (macrostring < next_format) {
+                        delimiters = macrostring;
+                        delimiters_count = next_format - delimiters;
+                    }
+                    if (!spf_expand_pattern(spf, &expand_buffer, entity, parts, reverse,
+                                            delimiters, delimiters_count)) {
+                        return NULL;
+                    }
+                    macrostring = next_format;
+                  } break;
+                }
+                ++macrostring;
+            }
+        }
+    } else {
+        buffer_add(&expand_buffer, macrostring, cidrStart - macrostring);
+    }
     if (*cidrStart != '\0') {
         char* end;
         ++cidrStart;
@@ -346,7 +483,7 @@ static void spf_next(spf_t* spf, bool start)
             return;
 
           case SPF_RULE_INCLUDE: {
-            const char* domain = spf_expand(spf, rule->content, NULL, NULL);
+            const char* domain = spf_expand(spf, rule->content, NULL, NULL, true);
             if (domain == NULL) {
                 spf_exit(spf, SPF_PERMERROR);
                 return;
@@ -361,7 +498,7 @@ static void spf_next(spf_t* spf, bool start)
           } break;
 
           case SPF_RULE_REDIRECT: {
-            const char* domain = spf_expand(spf, rule->content, NULL, NULL);
+            const char* domain = spf_expand(spf, rule->content, NULL, NULL, true);
             if (domain == NULL) {
                 spf_exit(spf, SPF_PERMERROR);
                 return;
@@ -379,7 +516,7 @@ static void spf_next(spf_t* spf, bool start)
           case SPF_RULE_A: {
             const char* domain = NULL;
             if (rule->content != NULL) {
-                domain = spf_expand(spf, rule->content, &spf->cidr4, &spf->cidr6);
+                domain = spf_expand(spf, rule->content, &spf->cidr4, &spf->cidr6, true);
                 if (domain == NULL) {
                     spf_exit(spf, SPF_PERMERROR);
                     return;
@@ -411,7 +548,7 @@ static void spf_next(spf_t* spf, bool start)
           } break;
 
           case SPF_RULE_IP4: {
-            const char* ip = spf_expand(spf, rule->content, &spf->cidr4, NULL);
+            const char* ip = spf_expand(spf, rule->content, &spf->cidr4, NULL, false);
             uint32_t val;
             if (ip == NULL || !parse_ip4(&val, ip + 1)) {
                 spf_exit(spf, SPF_PERMERROR);
@@ -424,7 +561,7 @@ static void spf_next(spf_t* spf, bool start)
           } break;
 
           case SPF_RULE_IP6: {
-            const char* ip = spf_expand(spf, rule->content, NULL, &spf->cidr6);
+            const char* ip = spf_expand(spf, rule->content, NULL, &spf->cidr6, false);
             uint8_t val[16];
             if (ip == NULL || !parse_ip6(val, ip + 1)) {
                 spf_exit(spf, SPF_PERMERROR);
@@ -437,7 +574,7 @@ static void spf_next(spf_t* spf, bool start)
           } break;
 
           case SPF_RULE_EXISTS: {
-            const char* domain = spf_expand(spf, rule->content, NULL, NULL);
+            const char* domain = spf_expand(spf, rule->content, NULL, NULL, true);
             if (domain == NULL) {
                 spf_exit(spf, SPF_PERMERROR);
                 return;
@@ -450,7 +587,7 @@ static void spf_next(spf_t* spf, bool start)
             const char* domain = NULL;
             spf->cidr4 = 32;
             if (rule->content == NULL) {
-                domain = spf_expand(spf, rule->content, NULL, NULL);
+                domain = spf_expand(spf, rule->content, NULL, NULL, true);
                 if (domain == NULL) {
                     spf_exit(spf, SPF_PERMERROR);
                     return;
@@ -465,9 +602,28 @@ static void spf_next(spf_t* spf, bool start)
                 buffer_addf(&dns_buffer, "%d.%d.%d.%d.in-addr.arpa.",
                             spf->ip4 & 0xff, (spf->ip4 >> 8) & 0xff,
                             (spf->ip4 >> 16) & 0xff, (spf->ip4 >> 24) & 0xff);
-                spf_query(spf, array_start(dns_buffer), DNS_RRT_PTR, spf_ptr_receive);
-                return;
+            } else {
+                buffer_addf(&dns_buffer, "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x."
+                                         "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.ip6.arpa.",
+                            spf->ip6[15] & 0x0f, (spf->ip6[15] >> 4) & 0x0f,
+                            spf->ip6[14] & 0x0f, (spf->ip6[14] >> 4) & 0x0f,
+                            spf->ip6[13] & 0x0f, (spf->ip6[13] >> 4) & 0x0f,
+                            spf->ip6[12] & 0x0f, (spf->ip6[12] >> 4) & 0x0f,
+                            spf->ip6[11] & 0x0f, (spf->ip6[11] >> 4) & 0x0f,
+                            spf->ip6[10] & 0x0f, (spf->ip6[10] >> 4) & 0x0f,
+                            spf->ip6[9] & 0x0f, (spf->ip6[9] >> 4) & 0x0f,
+                            spf->ip6[8] & 0x0f, (spf->ip6[8] >> 4) & 0x0f,
+                            spf->ip6[7] & 0x0f, (spf->ip6[7] >> 4) & 0x0f,
+                            spf->ip6[6] & 0x0f, (spf->ip6[6] >> 4) & 0x0f,
+                            spf->ip6[5] & 0x0f, (spf->ip6[5] >> 4) & 0x0f,
+                            spf->ip6[4] & 0x0f, (spf->ip6[4] >> 4) & 0x0f,
+                            spf->ip6[3] & 0x0f, (spf->ip6[3] >> 4) & 0x0f,
+                            spf->ip6[2] & 0x0f, (spf->ip6[2] >> 4) & 0x0f,
+                            spf->ip6[1] & 0x0f, (spf->ip6[1] >> 4) & 0x0f,
+                            spf->ip6[0] & 0x0f, (spf->ip6[0] >> 4) & 0x0f);
             }
+            spf_query(spf, array_start(dns_buffer), DNS_RRT_PTR, spf_ptr_receive);
+            return;
           } break;
 
           case SPF_RULE_UNKNOWN:
@@ -622,11 +778,21 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
     if (err == 0) {
         int i;
         for (i = 0 ; result->data[i] != NULL ; ++i) {
-            uint32_t ip = (((uint8_t)result->data[i][0]) << 24)
-                        | (((uint8_t)result->data[i][1]) << 16)
-                        | (((uint8_t)result->data[i][2]) << 8)
-                        | (((uint8_t)result->data[i][3]));
-            if (ip == spf->ip4) {
+            bool match = false;
+            if (spf->is_ip6) {
+                assert(result->qtype == DNS_RRT_AAAA);
+                if (memcmp(result->data[i], spf->ip6, 16) == 0) {
+                    match = true;
+                }
+            } else {
+                assert(result->qtype == DNS_RRT_A);
+                uint32_t ip = (((uint8_t)result->data[i][0]) << 24)
+                            | (((uint8_t)result->data[i][1]) << 16)
+                            | (((uint8_t)result->data[i][2]) << 8)
+                            | (((uint8_t)result->data[i][3]));
+                match = (ip == spf->ip4);
+            }
+            if (match) {
                 ssize_t namelen = m_strlen(result->qname);
                 ssize_t diff = namelen - domainlen;
                 if (diff == 0) {
@@ -677,7 +843,7 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
                 pos += count;
             }
             info("Entry found: %s", array_start(dns_buffer));
-            spf_query(spf, array_start(dns_buffer), DNS_RRT_A, spf_ptr_a_receive);
+            spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_ptr_a_receive);
         }
     }
     if (spf->a_resolutions == 0) {
