@@ -93,8 +93,14 @@ static spf_t* spf_new(void)
     return p_new(spf_t, 1);
 }
 
+static void spf_rule_wipe(spf_rule_t* rule)
+{
+    p_delete(&rule->content);
+}
+
 static void spf_wipe(spf_t* spf)
 {
+    array_deep_wipe(spf->rules, spf_rule_wipe);
     p_delete(&spf->domain);
     p_delete(&spf->ip);
     p_delete(&spf->sender);
