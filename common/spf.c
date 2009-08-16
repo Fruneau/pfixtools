@@ -37,6 +37,7 @@
  */
 
 #include <ctype.h>
+#include <arpa/inet.h>
 
 #include "spf.h"
 #include "spf_tokens.h"
@@ -60,6 +61,7 @@ struct spf_t {
     unsigned is_ip6       : 1;
 
     uint32_t ip4;
+    uint8_t ip6[16];
     char* ip;
     char* domain;
     char* sender;
@@ -265,26 +267,19 @@ static bool spf_subquery(spf_t* spf, const char* domain, spf_result_t cb)
 
 static bool parse_ip4(uint32_t* result, const char* txt)
 {
-#define READ_COMPONENT(End)                                                    \
-    val = strtol(txt, &end, 10);                                               \
-    if (val < 0 || val > 255 || end == txt || *end != End) {                   \
-        return false;                                                          \
-    }                                                                          \
-    txt = end + 1
-
-    char* end = NULL;
-    int val = 0;
-    *result = 0;
-    READ_COMPONENT('.');
-    *result = val;
-    READ_COMPONENT('.');
-    *result = (*result << 8) + val;
-    READ_COMPONENT('.');
-    *result = (*result << 8) + val;
-    READ_COMPONENT('\0');
-    *result = (*result << 8) + val;
+    if (inet_pton(AF_INET, txt, result) != 1) {
+        return false;
+    }
+    *result = ntohl(*result);
     return true;
-#undef READ_COMPONENT
+}
+
+static bool parse_ip6(uint8_t* result, const char* txt)
+{
+    if (inet_pton(AF_INET6, txt, result) != 1) {
+        return false;
+    }
+    return true;
 }
 
 static bool spf_checkip4(spf_t* spf, uint32_t ip, int cidr)
@@ -298,6 +293,29 @@ static bool spf_checkip4(spf_t* spf, uint32_t ip, int cidr)
     }
     info("Comparison between %x and %x (mask %x == /%d)", spf->ip4, ip, mask, cidr);
     return (spf->ip4 & mask) == (ip & mask);
+}
+
+static bool spf_checkip6(spf_t* spf, const uint8_t* ip, int cidr)
+{
+    if (!spf->is_ip6) {
+        return false;
+    }
+    if (cidr < 0) {
+        cidr = 128;
+    }
+    int bytes = cidr >> 3;
+    int bits  = cidr & 7;
+    if (bytes > 0) {
+        if (memcmp(spf->ip6, ip, bytes) != 0) {
+            return false;
+        }
+    }
+    if (bits > 0) {
+        if ((spf->ip6[bytes] >> (8 - bits)) != (ip[bytes] >> (8 - bits))) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static void spf_match(spf_t* spf)
@@ -396,6 +414,19 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
             if (spf_checkip4(spf, val, spf->cidr4)) {
+                spf_match(spf);
+                return;
+            }
+          } break;
+
+          case SPF_RULE_IP6: {
+            const char* ip = spf_expand(spf, rule->content, NULL, &spf->cidr6);
+            uint8_t val[16];
+            if (ip == NULL || !parse_ip6(val, ip + 1)) {
+                spf_exit(spf, SPF_PERMERROR);
+                return;
+            }
+            if (spf_checkip6(spf, val, spf->cidr6)) {
                 spf_match(spf);
                 return;
             }
@@ -987,8 +1018,20 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_res
     spf_t* spf = spf_acquire();
     spf->ip = m_strdup(ip);
     if (!parse_ip4(&spf->ip4, spf->ip)) {
+        if (!parse_ip6(spf->ip6, spf->ip)) {
+            spf_release(spf, false);
+            return NULL;
+        }
         spf->is_ip6 = true;
-    } else {
+
+        /* Find IP4 mapped on IP6 */
+        uint8_t mapped4to6[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
+        if (memcmp(mapped4to6, spf->ip6, 12) == 0) {
+            memcpy(&spf->ip4, spf->ip6 + 12, 4);
+            spf->ip4 = ntohl(spf->ip4);
+            spf->is_ip6 = false;
+        }
+    } else if (!parse_ip6(spf->ip6, spf->ip)) {
         spf->is_ip6 = false;
     }
     spf->domain = m_strdup(domain);
