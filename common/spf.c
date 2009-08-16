@@ -165,7 +165,6 @@ static void spf_exit(spf_t* spf, spf_code_t code)
     spf_cancel(spf);
 }
 
-__attribute__((used))
 static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, int* cidr6)
 {
     bool getCidr = false;
@@ -247,9 +246,13 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
     return array_start(expand_buffer);
 }
 
+
+/* Rule processing
+ */
 static void spf_include_exit(spf_code_t result, const char* exp, void* arg);
 static void spf_redirect_exit(spf_code_t result, const char* exp, void* arg);
 static void spf_a_receive(void* arg, int err, struct ub_result* result);
+static void spf_aaaa_receive(void* arg, int err, struct ub_result* result);
 static void spf_mx_receive(void* arg, int err, struct ub_result* result);
 static void spf_exists_receive(void* arg, int err, struct ub_result* result);
 static void spf_ptr_receive(void* arg, int err, struct ub_result* result);
@@ -399,7 +402,8 @@ static void spf_next(spf_t* spf, bool start)
             } else {
                 /* XXX: handle IPv6
                  */
-                if (!spf_query(spf, domain, DNS_RRT_A, spf_a_receive)) {
+                if (!spf_query(spf, domain, spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A,
+                                            spf->is_ip6 ? spf_aaaa_receive : spf_a_receive)) {
                     spf_exit(spf, SPF_TEMPERROR);
                 }
             }
@@ -475,6 +479,36 @@ static void spf_next(spf_t* spf, bool start)
     }
 }
 
+/* A Mechanism
+ */
+static void spf_aaaa_receive(void* arg, int err, struct ub_result* result)
+{
+    spf_t* spf = arg;
+    int i;
+    --spf->a_resolutions;
+    if (spf_release(spf, true)) {
+        info("processing already finished");
+        return;
+    }
+    if (err != 0 && err != 3) {
+        spf_exit(spf, SPF_TEMPERROR);
+        return;
+    }
+    if (err == 0) {
+        info("Reply received for AAAA(%s)", result->qname);
+        for (i = 0 ; result->data[i] != NULL ; ++i) {
+            if (spf_checkip6(spf, (uint8_t*)result->data[i], spf->cidr6)) {
+                info("IP matched");
+                spf_match(spf);
+                return;
+            }
+        }
+    }
+    if (spf->a_resolutions == 0) {
+        spf_next(spf, false);
+    }
+}
+
 static void spf_a_receive(void* arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
@@ -509,6 +543,8 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result)
     }
 }
 
+/* MX Mechanism
+ */
 static void spf_mx_receive(void* arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
@@ -538,7 +574,8 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
                 pos += count;
             }
             info("Entry found: %s", array_start(dns_buffer));
-            spf_query(spf, array_start(dns_buffer), DNS_RRT_A, spf_a_receive);
+            spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A,
+                                                    spf->is_ip6 ? spf_aaaa_receive : spf_a_receive);
         }
     }
     if (spf->a_resolutions == 0) {
@@ -547,6 +584,8 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
     }
 }
 
+/* EXISTS Mechanism
+ */
 static void spf_exists_receive(void* arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
@@ -565,6 +604,8 @@ static void spf_exists_receive(void* arg, int err, struct ub_result* result)
     }
 }
 
+/* PTR Mechanism
+ */
 static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
@@ -644,7 +685,8 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
     }
 }
 
-
+/* INCLUDE Mechanism
+ */
 static void spf_include_exit(spf_code_t result, const char* exp, void* arg)
 {
     spf_t* spf = arg;
@@ -672,6 +714,8 @@ static void spf_include_exit(spf_code_t result, const char* exp, void* arg)
     }
 }
 
+/* REDIRECT Modifier
+ */
 static void spf_redirect_exit(spf_code_t result, const char* exp, void* arg)
 {
     spf_t* spf = arg;
@@ -682,6 +726,9 @@ static void spf_redirect_exit(spf_code_t result, const char* exp, void* arg)
         spf_exit(spf, result);
     }
 }
+
+
+/*  Parsing   */
 
 static spf_code_t spf_qualifier(const char** str)
 {
