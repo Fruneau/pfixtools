@@ -1195,10 +1195,18 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
     }
     if (result->rcode == 0) {
         int i = 0;
-        while (result->data[i] != NULL) {
-            const char* str = result->data[i] + 1;
-            const int len   = result->len[i] - 1;
-            assert(len == result->data[i][0]);
+        for (i = 0 ; result->data[i] != NULL ; ++i) {
+            const char* pos = result->data[i];
+            const char* const end = pos + result->len[i];
+            array_len(expand_buffer) = 0;
+            while (pos < end) {
+                const int len = *pos;
+                buffer_add(&expand_buffer, pos + 1, len);
+                pos += len + 1;
+            }
+
+            const char* str = array_start(expand_buffer);
+            const int len   = array_len(expand_buffer);
             if (len < 6) {
                 info("record too short to be a spf record");
             } else {
@@ -1216,7 +1224,6 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
                     info("version is ok, but not finished by a space: \"%.*s\"", len, str);
                 }
             }
-            ++i;
         }
     }
     if (spf->txt_inerror && spf->spf_inerror) {
