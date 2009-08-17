@@ -1181,7 +1181,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
         info("processing already finished");
         return;
     }
-    if (spf->record != NULL) {
+    if (spf->record != NULL && spf->spf_received) {
         info("record already found");
         return;
     }
@@ -1195,7 +1195,15 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
     }
     if (result->rcode == 0) {
         int i = 0;
+        bool is_mine = false;
         for (i = 0 ; result->data[i] != NULL ; ++i) {
+            /* Parse field: (RFC 1035)
+             * TXT-DATA: One or more <character-string>
+             * <character-string> is a single
+             * length octet followed by that number of characters.  <character-string>
+             * is treated as binary information, and can be up to 256 characters in
+             * length (including the length octet).
+             */
             const char* pos = result->data[i];
             const char* const end = pos + result->len[i];
             array_len(expand_buffer) = 0;
@@ -1205,6 +1213,16 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
                 pos += len + 1;
             }
 
+            /* Looking for spf fields. (RFC 4408)
+             *  record           = version terms *SP
+             *  version          = "v=spf1"
+             *
+             *  1. Records that do not begin with a version section of exactly
+             *     "v=spf1" are discarded.  Note that the version section is
+             *     terminated either by an SP character or the end of the record.  A
+             *     record with a version section of "v=spf10" does not match and
+             *     must  be discarded.
+             */
             const char* str = array_start(expand_buffer);
             const int len   = array_len(expand_buffer);
             if (len < 6) {
@@ -1214,12 +1232,25 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
                     info("not a spf record: \"%.*s\"", len, str);
                 } else if (len == 6 || str[6] == ' ') {
                     info("spf record: \"%.*s\"", len, str);
+                    /* After the above steps, there should be exactly one record remaining
+                     * and evaluation can proceed.  If there are two or more records
+                     * remaining, then check_host() exits immediately with the result of
+                     * "PermError".
+                     */
                     if (spf->record != NULL) {
-                        info("too many spf records");
-                        spf_exit(spf, SPF_PERMERROR);
-                        return;
+                        if (is_mine || result->qtype != DNS_RRT_SPF) {
+                            info("too many spf records");
+                            spf_exit(spf, SPF_PERMERROR);
+                            return;
+                        } else {
+                            /* 2. If any record of type SPF are in the set, then all records
+                             *    of type TXT are discarded
+                             */
+                            p_delete(&spf->record);
+                        }
                     }
                     spf->record = p_dupstr(str, len);
+                    is_mine = true;
                 } else {
                     info("version is ok, but not finished by a space: \"%.*s\"", len, str);
                 }
@@ -1229,8 +1260,21 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
     if (spf->txt_inerror && spf->spf_inerror) {
         spf_exit(spf, SPF_TEMPERROR);
     } else if (spf->spf_received && spf->txt_received && spf->record == NULL) {
+        /* No record found
+         *
+         * If no matching records are returned, an SPF client MUST assume that
+         * the domain makes no SPF declarations.  SPF processing MUST stop and
+         * return "None".
+         */
         spf_exit(spf, SPF_NONE);
     } else if (spf->record != NULL) {
+        /* Parse record and start processing (RFC 4408)
+         *
+         * After one SPF record has been selected, the check_host() function
+         * parses and interprets it to find a result for the current test.  If
+         * there are any syntax errors, check_host() returns immediately with
+         * the result "PermError".
+         */
         if (!spf_parse(spf)) {
             spf_exit(spf, SPF_PERMERROR);
         } else {
