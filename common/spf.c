@@ -58,6 +58,7 @@ struct spf_t {
     unsigned txt_toomany  : 1;
     unsigned spf_received : 1;
     unsigned spf_inerror  : 1;
+    unsigned spf_nolookup : 1;
     unsigned canceled     : 1;
     unsigned is_ip6       : 1;
 
@@ -406,7 +407,7 @@ static bool spf_subquery(spf_t* spf, const char* domain, spf_result_t cb)
     if (spf->recursions >= SPF_MAX_RECUSION) {
         return false;
     } else {
-        spf->subquery = spf_check(spf->ip, domain, spf->sender, cb, spf);
+        spf->subquery = spf_check(spf->ip, domain, spf->sender, cb, spf->spf_nolookup, spf);
         spf->subquery->recursions = spf->recursions + 1;
         return true;
     }
@@ -1293,7 +1294,8 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
     }
 }
 
-spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_result_t resultcb, void *data)
+spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_result_t resultcb,
+                 bool no_spf_lookup, void *data)
 {
     spf_t* spf = spf_acquire();
     spf->ip = m_strdup(ip);
@@ -1314,11 +1316,14 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_res
     } else if (!parse_ip6(spf->ip6, spf->ip)) {
         spf->is_ip6 = false;
     }
+    spf->spf_received = spf->spf_nolookup = spf->spf_inerror = no_spf_lookup;
     spf->domain = m_strdup(domain);
     spf->sender = m_strdup(sender);
     spf->exit = resultcb;
     spf->data = data;
-    spf_query(spf, domain, DNS_RRT_SPF, spf_line_callback);
+    if (!spf->spf_nolookup) {
+        spf_query(spf, domain, DNS_RRT_SPF, spf_line_callback);
+    }
     spf_query(spf, domain, DNS_RRT_TXT, spf_line_callback);
     if (spf->queries == 0) {
         spf_delete(&spf);

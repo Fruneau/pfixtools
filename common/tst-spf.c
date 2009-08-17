@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     if (argc < 2) {
         return -1;
     }
-    spf_check(argv[2], argv[1], NULL, spf_done, NULL);
+    spf_check(argv[2], argv[1], NULL, spf_done, true, NULL);
     return server_loop(NULL, NULL, NULL, NULL, NULL);
 }
 
