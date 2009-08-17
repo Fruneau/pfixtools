@@ -55,6 +55,7 @@ ARRAY(spf_rule_t);
 struct spf_t {
     unsigned txt_received : 1;
     unsigned txt_inerror  : 1;
+    unsigned txt_toomany  : 1;
     unsigned spf_received : 1;
     unsigned spf_inerror  : 1;
     unsigned canceled     : 1;
@@ -1239,9 +1240,15 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
                      */
                     if (spf->record != NULL) {
                         if (is_mine || result->qtype != DNS_RRT_SPF) {
-                            info("too many spf records");
-                            spf_exit(spf, SPF_PERMERROR);
-                            return;
+                            if (spf->spf_received) {
+                                info("too many spf records");
+                                spf_exit(spf, SPF_PERMERROR);
+                                return;
+                            } else {
+                                spf->txt_toomany = true;
+                                p_delete(&spf->record);
+                                return;
+                            }
                         } else {
                             /* 2. If any record of type SPF are in the set, then all records
                              *    of type TXT are discarded
@@ -1257,6 +1264,9 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
             }
         }
     }
+    if (!spf->spf_received) {
+        return;
+    }
     if (spf->txt_inerror && spf->spf_inerror) {
         spf_exit(spf, SPF_TEMPERROR);
     } else if (spf->spf_received && spf->txt_received && spf->record == NULL) {
@@ -1266,7 +1276,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
          * the domain makes no SPF declarations.  SPF processing MUST stop and
          * return "None".
          */
-        spf_exit(spf, SPF_NONE);
+        spf_exit(spf, spf->txt_toomany ? SPF_PERMERROR : SPF_NONE);
     } else if (spf->record != NULL) {
         /* Parse record and start processing (RFC 4408)
          *
