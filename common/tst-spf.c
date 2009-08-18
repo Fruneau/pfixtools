@@ -12,7 +12,6 @@ static void spf_done(spf_code_t code, const char* explanation, void* data)
       case SPF_SOFTFAIL: str = "SOFTFAIL"; break;
       case SPF_TEMPERROR: str = "TEMPERROR"; break;
       case SPF_PERMERROR: str = "PERMERROR"; break;
-      case SPF_ASYNC: str = "ASYNC"; break;
     }
     info("SPF result: %s with %s", str, explanation != NULL ? explanation : "(no explanation)");
     exit(0);
