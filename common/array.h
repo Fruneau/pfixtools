@@ -54,13 +54,13 @@
 /** Declare type PA(Type).
  */
 #define PARRAY(Type)                                                           \
-    typedef PRIV_ARRAY(Type*) Type ## _ptr_array_t;                            \
-    static inline Type ## _ptr_array_t *Type ## _ptr_array_new(void)           \
+    typedef PRIV_ARRAY(Type*) PA(Type);                                        \
+    static inline PA(Type) *PA_NEW(Type)(void)                                 \
     {                                                                          \
-        return p_new(Type ## _ptr_array_t, 1);                                 \
+        return p_new(PA(Type), 1);                                             \
     }                                                                          \
                                                                                \
-    static inline void Type ## _ptr_array_delete(Type ## _ptr_array_t **array) \
+    static inline void PA_DELETE(Type)(PA(Type) **array)             \
     {                                                                          \
         if (*array) {                                                          \
             if ((*array)->locked) {                                            \
@@ -74,14 +74,14 @@
 /** Declare types A(Type) and PA(Type).
  */
 #define ARRAY(Type)                                                            \
-    typedef PRIV_ARRAY(Type) Type ## _array_t;                                 \
+    typedef PRIV_ARRAY(Type) A(Type);                                          \
                                                                                \
-    static inline Type ## _array_t *Type ## _array_new(void)                   \
+    static inline A(Type) *A_NEW(Type)(void)                                   \
     {                                                                          \
-        return p_new(Type ## _array_t, 1);                                     \
+        return p_new(A(Type), 1);                                              \
     }                                                                          \
                                                                                \
-    static inline void Type ## _array_delete(Type ## _array_t **array)         \
+    static inline void A_DELETE(Type)(A(Type) **array)                         \
     {                                                                          \
         if (*array) {                                                          \
             if ((*array)->locked) {                                            \
@@ -97,10 +97,14 @@
 /** Type A(Type) is a dynamic array of elements of type @c Type.
  */
 #define A(Type) Type ## _array_t
+#define A_NEW(Type) Type ## _array_new
+#define A_DELETE(Type) Type ## _array_delete
 
 /** Type PA(Type) is a dynamic array of pointers to type @c Type.
  */
 #define PA(Type) Type ## _ptr_array_t
+#define PA_NEW(Type) Type ## _ptr_array_new
+#define PA_DELETE(Type) Type ## _ptr_array_delete
 
 #define ARRAY_INIT { NULL, 0, 0, false }
 
