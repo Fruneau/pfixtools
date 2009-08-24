@@ -40,12 +40,10 @@ DOCS     = pfixtools.7
 
 # RULES ###################################################################{{{
 
-all test clean distclean doc install: %: %-recurse
+all clean distclean doc install: %: %-recurse
 
 %-recurse:
 	@set -e $(foreach dir,$(SUBDIRS),; $(MAKE) -C $(dir) $*)
-
-test: all
 
 install-recurse: install-dir
 install: install-postlicyd-tools install-postlicyd-conf

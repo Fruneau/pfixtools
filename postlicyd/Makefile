@@ -62,8 +62,6 @@ tst-qf_SOURCES = tst-qf.c query.c ../common/lib.a $(GENERATED)
 
 all:
 
-test: $(TESTS)
-
 hook_tokens.h hook_tokens.c: $(FILTERS)
 param_tokens.c param_tokens.h: $(FILTERS) config.c
 

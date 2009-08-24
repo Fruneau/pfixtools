@@ -46,7 +46,7 @@ MAN_SECTIONS = 1 2 3 4 5 6 7 8 9
 
 INSTALL_PROGS = $(addprefix install-,$(PROGRAMS))
 
-all: $(GENERATED) $(LIBS) $(PROGRAMS)
+all: $(GENERATED) $(LIBS) $(PROGRAMS) $(TESTS)
 
 DOCS_SRC  = $(foreach s,$(MAN_SECTIONS),$(patsubst %.$(s),%.txt,$(filter %.$(s),$(DOCS))))
 DOCS_HTML = $(DOCS_SRC:.txt=.html)
