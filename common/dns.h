@@ -64,6 +64,13 @@ typedef enum {
     DNS_RRT_SPF   = 99
 } dns_rrtype_t;
 
+typedef enum {
+    DNS_RRC_IN    = 1,
+    DNS_RRC_CS    = 2,
+    DNS_RRC_CH    = 3,
+    DNS_RRC_HS    = 4,
+} dns_rrclass_t;
+
 typedef void (*dns_result_callback_t)(dns_result_t *result, void *data);
 
 /** Run a DNS resolution for the given host with the given host and RRT

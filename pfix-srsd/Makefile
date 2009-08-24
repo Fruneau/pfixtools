@@ -40,4 +40,6 @@ pfix-srsd_LIBADD  = -lsrs2 -lev
 
 all:
 
+test: $(TESTS)
+
 include ../mk/common.mk

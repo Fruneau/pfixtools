@@ -37,26 +37,15 @@ LIBDIRS  = common
 SUBDIRS  = $(LIBDIRS) $(PROGDIRS)
 
 DOCS     = pfixtools.7
-COMMON_TESTS = trie regexp spf
-POSTLICYD_TESTS = filters greylist qf rbl
 
 # RULES ###################################################################{{{
 
-all clean distclean doc install: %: %-recurse
+all test clean distclean doc install: %: %-recurse
 
 %-recurse:
 	@set -e $(foreach dir,$(SUBDIRS),; $(MAKE) -C $(dir) $*)
 
-test: all $(COMMON_TESTS) $(POSTLICYD_TESTS)
-
-$(COMMON_TESTS): %: common-tst-%
-$(POSTLICYD_TESTS): %: postlicyd-tst-%
-
-common-tst-%:
-	$(MAKE) -C common tst-$*
-
-postlicyd-tst-%:
-	$(MAKE) -C postlicyd tst-$*
+test: all
 
 install-recurse: install-dir
 install: install-postlicyd-tools install-postlicyd-conf

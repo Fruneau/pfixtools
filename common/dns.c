@@ -142,7 +142,7 @@ bool dns_resolve(const char *hostname, dns_rrtype_t type, ub_callback_t callback
         }
     }
     debug("running dns resolution on %s", hostname);
-    return (ub_resolve_async(ctx, (char*)hostname, type, 1, data, callback, NULL) == 0);
+    return (ub_resolve_async(ctx, (char*)hostname, type, DNS_RRC_IN, data, callback, NULL) == 0);
 }
 
 bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,

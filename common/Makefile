@@ -46,6 +46,8 @@ tst-spf_LIBADD = -lunbound -lev
 
 all:
 
+test: $(TESTS)
+
 .server.o: CFLAGS=$(if $(DARWIN),$(filter-out -Wredundant-decls,$(filter-out -Wshadow,$(CFLAGSBASE))),$(CFLAGSBASE))
 
 include ../mk/common.mk
