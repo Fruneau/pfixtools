@@ -33,7 +33,7 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2008-2009 Florent Bruneau
+ * Copyright © 2009 Florent Bruneau
  */
 
 #include <ctype.h>
