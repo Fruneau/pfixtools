@@ -155,6 +155,7 @@ static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_call
     if (array_last(query_buffer) != '.') {
         buffer_addch(&query_buffer, '.');
     }
+    debug("spf (depth=%d): performing query of type %d for %s", spf->recursions, rtype, query);
     if (dns_resolve(array_start(query_buffer), rtype, cb, spf)) {
         if (rtype == DNS_RRT_A || rtype == DNS_RRT_AAAA) {
             ++spf->a_resolutions;
@@ -167,6 +168,19 @@ static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_call
 
 static void spf_exit(spf_t* spf, spf_code_t code)
 {
+    if (log_level >= LOG_NOTICE) {
+        const char* str = NULL;
+        switch (code) {
+          case SPF_NONE: str = "NONE"; break;
+          case SPF_NEUTRAL: str = "NEUTRAL"; break;
+          case SPF_PASS: str = "PASS"; break;
+          case SPF_FAIL: str = "FAIL"; break;
+          case SPF_SOFTFAIL: str = "SOFTFAIL"; break;
+          case SPF_TEMPERROR: str = "TEMPERROR"; break;
+          case SPF_PERMERROR: str = "PERMERROR"; break;
+        }
+        notice("spf (depth=%d): result for query is %s", spf->recursions, str);
+    }
     if (spf->exit) {
         spf->exit(code, NULL, spf->data);
     }
@@ -263,7 +277,7 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
     }
     const char* cidrStart = m_strchrnul(macrostring, '/');
     if (*cidrStart != '\0' && !getCidr) {
-        info("CIDR length found, but no cidr requested");
+        debug("spf (depth=%d): cidr length found, but no cidr requested on %s", spf->recursions, macrostring);
         return NULL;
     }
     array_len(expand_buffer) = 0;
@@ -291,6 +305,7 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
                     ++macrostring;
                     next_format = strchr(macrostring, '}');
                     if (next_format == NULL || next_format >= cidrStart) {
+                        debug("spf (depth=%d): unmatched %%{ in macro \"%s\"", spf->recursions, macrostring);
                         return NULL;
                     }
                     char* end;
@@ -303,6 +318,7 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
                     if (isdigit(*macrostring)) {
                         parts = strtol(macrostring, &end, 10);
                         if (parts < 0) {
+                            debug("spf (depth=%d): invalid number of parts (%d) in macro  \"%s\"", spf->recursions, parts, macrostring);
                             return NULL;
                         }
                         macrostring = end;
@@ -317,6 +333,7 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
                     }
                     if (!spf_expand_pattern(spf, &expand_buffer, entity, parts, reverse,
                                             delimiters, delimiters_count)) {
+                        debug("spf (depth=%d): invalid macro %c in \"%s\"", spf->recursions, entity, macrostring);
                         return NULL;
                     }
                     macrostring = next_format;
@@ -333,44 +350,44 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
         ++cidrStart;
         if (*cidrStart == '/') {
             if (cidr4 == NULL || cidr6 == NULL) {
-                info("Invalid CIDR (line %d)", __LINE__);
+                debug("spf (depth=%d): invalid cidr4 length in macrostring \"%s\"", spf->recursions, macrostring);
                 return NULL;
             }
             ++cidrStart;
             *cidr6 = strtol(cidrStart, &end, 10);
             if (end == cidrStart || *end != '\0' || *cidr6 < 0 || *cidr6 > 128) {
-                info("Invalid CIDR (line %d)", __LINE__);
+                debug("spf (depth=%d): invalid cidr6 length in macrostring \"%s\"", spf->recursions, macrostring);
                 return NULL;
             }
         } else {
             int count = strtol(cidrStart, &end, 10);
             if (end == cidrStart) {
-                info("Invalid CIDR (line %d)", __LINE__);
+                debug("spf (depth=%d): invalid cidr length in macrostring \"%s\"", spf->recursions, macrostring);
                 return NULL;
             }
             cidrStart = end;
             if (cidr4 != NULL) {
                 if (count < 0 || count > 32) {
-                    info("Invalid CIDR (line %d)", __LINE__);
+                    debug("spf (depth=%d): invalid cidr4 length in macrostring \"%s\"", spf->recursions, macrostring);
                     return NULL;
                 }
                 *cidr4 = count;
                 if (*cidrStart == '/') {
                     ++cidrStart;
                     if (cidr6 == NULL || *cidrStart != '/') {
-                        info("Invalid CIDR (line %d)", __LINE__);
+                        debug("spf (depth=%d): invalid cidr6 length in macrostring \"%s\"", spf->recursions, macrostring);
                         return NULL;
                     }
                     ++cidrStart;
                     *cidr6 = strtol(cidrStart, &end, 10);
                     if (end == cidrStart || *end != '\0' || *cidr6 < 0 || *cidr6 > 128) {
-                        info("Invalid CIDR (line %d)", __LINE__);
+                        debug("spf (depth=%d): invalid cidr6 length in macrostring \"%s\"", spf->recursions, macrostring);
                         return NULL;
                     }
                 }
             } else {
                 if (count < 0 || count > 128 || *cidrStart != '\0') {
-                    info("Invalid CIDR (line %d)", __LINE__);
+                    debug("spf (depth=%d): invalid cidr6 length in macrostring \"%s\"", spf->recursions, macrostring);
                     return NULL;
                 }
                 *cidr6 = count;
@@ -379,14 +396,17 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
     }
     if (cidr4 != NULL) {
         if (cidr6 != NULL) {
-            info("String parsed: %s with cidr4=%d cidr6=%d", array_start(expand_buffer), *cidr4, *cidr6);
+            debug("spf (depth=%d): macro \"%s\" parsed: \"%s\" with cidr4=%d cidr6=%d", spf->recursions,
+                  macrostring, array_start(expand_buffer), *cidr4, *cidr6);
         } else {
-            info("String parsed: %s with cidr4=%d", array_start(expand_buffer), *cidr4);
+            debug("spf (depth=%d): macro \"%s\" parsed: \"%s\" with cidr4=%d", spf->recursions,
+                  macrostring, array_start(expand_buffer), *cidr4);
         }
     } else if (cidr6 != NULL) {
-        info("String parsed: %s with cidr6=%d", array_start(expand_buffer), *cidr6);
+        debug("spf (depth=%d): macro \"%s\" parsed: \"%s\" with cidr6=%d", spf->recursions,
+              macrostring, array_start(expand_buffer), *cidr6);
     } else {
-        info("String parsed: %s", array_start(expand_buffer));
+        debug("spf (depth=%d): macro \"%s\" parsed: \"%s\"", spf->recursions, macrostring, array_start(expand_buffer));
     }
     return array_start(expand_buffer);
 }
@@ -439,7 +459,6 @@ static bool spf_checkip4(spf_t* spf, uint32_t ip, int cidr)
     if (cidr >= 0) {
         mask <<= 32 - cidr;
     }
-    info("Comparison between %x and %x (mask %x == /%d)", spf->ip4, ip, mask, cidr);
     return (spf->ip4 & mask) == (ip & mask);
 }
 
@@ -479,12 +498,13 @@ static void spf_next(spf_t* spf, bool start)
         }
         start = false;
         if (spf->current_rule >= array_len(spf->rules)) {
+            debug("spf (depth=%d): reached the end of spf record", spf->recursions);
             spf_exit(spf, SPF_NEUTRAL);
             return;
         }
         spf_rule_t* rule = array_ptr(spf->rules, spf->current_rule);
-        info("Testing rule: %s = %s", spftokens[rule->rule],
-             rule->content == NULL ? "(empty)" : rule->content);
+        notice("spf (depth=%d): processing rule %s: %s", spf->recursions, spftokens[rule->rule],
+              rule->content == NULL ? "(empty)" : rule->content);
         switch (rule->rule) {
           case SPF_RULE_ALL:
             spf_exit(spf, rule->qualifier);
@@ -497,9 +517,8 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
             ++domain;
-            info("Result: %s", domain);
             if (!spf_subquery(spf, domain, spf_include_exit)) {
-                warn("SPF: maximum recursion depth exceeded, error");
+                warn("spf: maximum recursion depth exceeded, error");
                 spf_exit(spf, SPF_PERMERROR);
             }
             return;
@@ -512,9 +531,8 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
             ++domain;
-            info("Result: %s", domain);
             if (!spf_subquery(spf, domain, spf_redirect_exit)) {
-                warn("SPF: maximum recursion depth exceeded, error");
+                warn("spf: maximum recursion depth exceeded, error");
                 spf_exit(spf, SPF_PERMERROR);
             }
             return;
@@ -539,14 +557,11 @@ static void spf_next(spf_t* spf, bool start)
                 spf->cidr4 = 32;
                 spf->cidr6 = 128;
             }
-            info("Result: %s", domain);
             if (rule->rule == SPF_RULE_MX) {
                 if (!spf_query(spf, domain, DNS_RRT_MX, spf_mx_receive)) {
                     spf_exit(spf, SPF_TEMPERROR);
                 }
             } else {
-                /* XXX: handle IPv6
-                 */
                 if (!spf_query(spf, domain, spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A,
                                             spf->is_ip6 ? spf_aaaa_receive : spf_a_receive)) {
                     spf_exit(spf, SPF_TEMPERROR);
@@ -651,18 +666,19 @@ static void spf_aaaa_receive(void* arg, int err, struct ub_result* result)
     int i;
     --spf->a_resolutions;
     if (spf_release(spf, true)) {
-        info("processing already finished");
+        debug("spf (depth=%d): AAAA received but processing already finished", spf->recursions);
         return;
     }
     if (err != 0 && err != 3) {
+        debug("spf (depth=%d): DNS error on AAAA query for %s", spf->recursions, result->qname);
         spf_exit(spf, SPF_TEMPERROR);
         return;
     }
+    debug("spf (depth=%d): AAAA answer received for %s", spf->recursions, result->qname);
     if (err == 0) {
-        info("Reply received for AAAA(%s)", result->qname);
         for (i = 0 ; result->data[i] != NULL ; ++i) {
             if (spf_checkip6(spf, (uint8_t*)result->data[i], spf->cidr6)) {
-                info("IP matched");
+                debug("spf (depth=%d): IPv6 matches with cidr=%d for query on %s", spf->recursions, spf->cidr6, result->qname);
                 spf_match(spf);
                 return;
             }
@@ -679,26 +695,31 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result)
     int i;
     --spf->a_resolutions;
     if (spf_release(spf, true)) {
-        info("processing already finished");
+        debug("spf (depth=%d): A received but processing already finished", spf->recursions);
         return;
     }
     if (err != 0 && err != 3) {
+        debug("spf (depth=%d): DNS error on A query for %s", spf->recursions, result->qname);
         spf_exit(spf, SPF_TEMPERROR);
         return;
     }
+    debug("spf (depth=%d): A answer received for %s", spf->recursions, result->qname);
     if (err == 0) {
-        info("Reply received for A(%s)", result->qname);
         for (i = 0 ; result->data[i] != NULL ; ++i) {
             uint32_t ip = (((uint8_t)result->data[i][0]) << 24)
                         | (((uint8_t)result->data[i][1]) << 16)
                         | (((uint8_t)result->data[i][2]) << 8)
                         | (((uint8_t)result->data[i][3]));
-            info("Got IP: %d.%d.%d.%d", result->data[i][0],
-                 result->data[i][1], result->data[i][2], result->data[i][3]);
             if (spf_checkip4(spf, ip, spf->cidr4)) {
-                info("IP matched");
+                debug("spf (depth=%d): IPv4 (%d.%d.%d.%d) matches with cidr=%d for query on %s", spf->recursions,
+                      result->data[i][0], result->data[i][1], result->data[i][2], result->data[i][3],
+                      spf->cidr4, result->qname);
                 spf_match(spf);
                 return;
+            } else {
+                debug("spf (depth=%d): IPv4 (%d.%d.%d.%d) does not match with cidr=%d for query on %s", spf->recursions,
+                      result->data[i][0], result->data[i][1], result->data[i][2], result->data[i][3],
+                      spf->cidr4, result->qname);
             }
         }
     }
@@ -714,20 +735,21 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
     spf_t* spf = arg;
     int i;
     if (spf_release(spf, true)) {
-        info("processing already finished");
+        debug("spf (depth=%d): MX received but processing already finished", spf->recursions);
         return;
     }
     if (err != 0 && err != 3) {
+        debug("spf (depth=%d): DNS error on query for MX entry for %s", spf->recursions, result->qname);
         spf_exit(spf, SPF_TEMPERROR);
         return;
     }
+    debug("spf (depth=%d): MX entry received for %s", spf->recursions, result->qname);
     if (err == 0) {
-        info("Reply received for MX(%s) -> %s", result->qname, result->canonname);
         for (i = 0 ; result->data[i] != NULL ; ++i) {
             const char* pos = result->data[i] + 2;
             array_len(dns_buffer) = 0;
             if (i >= 10) {
-                warn("Too many MX entries for %s", result->qname);
+                notice("spf (depth=%d): too many MX entries for %s", spf->recursions, result->qname);
                 break;
             }
             while (*pos != '\0') {
@@ -737,13 +759,12 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
                 buffer_addch(&dns_buffer, '.');
                 pos += count;
             }
-            info("Entry found: %s", array_start(dns_buffer));
             spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A,
                                                     spf->is_ip6 ? spf_aaaa_receive : spf_a_receive);
         }
     }
     if (spf->a_resolutions == 0) {
-        warn("No MX entry for %s", result->qname);
+        notice("spf (depth=%d): no MX entry for %s", spf->recursions, result->qname);
         spf_next(spf, false);
     }
 }
@@ -754,13 +775,15 @@ static void spf_exists_receive(void* arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
     if (spf_release(spf, true)) {
-        info("processing already finished");
+        debug("spf (depth=%d): A received but processing already finished", spf->recursions);
         return;
     }
     if (err != 0 && err != 3) {
+        debug("spf (depth=%d): DNS error on A query for existence for %s", spf->recursions, result->qname);
         spf_exit(spf, SPF_TEMPERROR);
         return;
     }
+    debug("spf (depth=%d): existence query received for %s", spf->recursions, result->qname);
     if (err == 0) {
         spf_match(spf);
     } else {
@@ -775,13 +798,15 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
     spf_t* spf = arg;
     --spf->a_resolutions;
     if (spf_release(spf, true)) {
-        info("processing already finished");
+        debug("spf (depth=%d): A received but processing already finished", spf->recursions);
         return;
     }
     if (err != 0 && err != 3) {
+        debug("spf (depth=%d): DNS error for A query on %s", spf->recursions, result->qname);
         spf_exit(spf, SPF_TEMPERROR);
         return;
     }
+    debug("spf (depth=%d): A entry received following PTR request for %s", spf->recursions, result->qname);
     ssize_t domainlen = m_strlen(spf->domain);
     if (err == 0) {
         int i;
@@ -805,12 +830,14 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
                 ssize_t diff = namelen - domainlen;
                 if (diff == 0) {
                     if (strcasecmp(spf->domain, result->qname) == 0) {
+                        notice("spf (depth=%d): PTR validated by domain %s", spf->recursions, result->qname);
                         spf_match(spf);
                         return;
                     }
                 } else if (diff > 0) {
                     if (result->qname[diff - 1] == '.'
                         && strcasecmp(spf->domain, result->qname + diff) == 0) {
+                        notice("spf (depth=%d): PTR validated by subdomain %s", spf->recursions, result->qname);
                         spf_match(spf);
                         return;
                     }
@@ -827,20 +854,22 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
     if (spf_release(spf, true)) {
-        info("processing already finished");
+        debug("spf (depth=%d): PTR received but processing already finished", spf->recursions);
         return;
     }
     if (err != 0 && err != 3) {
+        debug("spf (depth=%d): DNS error for PTR query on %s", spf->recursions, result->qname);
         spf_exit(spf, SPF_TEMPERROR);
         return;
     }
+    debug("spf (depth=%d): PTR entry received for query %s", spf->recursions, result->qname);
     if (err == 0) {
         int i;
         for (i = 0 ; result->data[i] != NULL ; ++i) {
             const char* pos = result->data[i];
             array_len(dns_buffer) = 0;
             if (i >= 10) {
-                warn("Too many PTR entries for %s", result->qname);
+                notice("spf (depth=%d): too many PTR entries for %s", spf->recursions, result->qname);
                 break;
             }
             while (*pos != '\0') {
@@ -850,7 +879,6 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
                 buffer_addch(&dns_buffer, '.');
                 pos += count;
             }
-            info("Entry found: %s", array_start(dns_buffer));
             spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_ptr_a_receive);
         }
     }
@@ -867,6 +895,7 @@ static void spf_include_exit(spf_code_t result, const char* exp, void* arg)
     spf->subquery = NULL;
     switch (result) {
       case SPF_PASS:
+        debug("spf (depth=%d): include matched", spf->recursions);
         spf_match(spf);
         return;
 
@@ -897,6 +926,7 @@ static void spf_redirect_exit(spf_code_t result, const char* exp, void* arg)
     if (result == SPF_NONE) {
         spf_exit(spf, SPF_PERMERROR);
     } else {
+        debug("spf (depth=%d): redirect matched", spf->recursions);
         spf_exit(spf, result);
     }
 }
@@ -1160,8 +1190,6 @@ static bool spf_parse(spf_t* spf) {
             }
         }
 
-        info("rule found: %.*s -> %s", (int)(name_end - rule_start), rule_start,
-                                       id != SPF_RULE_UNKNOWN ? spftokens[id] : "unknown");
         spf_rule_t rule;
         rule.qualifier = qual;
         rule.rule = id;
@@ -1178,13 +1206,13 @@ static bool spf_parse(spf_t* spf) {
 static void spf_line_callback(void *arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
-    info("Coucou %d", result->qtype);
     if (spf_release(spf, true)) {
-        info("processing already finished");
+        debug("spf (depth=%d): %s received but  processing already finished", spf->recursions,
+              result->qtype == DNS_RRT_TXT ? "TXT" : "SPF");
         return;
     }
     if (spf->record != NULL && spf->spf_received) {
-        info("record already found");
+        debug("spf (depth=%d): record already found", spf->recursions);
         return;
     }
     if (result->qtype == DNS_RRT_SPF) {
@@ -1228,12 +1256,12 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
             const char* str = array_start(expand_buffer);
             const int len   = array_len(expand_buffer);
             if (len < 6) {
-                info("record too short to be a spf record");
+                debug("spf (depth=%d): entry too short to be a spf record", spf->recursions);
             } else {
                 if (strncmp(str, "v=spf1", 6) != 0) {
-                    info("not a spf record: \"%.*s\"", len, str);
+                    debug("spf (depth=%d): not a record: \"%.*s\"", spf->recursions, len, str);
                 } else if (len == 6 || str[6] == ' ') {
-                    info("spf record: \"%.*s\"", len, str);
+                    debug("spf (depth=%d): record found: \"%.*s\"", spf->recursions, len, str);
                     /* After the above steps, there should be exactly one record remaining
                      * and evaluation can proceed.  If there are two or more records
                      * remaining, then check_host() exits immediately with the result of
@@ -1242,7 +1270,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
                     if (spf->record != NULL) {
                         if (is_mine || result->qtype != DNS_RRT_SPF) {
                             if (spf->spf_received) {
-                                info("too many spf records");
+                                notice("spf (depth=%d): too many records", spf->recursions);
                                 spf_exit(spf, SPF_PERMERROR);
                                 return;
                             } else {
@@ -1260,7 +1288,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
                     spf->record = p_dupstr(str, len);
                     is_mine = true;
                 } else {
-                    info("version is ok, but not finished by a space: \"%.*s\"", len, str);
+                    debug("spf (depth=%d): invalid record, version is ok, but not finished by a space: \"%.*s\"", spf->recursions, len, str);
                 }
             }
         }
@@ -1277,6 +1305,11 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
          * the domain makes no SPF declarations.  SPF processing MUST stop and
          * return "None".
          */
+        if (spf->txt_toomany) {
+            notice("spf (depth=%d): too many records", spf->recursions);
+        } else {
+            notice("spf (depth=%d): no record found", spf->recursions);
+        }
         spf_exit(spf, spf->txt_toomany ? SPF_PERMERROR : SPF_NONE);
     } else if (spf->record != NULL) {
         /* Parse record and start processing (RFC 4408)
@@ -1287,8 +1320,10 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
          * the result "PermError".
          */
         if (!spf_parse(spf)) {
+            notice("spf (depth=%d): cannot parse spf entry: \"%s\"", spf->recursions, spf->record);
             spf_exit(spf, SPF_PERMERROR);
         } else {
+            notice("spf (depth=%d): record selected: \"%s\"", spf->recursions, spf->record);
             spf_next(spf, true);
         }
     }

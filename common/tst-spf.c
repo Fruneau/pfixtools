@@ -22,6 +22,7 @@ int main(int argc, char *argv[])
     if (argc < 2) {
         return -1;
     }
+    log_level = LOG_NOTICE;
     spf_check(argv[2], argv[1], NULL, spf_done, true, NULL);
     return server_loop(NULL, NULL, NULL, NULL, NULL);
 }

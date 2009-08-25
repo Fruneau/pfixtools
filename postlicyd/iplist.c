@@ -312,7 +312,7 @@ static bool iplist_filter_constructor(filter_t *filter)
 #define PARSE_CHECK(Expr, Str, ...)                                            \
     if (!(Expr)) {                                                             \
         err(Str, ##__VA_ARGS__);                                               \
-        iplist_filter_delete(&data);                                              \
+        iplist_filter_delete(&data);                                           \
         return false;                                                          \
     }
 
