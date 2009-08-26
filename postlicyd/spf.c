@@ -151,7 +151,7 @@ static filter_result_t spf_filter(const filter_t *filter, const query_t *query,
         buffer_add(&domain, query->sender_domain.str, query->sender_domain.len);
         buffer_add(&sender, query->sender.str, query->sender.len);
     }
-    if (spf_check(array_start(ip), array_start(domain), array_start(sender),
+    if (spf_check(array_start(ip), array_start(domain), array_start(sender), query->helo_name.str,
                   spf_filter_async, !data->use_spf_record, context) == NULL) {
         err("filter %s: error while trying to run spf check", filter->name);
         return HTK_TEMP_ERROR;

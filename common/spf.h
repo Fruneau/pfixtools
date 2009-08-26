@@ -95,6 +95,7 @@ typedef void (*spf_result_t)(spf_code_t result, const char* exp, void *arg);
  *               is not mandatory (but recommended).
  * @param sender The MAIL FROM identity. If none is given, postmaster@HELO domain is used
  *               as a fallback.
+ * @param helo HELO/EHLO domain.
  * @param cb A function to call back when a result is found.
  * @param no_spf_lookup If true, disable lookup of spf entries in SPF dns record (in this
  *                      case only entries in TXT dns records are selected). This avoid
@@ -103,8 +104,8 @@ typedef void (*spf_result_t)(spf_code_t result, const char* exp, void *arg);
  * @param arg A custom argument that will be passed to the result callback @p cb.
  * @return A pointer to an abstract spf context in case of success, NULL in case of error.
  */
-spf_t* spf_check(const char *ip, const char *domain, const char *sender, spf_result_t cb,
-                 bool no_spf_lookup, void* arg);
+spf_t* spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
+                 spf_result_t cb, bool no_spf_lookup, void* arg);
 
 /** Cancel a SPF lookup.
  *
