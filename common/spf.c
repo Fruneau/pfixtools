@@ -76,7 +76,7 @@ struct spf_t {
 
     int cidr4;
     int cidr6;
-    const char* domainspec;
+    buffer_t domainspec;
 
     int recursions;
     struct spf_t* subquery;
@@ -115,6 +115,7 @@ static void spf_wipe(spf_t* spf)
     array_wipe(spf->sender);
     array_wipe(spf->helo);
     array_wipe(spf->record);
+    array_wipe(spf->domainspec);
     p_clear(spf, 1);
 }
 
@@ -157,6 +158,7 @@ static bool spf_release(spf_t* spf, bool decrement)
         array_len(spf->sender) = 0;
         array_len(spf->record) = 0;
         array_len(spf->helo) = 0;
+        array_len(spf->domainspec) = 0;
         array_add(spf_pool, spf);
         return true;
     }
@@ -638,7 +640,11 @@ static void spf_next(spf_t* spf, bool start)
             } else {
                 domain = array_start(spf->domain);
             }
-            spf->domainspec = domain;
+            array_len(spf->domainspec) = 0;
+            buffer_addstr(&spf->domainspec, domain);
+            if (array_last(spf->domainspec) != '.') {
+                buffer_addch(&spf->domainspec, '.');
+            }
             array_len(dns_buffer) = 0;
             if (!spf->is_ip6) {
                 buffer_addf(&dns_buffer, "%d.%d.%d.%d.in-addr.arpa.",
@@ -865,14 +871,14 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
                 ssize_t namelen = m_strlen(result->qname);
                 ssize_t diff = namelen - domainlen;
                 if (diff == 0) {
-                    if (strcasecmp(array_start(spf->domain), result->qname) == 0) {
+                    if (strcasecmp(array_start(spf->domainspec), result->qname) == 0) {
                         notice("spf (depth=%d): PTR validated by domain %s", spf->recursions, result->qname);
                         spf_match(spf);
                         return;
                     }
                 } else if (diff > 0) {
                     if (result->qname[diff - 1] == '.'
-                        && strcasecmp(array_start(spf->domain), result->qname + diff) == 0) {
+                        && strcasecmp(array_start(spf->domainspec), result->qname + diff) == 0) {
                         notice("spf (depth=%d): PTR validated by subdomain %s", spf->recursions, result->qname);
                         spf_match(spf);
                         return;
