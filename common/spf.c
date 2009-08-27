@@ -82,6 +82,8 @@ struct spf_t {
     struct spf_t* subquery;
 
     uint8_t a_resolutions;
+    bool a_dnserror;
+
     uint8_t queries;
     spf_result_t exit;
     void* data;
@@ -518,6 +520,7 @@ static void spf_next(spf_t* spf, bool start)
             spf_exit(spf, SPF_NEUTRAL);
             return;
         }
+        spf->a_dnserror = false;
         spf_rule_t* rule = array_ptr(spf->rules, spf->current_rule);
         notice("spf (depth=%d): processing rule %s: %s", spf->recursions, spftokens[rule->rule],
               array_len(rule->content) == 0 ? "(empty)" : array_start(rule->content));
@@ -687,7 +690,10 @@ static void spf_aaaa_receive(void* arg, int err, struct ub_result* result)
     }
     if (err != 0 && err != 3) {
         debug("spf (depth=%d): DNS error on AAAA query for %s", spf->recursions, result->qname);
-        spf_exit(spf, SPF_TEMPERROR);
+        spf->a_dnserror = true;
+        if (spf->a_resolutions == 0) {
+            spf_exit(spf, SPF_TEMPERROR);
+        }
         return;
     }
     debug("spf (depth=%d): AAAA answer received for %s", spf->recursions, result->qname);
@@ -701,7 +707,11 @@ static void spf_aaaa_receive(void* arg, int err, struct ub_result* result)
         }
     }
     if (spf->a_resolutions == 0) {
-        spf_next(spf, false);
+        if (spf->a_dnserror) {
+            spf_exit(spf, SPF_TEMPERROR);
+        } else {
+            spf_next(spf, false);
+        }
     }
 }
 
@@ -716,7 +726,10 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result)
     }
     if (err != 0 && err != 3) {
         debug("spf (depth=%d): DNS error on A query for %s", spf->recursions, result->qname);
-        spf_exit(spf, SPF_TEMPERROR);
+        spf->a_dnserror = true;
+        if (spf->a_resolutions == 0) {
+            spf_exit(spf, SPF_TEMPERROR);
+        }
         return;
     }
     debug("spf (depth=%d): A answer received for %s", spf->recursions, result->qname);
@@ -740,7 +753,11 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result)
         }
     }
     if (spf->a_resolutions == 0) {
-        spf_next(spf, false);
+        if (spf->a_dnserror) {
+            spf_exit(spf, SPF_TEMPERROR);
+        } else {
+            spf_next(spf, false);
+        }
     }
 }
 
@@ -819,7 +836,10 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
     }
     if (err != 0 && err != 3) {
         debug("spf (depth=%d): DNS error for A query on %s", spf->recursions, result->qname);
-        spf_exit(spf, SPF_TEMPERROR);
+        spf->a_dnserror = true;
+        if (spf->a_resolutions == 0) {
+            spf_exit(spf, SPF_TEMPERROR);
+        }
         return;
     }
     debug("spf (depth=%d): A entry received following PTR request for %s", spf->recursions, result->qname);
@@ -862,7 +882,11 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
         }
     }
     if (spf->a_resolutions == 0) {
-        spf_next(spf, false);
+        if (spf->a_dnserror) {
+            spf_exit(spf, SPF_TEMPERROR);
+        } else {
+            spf_next(spf, false);
+        }
     }
 }
 
