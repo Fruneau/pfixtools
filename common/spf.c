@@ -849,7 +849,6 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
         return;
     }
     debug("spf (depth=%d): A entry received following PTR request for %s", spf->recursions, result->qname);
-    ssize_t domainlen = array_len(spf->domain);
     if (err == 0) {
         int i;
         for (i = 0 ; result->data[i] != NULL ; ++i) {
@@ -868,22 +867,9 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
                 match = (ip == spf->ip4);
             }
             if (match) {
-                ssize_t namelen = m_strlen(result->qname);
-                ssize_t diff = namelen - domainlen;
-                if (diff == 0) {
-                    if (strcasecmp(array_start(spf->domainspec), result->qname) == 0) {
-                        notice("spf (depth=%d): PTR validated by domain %s", spf->recursions, result->qname);
-                        spf_match(spf);
-                        return;
-                    }
-                } else if (diff > 0) {
-                    if (result->qname[diff - 1] == '.'
-                        && strcasecmp(array_start(spf->domainspec), result->qname + diff) == 0) {
-                        notice("spf (depth=%d): PTR validated by subdomain %s", spf->recursions, result->qname);
-                        spf_match(spf);
-                        return;
-                    }
-                }
+                notice("spf (depth=%d): PTR validated by domain %s", spf->recursions, result->qname);
+                spf_match(spf);
+                return;
             }
         }
     }
@@ -914,7 +900,7 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
         for (i = 0 ; result->data[i] != NULL ; ++i) {
             const char* pos = result->data[i];
             array_len(dns_buffer) = 0;
-            if (i >= 10) {
+            if (spf->a_resolutions >= 10) {
                 notice("spf (depth=%d): too many PTR entries for %s", spf->recursions, result->qname);
                 break;
             }
@@ -925,7 +911,23 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
                 buffer_addch(&dns_buffer, '.');
                 pos += count;
             }
-            spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_ptr_a_receive);
+
+            ssize_t diff = array_len(dns_buffer) - array_len(spf->domainspec);
+            bool match = false;
+            if (diff == 0) {
+                if (strcasecmp(array_start(spf->domainspec), array_start(dns_buffer)) == 0) {
+                    debug("spf (depth=%d): PTR potential entry found for domain %s", spf->recursions, array_start(dns_buffer));
+                    match = true;
+                }
+            } else if (diff > 0 && array_elt(dns_buffer, diff - 1) == '.') {
+                if (strcasecmp(array_start(spf->domainspec), array_ptr(dns_buffer, diff)) == 0) {
+                    debug("spf (depth=%d): PTR potential entry found for subdomain %s", spf->recursions, array_start(dns_buffer));
+                    match = true;
+                }
+            }
+            if (match) {
+                spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_ptr_a_receive);
+            }
         }
     }
     if (spf->a_resolutions == 0) {
