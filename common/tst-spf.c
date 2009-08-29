@@ -186,18 +186,21 @@ static spf_test_t testcases[] = {
     { "include-loop", "Processing limits", "10.1/6", "mail.example.com", "1.2.3.4", "foo@e2.example.com", SPF_PERMERROR, -1 },
     { NULL, NULL, NULL, NULL, NULL, NULL, -1, -1 }
 };
+static int tested = 0;
+static int passed = 0;
 
 static void spf_test_next(spf_test_t* current);
 
 static void spf_test_done(spf_code_t code, const char* explanation, void* data)
 {
     spf_test_t* current = data;
+    ++tested;
     if ((int)code == current->result1 || (int)code == current->result2) {
         printf("SUCCESS: %s\n", current->testid);
+        ++passed;
     } else {
         printf("ERROR: %s\n", current->testid);
     }
-    sleep(1);
     spf_test_next(current);
 }
 

@@ -165,6 +165,33 @@ static bool spf_release(spf_t* spf, bool decrement)
     return false;
 }
 
+static bool spf_validate_domain(const char* domain) {
+    int label_count = 0;
+    int label_length = 0;
+    const char* pos = domain;
+    while (*pos != '\0') {
+        if (*pos == '.') {
+            if (label_length == 0) {
+                debug("spf: invalid domain name \"%s\": contains a non-terminal zero-length label", domain);
+                return false;
+            }
+            label_length = 0;
+            ++label_count;
+        } else if (!isalnum(*pos) && *pos != '-' && *pos != '_') {
+            debug("spf: invalid domain name \"%s\": contains illegal character '%c'", domain, *pos);
+            return false;
+        } else {
+            ++label_length;
+            if (label_length > 63) {
+                debug("spf: invalid domain name \"%s\": contains a too long label", domain);
+                return false;
+            }
+        }
+        ++pos;
+    }
+    return label_count >= 1;
+}
+
 static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_callback_t cb)
 {
     array_len(query_buffer) = 0;
@@ -292,6 +319,9 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
     if (cidr6 != NULL) {
         getCidr = true;
         *cidr6 = 128;
+    }
+    if (macrostring == NULL) {
+        macrostring = "";
     }
     const char* cidrStart = m_strchrnul(macrostring, '/');
     if (*cidrStart != '\0' && !getCidr) {
@@ -542,6 +572,10 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
             ++domain;
+            if (!spf_validate_domain(domain)) {
+                spf_exit(spf, SPF_PERMERROR);
+                return;
+            }
             if (!spf_subquery(spf, domain, spf_include_exit)) {
                 warn("spf: maximum recursion depth exceeded, error");
                 spf_exit(spf, SPF_PERMERROR);
@@ -556,13 +590,17 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
             ++domain;
+            if (!spf_validate_domain(domain)) {
+                spf_exit(spf, SPF_PERMERROR);
+                return;
+            }
             if (!spf_subquery(spf, domain, spf_redirect_exit)) {
                 warn("spf: maximum recursion depth exceeded, error");
                 spf_exit(spf, SPF_PERMERROR);
             }
             return;
           } break;
- 
+
           case SPF_RULE_MX:
           case SPF_RULE_A: {
             const char* domain = NULL;
@@ -576,6 +614,10 @@ static void spf_next(spf_t* spf, bool start)
                     domain = array_start(spf->domain);
                 } else {
                     ++domain;
+                }
+                if (!spf_validate_domain(domain)) {
+                    spf_exit(spf, SPF_PERMERROR);
+                    return;
                 }
             } else {
                 domain = array_start(spf->domain);
@@ -627,7 +669,12 @@ static void spf_next(spf_t* spf, bool start)
                 spf_exit(spf, SPF_PERMERROR);
                 return;
             }
-            spf_query(spf, domain + 1, DNS_RRT_A, spf_exists_receive);
+            ++domain;
+            if (!spf_validate_domain(domain)) {
+                spf_exit(spf, SPF_PERMERROR);
+                return;
+            }
+            spf_query(spf, domain, DNS_RRT_A, spf_exists_receive);
             return;
           } break;
 
@@ -641,6 +688,10 @@ static void spf_next(spf_t* spf, bool start)
                     return;
                 }
                 ++domain;
+                if (!spf_validate_domain(domain)) {
+                    spf_exit(spf, SPF_PERMERROR);
+                    return;
+                }
             } else {
                 domain = array_start(spf->domain);
             }
@@ -1388,32 +1439,6 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
     }
 }
 
-static bool spf_validate_domain(const char* domain) {
-    int label_count = 0;
-    int label_length = 0;
-    const char* pos = domain;
-    while (*pos != '\0') {
-        if (*pos == '.') {
-            if (label_length == 0) {
-                debug("spf: invalid domain name \"%s\": contains a non-terminal zero-length label", domain);
-                return false;
-            }
-            label_length = 0;
-            ++label_count;
-        } else if (!isalnum(*pos) && *pos != '-' && *pos != '_') {
-            debug("spf: invalid domain name \"%s\": contains illegal character '%c'", domain, *pos);
-            return false;
-        } else {
-            ++label_length;
-            if (label_length > 63) {
-                debug("spf: invalid domain name \"%s\": contains a too long label", domain);
-                return false;
-            }
-        }
-        ++pos;
-    }
-    return label_count >= 1;
-}
 
 spf_t* spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
                  spf_result_t resultcb, bool no_spf_lookup, void *data, spf_code_t* code)
