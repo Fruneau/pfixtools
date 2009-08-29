@@ -1242,7 +1242,7 @@ static bool spf_parse(spf_t* spf) {
         if (is_mechanism) {
             switch (id) {
               case SPF_RULE_ALL:
-                if (*name_end == ':') {
+                if (*name_end == ':' || *name_end == '/') {
                     return false;
                 }
                 break;
