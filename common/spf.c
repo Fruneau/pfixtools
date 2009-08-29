@@ -73,6 +73,7 @@ struct spf_t {
     buffer_t record;
     A(spf_rule_t) rules;
     uint8_t current_rule;
+    int8_t redirect;
 
     int cidr4;
     int cidr6;
@@ -176,11 +177,13 @@ static bool spf_validate_domain(const char* domain) {
                 return false;
             }
             label_length = 0;
-            ++label_count;
         } else if (!isalnum(*pos) && *pos != '-' && *pos != '_') {
             debug("spf: invalid domain name \"%s\": contains illegal character '%c'", domain, *pos);
             return false;
         } else {
+            if (label_length == 0) {
+                ++label_count;
+            }
             ++label_length;
             if (label_length > 63) {
                 debug("spf: invalid domain name \"%s\": contains a too long label", domain);
@@ -189,7 +192,7 @@ static bool spf_validate_domain(const char* domain) {
         }
         ++pos;
     }
-    return label_count >= 1;
+    return label_count > 1;
 }
 
 static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_callback_t cb)
@@ -512,9 +515,10 @@ static bool spf_checkip4(spf_t* spf, uint32_t ip, int cidr)
     if (spf->is_ip6) {
         return false;
     }
-    if (cidr >= 0) {
-        mask <<= 32 - cidr;
+    if (cidr < 0) {
+        cidr = 32;
     }
+    mask <<= 32 - cidr;
     return (spf->ip4 & mask) == (ip & mask);
 }
 
@@ -553,14 +557,37 @@ static void spf_next(spf_t* spf, bool start)
             ++spf->current_rule;
         }
         start = false;
-        if (spf->current_rule >= array_len(spf->rules)) {
-            debug("spf (depth=%d): reached the end of spf record", spf->recursions);
-            spf_exit(spf, SPF_NEUTRAL);
-            return;
-        }
         spf->a_dnserror = false;
+        if (spf->current_rule >= array_len(spf->rules)) {
+            if (spf->redirect >= 0) {
+                debug("spf (debug=%d): reached the end of spf record, running redirect", spf->recursions);
+                spf_rule_t* rule = array_ptr(spf->rules, spf->redirect);
+                const char* domain = spf_expand(spf, array_start(rule->content), NULL, NULL, true);
+                if (domain == NULL) {
+                    spf_exit(spf, SPF_PERMERROR);
+                    return;
+                }
+                ++domain;
+                if (!spf_validate_domain(domain)) {
+                    spf_exit(spf, SPF_PERMERROR);
+                    return;
+                }
+                if (!spf_subquery(spf, domain, spf_redirect_exit)) {
+                    warn("spf: maximum recursion depth exceeded, error");
+                    spf_exit(spf, SPF_PERMERROR);
+                }
+                return;
+            } else {
+                debug("spf (depth=%d): reached the end of spf record", spf->recursions);
+                spf_exit(spf, SPF_NEUTRAL);
+                return;
+            }
+        }
+        spf->cidr4 = 32;
+        spf->cidr6 = 128;
         spf_rule_t* rule = array_ptr(spf->rules, spf->current_rule);
-        notice("spf (depth=%d): processing rule %s: %s", spf->recursions, spftokens[rule->rule],
+        notice("spf (depth=%d): processing rule %s: %s", spf->recursions,
+              rule->rule == SPF_RULE_UNKNOWN ? "unknown" : spftokens[rule->rule],
               array_len(rule->content) == 0 ? "(empty)" : array_start(rule->content));
         switch (rule->rule) {
           case SPF_RULE_ALL:
@@ -585,23 +612,9 @@ static void spf_next(spf_t* spf, bool start)
             return;
           } break;
 
-          case SPF_RULE_REDIRECT: {
-            const char* domain = spf_expand(spf, array_start(rule->content), NULL, NULL, true);
-            if (domain == NULL) {
-                spf_exit(spf, SPF_PERMERROR);
-                return;
-            }
-            ++domain;
-            if (!spf_validate_domain(domain)) {
-                spf_exit(spf, SPF_PERMERROR);
-                return;
-            }
-            if (!spf_subquery(spf, domain, spf_redirect_exit)) {
-                warn("spf: maximum recursion depth exceeded, error");
-                spf_exit(spf, SPF_PERMERROR);
-            }
-            return;
-          } break;
+          case SPF_RULE_REDIRECT:
+            spf->redirect = spf->current_rule;
+            break;
 
           case SPF_RULE_MX:
           case SPF_RULE_A: {
@@ -623,8 +636,6 @@ static void spf_next(spf_t* spf, bool start)
                 }
             } else {
                 domain = array_start(spf->domain);
-                spf->cidr4 = 32;
-                spf->cidr6 = 128;
             }
             if (rule->rule == SPF_RULE_MX) {
                 if (!spf_query(spf, domain, DNS_RRT_MX, spf_mx_receive)) {
@@ -682,7 +693,6 @@ static void spf_next(spf_t* spf, bool start)
 
           case SPF_RULE_PTR: {
             const char* domain = NULL;
-            spf->cidr4 = 32;
             if (array_len(rule->content) == 0) {
                 domain = spf_expand(spf, array_start(rule->content), NULL, NULL, true);
                 if (domain == NULL) {
@@ -1113,11 +1123,9 @@ static bool spf_check_domainspec(const char* pos, const char* end,
     }
     if (*pos == ':' || *pos == '=') {
         can_be_end = false;
+        READ_NEXT;
     }
-    READ_NEXT;
     while (pos < end) {
-        can_be_end = false;
-
         /* cidr length parsing */
         if (*pos == '/') {
             if (!with_cidr_length || !can_be_end) {
@@ -1135,7 +1143,7 @@ static bool spf_check_domainspec(const char* pos, const char* end,
                 continue;
             }
             while (pos < end) {
-                if (*pos == '-') {
+                if (*pos == '-' && has_alpha) {
                     has_dash = true;
                     can_be_end = false;
                 } else if (isalpha(*pos)) {
@@ -1159,6 +1167,7 @@ static bool spf_check_domainspec(const char* pos, const char* end,
 
         /* macro expand */
         } else if (*pos == '%') {
+            can_be_end = false;
             READ_NEXT;
             if (*pos == '%' || *pos == '_' || *pos == '-') {
                 can_be_end = true;
@@ -1189,6 +1198,8 @@ static bool spf_check_domainspec(const char* pos, const char* end,
             } else if (*pos < 0x21 || *pos > 0x7e) {
                 return false;
             }
+        } else {
+            can_be_end = false;
         }
         READ_NEXT;
     }
@@ -1198,7 +1209,9 @@ static bool spf_check_domainspec(const char* pos, const char* end,
 }
 
 static bool spf_parse(spf_t* spf) {
-    const char* pos = array_start(spf->record) + 6;
+    const char* pos = array_start(spf->record);
+    const char* end = pos + array_len(spf->record);
+    pos += 6;
     do {
         while (*pos == ' ') {
             ++pos;
@@ -1208,8 +1221,8 @@ static bool spf_parse(spf_t* spf) {
         }
         const char* rule_start = pos;
         const char* name_end = NULL;
-        while (*pos != ' ' && *pos != '\0') {
-            if (name_end == NULL && (*pos == ':' || *pos == '=')) {
+        while (*pos != ' ' && pos < end) {
+            if (name_end == NULL && (*pos == ':' || *pos == '=' || *pos == '/')) {
                 name_end = pos;
             }
             ++pos;
@@ -1217,7 +1230,7 @@ static bool spf_parse(spf_t* spf) {
         if (name_end == NULL) {
             name_end = pos;
         }
-        bool is_mechanism = (*name_end == '\0' || *name_end == ' ' || *name_end == ':');
+        bool is_mechanism = (name_end == end || *name_end == ' ' || *name_end == ':' || *name_end == '/');
         spf_code_t qual = SPF_NEUTRAL;
         if (is_mechanism) {
             qual = spf_qualifier(&rule_start);
@@ -1367,7 +1380,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
             if (len < 6) {
                 debug("spf (depth=%d): entry too short to be a spf record", spf->recursions);
             } else {
-                if (strncmp(str, "v=spf1", 6) != 0) {
+                if (strncasecmp(str, "v=spf1", 6) != 0) {
                     debug("spf (depth=%d): not a record: \"%.*s\"", spf->recursions, len, str);
                 } else if (len == 6 || str[6] == ' ') {
                     debug("spf (depth=%d): record found: \"%.*s\"", spf->recursions, len, str);
@@ -1402,9 +1415,6 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
             }
         }
     }
-    debug("spf: spf=%d (error=%d), txt=%d (error=%d), record=%d",
-          spf->spf_received, spf->spf_inerror, spf->txt_received, spf->txt_inerror,
-          array_len(spf->record));
     if (!spf->spf_received) {
         return;
     }
@@ -1459,6 +1469,8 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     spf->a_resolutions = 0;
     spf->a_dnserror = 0;
     spf->recursions = 0;
+    spf->redirect = -1;
+    spf->current_rule = 0;
 
     buffer_addstr(&spf->ip, ip);
     if (!parse_ip4(&spf->ip4, ip)) {
@@ -1493,8 +1505,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     }
     if (sender_domain == NULL
         || !spf_validate_domain(array_start(spf->domain))
-        || !spf_validate_domain(sender_domain + 1)
-        || !spf_validate_domain(array_start(spf->helo))) {
+        || !spf_validate_domain(sender_domain + 1)) {
         *code = SPF_NONE;
         err("spf: malformed query");
         spf_release(spf, false);
