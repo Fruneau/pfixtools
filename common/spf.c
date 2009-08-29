@@ -287,10 +287,12 @@ static bool spf_expand_pattern(spf_t* spf, buffer_t* buffer, char identifier, in
                 pos->len = 0;
                 break;
             }
+            ++delim;
         }
         if (!is_delim) {
             ++(pos->len);
         }
+        ++c;
     }
     if (parts > pos - sections + 1) {
         parts = pos - sections + 1;
