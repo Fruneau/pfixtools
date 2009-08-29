@@ -97,6 +97,10 @@ __attribute__((nonnull(1,2,3)))
 bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result,
                    dns_result_callback_t callback, void *data);
 
+/** Use local DNS configuration (/etc/resolv.conf, /etc/hosts).
+ */
+void dns_use_local_conf(const char* resolv);
+
 #endif
 
 /* vim:set et sw=4 sts=4 sws=4: */

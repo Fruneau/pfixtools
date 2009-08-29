@@ -102,10 +102,12 @@ typedef void (*spf_result_t)(spf_code_t result, const char* exp, void *arg);
  *                      a DNS lookup and can make resolution a bit faster since most
  *                      domains do not expose a SPF dns record.
  * @param arg A custom argument that will be passed to the result callback @p cb.
+ * @param code In case of error, code is filled with the valid spf result code corresponding
+ *             to the reason of the error.
  * @return A pointer to an abstract spf context in case of success, NULL in case of error.
  */
 spf_t* spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
-                 spf_result_t cb, bool no_spf_lookup, void* arg);
+                 spf_result_t cb, bool no_spf_lookup, void* arg, spf_code_t* code);
 
 /** Cancel a SPF lookup.
  *

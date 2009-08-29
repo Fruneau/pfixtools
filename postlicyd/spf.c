@@ -106,32 +106,30 @@ static void spf_filter_destructor(filter_t *filter)
     filter->data = data;
 }
 
+static filter_result_t spf_code_to_result(spf_code_t code) {
+    switch (code) {
+      case SPF_NONE:
+        return HTK_NONE;
+      case SPF_NEUTRAL:
+        return HTK_NEUTRAL;
+      case SPF_PASS:
+        return HTK_PASS;
+      case SPF_FAIL:
+        return HTK_FAIL;
+      case SPF_SOFTFAIL:
+        return HTK_SOFT_FAIL;
+      case SPF_TEMPERROR:
+        return HTK_TEMP_ERROR;
+      case SPF_PERMERROR:
+        return HTK_PERM_ERROR;
+    }
+    return HTK_NONE;
+}
+
 static void spf_filter_async(spf_code_t result, const char* exp, void *arg)
 {
     filter_context_t* context = arg;
-    switch (result) {
-      case SPF_NONE:
-        filter_post_async_result(context, HTK_NONE);
-        return;
-      case SPF_NEUTRAL:
-        filter_post_async_result(context, HTK_NEUTRAL);
-        return;
-      case SPF_PASS:
-        filter_post_async_result(context, HTK_PASS);
-        return;
-      case SPF_FAIL:
-        filter_post_async_result(context, HTK_FAIL);
-        return;
-      case SPF_SOFTFAIL:
-        filter_post_async_result(context, HTK_SOFT_FAIL);
-        return;
-      case SPF_TEMPERROR:
-        filter_post_async_result(context, HTK_TEMP_ERROR);
-        return;
-      case SPF_PERMERROR:
-        filter_post_async_result(context, HTK_PERM_ERROR);
-        return;
-    }
+    filter_post_async_result(context, spf_code_to_result(result));
 }
 
 
@@ -151,10 +149,12 @@ static filter_result_t spf_filter(const filter_t *filter, const query_t *query,
         buffer_add(&domain, query->sender_domain.str, query->sender_domain.len);
         buffer_add(&sender, query->sender.str, query->sender.len);
     }
+
+    spf_code_t res;
     if (spf_check(array_start(ip), array_start(domain), array_start(sender), query->helo_name.str,
-                  spf_filter_async, !data->use_spf_record, context) == NULL) {
+                  spf_filter_async, !data->use_spf_record, context, &res) == NULL) {
         err("filter %s: error while trying to run spf check", filter->name);
-        return HTK_TEMP_ERROR;
+        return spf_code_to_result(res);
     }
     return HTK_ASYNC;
 }

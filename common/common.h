@@ -118,8 +118,8 @@ void common_init(void);
 #define alert(Fmt, ...)  __log(LOG_ALERT,   Fmt, ##__VA_ARGS__)
 #define emerg(Fmt, ...)  __log(LOG_ALERT,   Fmt, ##__VA_ARGS__)
 
-#define UNIXERR(fun)     err("%s:%d:%s %s: %m",                      \
-                             __FILE__, __LINE__, __func__, fun)
+#define UNIXERR(fun)     err("%s:%d:%s %s: %s",                      \
+                             __FILE__, __LINE__, __func__, fun, strerror(errno))
 
 extern int          log_level;
 extern bool         log_syslog;

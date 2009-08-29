@@ -445,9 +445,13 @@ static bool spf_subquery(spf_t* spf, const char* domain, spf_result_t cb)
     if (spf->recursions >= SPF_MAX_RECUSION) {
         return false;
     } else {
+        spf_code_t code;
         spf->subquery = spf_check(array_start(spf->ip), domain,
                                   array_start(spf->sender), array_start(spf->helo),
-                                  cb, spf->spf_nolookup, spf);
+                                  cb, spf->spf_nolookup, spf, &code);
+        if (spf->subquery == NULL) {
+            return false;
+        }
         spf->subquery->recursions = spf->recursions + 1;
         return true;
     }
@@ -1257,12 +1261,12 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
 {
     spf_t* spf = arg;
     if (spf_release(spf, true)) {
-        debug("spf (depth=%d): %s received but  processing already finished", spf->recursions,
-              result->qtype == DNS_RRT_TXT ? "TXT" : "SPF");
+        debug("spf (depth=%d): %s for %s received but processing already finished", spf->recursions,
+              result->qtype == DNS_RRT_TXT ? "TXT" : "SPF", result->qname);
         return;
     }
     if (array_len(spf->record) != 0 && spf->spf_received) {
-        debug("spf (depth=%d): record already found", spf->recursions);
+        debug("spf (depth=%d): record already found for %s", spf->recursions, result->qname);
         return;
     }
     if (result->qtype == DNS_RRT_SPF) {
@@ -1273,6 +1277,8 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
         spf->txt_received = true;
         spf->txt_inerror  = (result->rcode != 0 && result->rcode != 3);
     }
+    debug("spf (depth=%d): %s for %s received", spf->recursions,
+          result->qtype == DNS_RRT_TXT ? "TXT" : "SPF", result->qname);
     if (result->rcode == 0) {
         int i = 0;
         bool is_mine = false;
@@ -1343,6 +1349,9 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
             }
         }
     }
+    debug("spf: spf=%d (error=%d), txt=%d (error=%d), record=%d",
+          spf->spf_received, spf->spf_inerror, spf->txt_received, spf->txt_inerror,
+          array_len(spf->record));
     if (!spf->spf_received) {
         return;
     }
@@ -1379,14 +1388,56 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
     }
 }
 
+static bool spf_validate_domain(const char* domain) {
+    int label_count = 0;
+    int label_length = 0;
+    const char* pos = domain;
+    while (*pos != '\0') {
+        if (*pos == '.') {
+            if (label_length == 0) {
+                debug("spf: invalid domain name \"%s\": contains a non-terminal zero-length label", domain);
+                return false;
+            }
+            label_length = 0;
+            ++label_count;
+        } else if (!isalnum(*pos) && *pos != '-' && *pos != '_') {
+            debug("spf: invalid domain name \"%s\": contains illegal character '%c'", domain, *pos);
+            return false;
+        } else {
+            ++label_length;
+            if (label_length > 63) {
+                debug("spf: invalid domain name \"%s\": contains a too long label", domain);
+                return false;
+            }
+        }
+        ++pos;
+    }
+    return label_count >= 1;
+}
+
 spf_t* spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
-                 spf_result_t resultcb, bool no_spf_lookup, void *data)
+                 spf_result_t resultcb, bool no_spf_lookup, void *data, spf_code_t* code)
 {
-    notice("spf: new SPF lookup of (%s,%s,%s)", ip, domain, sender);
+    notice("spf: new SPF lookup of (%s, %s, %s)", ip, domain, sender);
     spf_t* spf = spf_acquire();
+    spf->txt_received = false;
+    spf->txt_inerror  = false;
+    spf->txt_toomany  = false;
+    spf->spf_received = false;
+    spf->spf_inerror  = false;
+    spf->spf_nolookup = false;
+    spf->canceled = false;
+    spf->is_ip6   = false;
+    spf->queries  = 0;
+    spf->a_resolutions = 0;
+    spf->a_dnserror = 0;
+    spf->recursions = 0;
+
     buffer_addstr(&spf->ip, ip);
     if (!parse_ip4(&spf->ip4, ip)) {
         if (!parse_ip6(spf->ip6, ip)) {
+            *code = SPF_NONE;
+            err("spf: invalid ip: %s", ip);
             spf_release(spf, false);
             return NULL;
         }
@@ -1406,6 +1457,22 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     buffer_addstr(&spf->domain, domain);
     buffer_addstr(&spf->sender, sender);
     buffer_addstr(&spf->helo, helo);
+    const char* sender_domain = strchr(array_start(spf->sender), '@');
+    if (sender_domain == array_start(spf->sender)) {
+        array_len(spf->sender) = 0;
+        buffer_addstr(&spf->sender, "postmaster");
+        buffer_addstr(&spf->sender, sender);
+        sender_domain = strchr(array_start(spf->sender), '@');
+    }
+    if (sender_domain == NULL
+        || !spf_validate_domain(array_start(spf->domain))
+        || !spf_validate_domain(sender_domain + 1)
+        || !spf_validate_domain(array_start(spf->helo))) {
+        *code = SPF_NONE;
+        err("spf: malformed query");
+        spf_release(spf, false);
+        return NULL;
+    }
     spf->exit = resultcb;
     spf->data = data;
     if (!spf->spf_nolookup) {
@@ -1413,7 +1480,8 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     }
     spf_query(spf, domain, DNS_RRT_TXT, spf_line_callback);
     if (spf->queries == 0) {
-        spf_delete(&spf);
+        *code = SPF_TEMPERROR;
+        spf_release(spf, false);
         return NULL;
     } else {
         return spf;

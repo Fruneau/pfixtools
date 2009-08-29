@@ -49,6 +49,7 @@ typedef struct dns_context_t {
 } dns_context_t;
 ARRAY(dns_context_t);
 
+static char *use_local_config = false;
 static struct ub_ctx *ctx = NULL;
 static client_t *async_event = NULL;
 static PA(dns_context_t) ctx_pool = ARRAY_INIT;
@@ -95,6 +96,7 @@ static void dns_exit(void)
         client_release(async_event);
         async_event = NULL;
     }
+    p_delete(&use_local_config);
     array_deep_wipe(ctx_pool, dns_context_delete);
 }
 module_exit(dns_exit);
@@ -135,6 +137,10 @@ bool dns_resolve(const char *hostname, dns_rrtype_t type, ub_callback_t callback
 {
     if (ctx == NULL) {
         ctx = ub_ctx_create();
+        if (use_local_config != NULL) {
+            debug("using local dns configuration");
+            ub_ctx_resolvconf(ctx, use_local_config);
+        }
         ub_ctx_async(ctx, true);
         if ((async_event = client_register(ub_fd(ctx), dns_handler, NULL)) == NULL) {
             crit("cannot register asynchronous DNS event handler");
@@ -190,6 +196,11 @@ bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result
     if (host[len - 2] == '.')
         host[len - 1] = '\0';
     return dns_check(host, DNS_RRT_A, result, callback, data);
+}
+
+void dns_use_local_conf(const char* resolv) {
+    p_delete(&use_local_config);
+    use_local_config = m_strdup(resolv);
 }
 
 /* vim:set et sw=4 sts=4 sws=4: */
