@@ -247,7 +247,7 @@ static inline const filter_hook_t *filter_hook_for_result(const filter_t *filter
     }
 
     if (forward[filter->type][res] != HTK_UNKNOWN) {
-        debug("no hook for result %s, forwarding to %s", ftokens[res], ftokens[forward[filter->type][res]]);
+        debug("no hook for result %s, forwarding to %s", htokens[res], htokens[forward[filter->type][res]]);
         return filter_hook_for_result(filter, forward[filter->type][res]);
     } else {
         warn("missing hook %s for filter %s", htokens[res], filter->name);
