@@ -161,6 +161,15 @@ static bool spf_release(spf_t* spf, bool decrement)
         buffer_reset(&spf->record);
         buffer_reset(&spf->helo);
         buffer_reset(&spf->domainspec);
+        spf_t bak = *spf;
+        p_clear(spf, 1);
+        spf->rules = bak.rules;
+        spf->domain = bak.domain;
+        spf->ip = bak.ip;
+        spf->sender = bak.sender;
+        spf->record = bak.record;
+        spf->helo = bak.helo;
+        spf->domainspec = bak.domainspec;
         array_add(spf_pool, spf);
         return true;
     }
@@ -1532,21 +1541,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
 {
     notice("spf: new SPF lookup of (%s, %s, %s)", ip, domain, sender);
     spf_t* spf = spf_acquire();
-    spf->txt_received = false;
-    spf->txt_inerror  = false;
-    spf->txt_toomany  = false;
-    spf->spf_received = false;
-    spf->spf_inerror  = false;
-    spf->spf_nolookup = false;
-    spf->canceled = false;
-    spf->is_ip6   = false;
-    spf->queries  = 0;
-    spf->a_resolutions = 0;
-    spf->a_dnserror = 0;
-    spf->recursions = 0;
     spf->redirect = -1;
-    spf->current_rule = 0;
-    spf->mech_withdns = 0;
 
     buffer_addstr(&spf->ip, ip);
     if (!parse_ip4(&spf->ip4, ip)) {
