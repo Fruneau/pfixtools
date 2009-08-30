@@ -185,6 +185,11 @@ static int spf_init(void)
     (void)filter_hook_register(filter_type, "perm_error");
     (void)filter_hook_register(filter_type, "async");
 
+    filter_hook_forward_register(filter_type, HTK_NEUTRAL, HTK_NONE);
+    filter_hook_forward_register(filter_type, HTK_TEMP_ERROR, HTK_NONE);
+    filter_hook_forward_register(filter_type, HTK_PERM_ERROR, HTK_NONE);
+    filter_hook_forward_register(filter_type, HTK_SOFT_FAIL, HTK_FAIL);
+
     /* Parameters.
      */
     (void)filter_param_register(filter_type, "use_spf_record");

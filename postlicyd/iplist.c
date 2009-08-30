@@ -567,12 +567,14 @@ static int iplist_init(void)
                                    iplist_context_destructor);
     /* Hooks.
      */
-    (void)filter_hook_register(filter_type, "abort");
     (void)filter_hook_register(filter_type, "error");
     (void)filter_hook_register(filter_type, "fail");
     (void)filter_hook_register(filter_type, "hard_match");
     (void)filter_hook_register(filter_type, "soft_match");
     (void)filter_hook_register(filter_type, "async");
+
+    filter_hook_forward_register(filter_type, HTK_SOFT_MATCH, HTK_HARD_MATCH);
+    filter_hook_forward_register(filter_type, HTK_ERROR, HTK_FAIL);
 
     /* Parameters.
      */

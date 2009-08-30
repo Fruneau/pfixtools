@@ -345,8 +345,6 @@ static int match_init(void)
                                           NULL, NULL);
     /* Hooks.
      */
-    (void)filter_hook_register(type, "abort");
-    (void)filter_hook_register(type, "error");
     (void)filter_hook_register(type, "match");
     (void)filter_hook_register(type, "fail");
 

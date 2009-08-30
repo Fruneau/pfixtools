@@ -44,6 +44,7 @@ static filter_runner_t      runners[FTK_count];
 static filter_constructor_t constructors[FTK_count];
 static filter_destructor_t  destructors[FTK_count];
 static bool                 hooks[FTK_count][HTK_count];
+static filter_result_t      forward[FTK_count][HTK_count];
 static bool                 params[FTK_count][ATK_count];
 
 static filter_context_constructor_t ctx_constructors[FTK_count];
@@ -72,6 +73,17 @@ static const filter_hook_t async_hook = {
 
 uint32_t filter_running = 0;
 
+static int filter_module_init(void)
+{
+    for (int i = 0 ; i < FTK_count ; ++i) {
+        for (int j = 0 ; j < HTK_count ; ++j) {
+            forward[i][j] = HTK_UNKNOWN;
+        }
+    }
+    return 0;
+}
+module_init(filter_module_init);
+
 filter_type_t filter_register(const char *type, filter_constructor_t constructor,
                               filter_destructor_t destructor, filter_runner_t runner,
                               filter_context_constructor_t context_constructor,
@@ -98,6 +110,18 @@ filter_result_t filter_hook_register(filter_type_t filter,
 
     hooks[filter][tok] = true;
     return tok;
+}
+
+void filter_hook_forward_register(filter_type_t filter,
+                                  filter_result_t source, filter_result_t target)
+{
+    CHECK_FILTER(filter);
+    CHECK_HOOK(source);
+    CHECK_HOOK(target);
+    assert(target != HTK_ASYNC && target != HTK_ABORT && "Cannot forward async or abort");
+    assert(target != HTK_ASYNC && "Cannot forward result to async");
+
+    forward[filter][source] = target;
 }
 
 filter_param_id_t filter_param_register(filter_type_t filter,
@@ -221,8 +245,14 @@ static inline const filter_hook_t *filter_hook_for_result(const filter_t *filter
             start = mid + 1;
         }
     }
-    warn("missing hook %s for filter %s", htokens[res], filter->name);
-    return &default_hook;
+
+    if (forward[filter->type][res] != HTK_UNKNOWN) {
+        debug("no hook for result %s, forwarding to %s", ftokens[res], ftokens[forward[filter->type][res]]);
+        return filter_hook_for_result(filter, forward[filter->type][res]);
+    } else {
+        warn("missing hook %s for filter %s", htokens[res], filter->name);
+        return &default_hook;
+    }
 }
 
 const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,

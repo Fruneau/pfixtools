@@ -840,6 +840,9 @@ static int strlist_init(void)
     (void)filter_hook_register(filter_type, "hard_match");
     (void)filter_hook_register(filter_type, "soft_match");
 
+    filter_hook_forward_register(filter_type, HTK_ERROR, HTK_FAIL);
+    filter_hook_forward_register(filter_type, HTK_SOFT_MATCH, HTK_HARD_MATCH);
+
     /* Parameters.
      */
     (void)filter_param_register(filter_type, "file");

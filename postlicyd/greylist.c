@@ -568,7 +568,6 @@ static int greylist_init(void)
     /* Hooks.
      */
     (void)filter_hook_register(type, "abort");
-    (void)filter_hook_register(type, "error");
     (void)filter_hook_register(type, "greylist");
     (void)filter_hook_register(type, "whitelist");
 

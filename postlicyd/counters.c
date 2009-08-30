@@ -121,6 +121,8 @@ static int counter_init(void)
     (void)filter_hook_register(type, "hard_match");
     (void)filter_hook_register(type, "soft_match");
 
+    filter_hook_forward_register(type, HTK_SOFT_MATCH, HTK_HARD_MATCH);
+
     /* Parameters.
      */
     (void)filter_param_register(type, "counter");

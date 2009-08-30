@@ -160,6 +160,14 @@ filter_param_id_t filter_param_register(filter_type_t filter, const char *name);
 __attribute__((nonnull))
 void filter_async_handler_register(filter_async_handler_t handler);
 
+/** Register a result forwarding.
+ *
+ * If no hook is declared for the given @p source result value for a filter of type @p filter,
+ * postlicyd will process the result as if the result was @p target.
+ */
+void filter_hook_forward_register(filter_type_t filter, filter_result_t source, filter_result_t target);
+
+
 /* Filter builder.
  */
 
