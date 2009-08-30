@@ -12,6 +12,18 @@ typedef struct spf_test_t {
     int result2;
 } spf_test_t;
 
+/* Test cases imported from openspf.org testsuite rfc4408-tests-2008.08.yml
+ * Contributors:
+ *   Stuart D Gathman    90% of the tests
+ *   Julian Mehnle       some tests, proofread YAML syntax, formal schema
+ *   Frank Ellermann
+ *   Scott Kitterman
+ *   Wayne Schlitt
+ *   Craig Whitmore
+ *   Norman Maurer
+ *   Mark Shewmaker
+ *   Philip Gladstone
+ */
 static spf_test_t testcases[] = {
     { "helo-not-fqdn", "Initial processing", "4.3/1", "A2345678", "1.2.3.5", "", SPF_NONE, -1 },
     { "emptylabel", "Initial processing", "4.3/1", "mail.test.t0.example.net", "1.2.3.5", "lyme.eater@A...test.t0.example.com", SPF_NONE, -1 },
