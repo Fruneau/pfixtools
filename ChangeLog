@@ -1,4 +1,16 @@
 ------------------------------------------------------------------------------
+version 0.7
+
+  * common:
+    NEW: spf implementation                                                FRU
+    FIX: build with gcc 4.3                                                VZA
+    FIX: regexp in trie when reverse lookup is disabled                    FRU
+
+  * postlicyd:
+    NEW: spf support                                                       FRU
+    NEW: add default behaviour for some results to have simpler conf.      FRU
+
+------------------------------------------------------------------------------
 version 0.6                                                       Feb 26, 2009
 
   * common:
