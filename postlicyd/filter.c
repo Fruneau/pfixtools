@@ -71,10 +71,15 @@ static const filter_hook_t async_hook = {
     .filter_id = 0
 };
 
+static bool init_done  = false;
 uint32_t filter_running = 0;
 
 static int filter_module_init(void)
 {
+    if (init_done) {
+        return 0;
+    }
+    init_done = true;
     for (int i = 0 ; i < FTK_count ; ++i) {
         for (int j = 0 ; j < HTK_count ; ++j) {
             forward[i][j] = HTK_UNKNOWN;
@@ -115,6 +120,7 @@ filter_result_t filter_hook_register(filter_type_t filter,
 void filter_hook_forward_register(filter_type_t filter,
                                   filter_result_t source, filter_result_t target)
 {
+    filter_module_init();
     CHECK_FILTER(filter);
     CHECK_HOOK(source);
     CHECK_HOOK(target);
