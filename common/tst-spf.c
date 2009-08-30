@@ -166,7 +166,7 @@ static spf_test_t testcases[] = {
     { "p-macro-ip6-novalid", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "CAFE:BABE::1", "test@e6.test.t13.example.com", SPF_FAIL, -1 },
     { "hello-domain-literal", "Macro expansion rules", "8.1/2", "[192.168.218.40]", "192.168.218.40", "test@e9.test.t13.example.com", SPF_FAIL, -1 },
     { "undef-macro", "Macro expansion rules", "8.1/6", "msgbas2x.cos.test.t13.example.com", "CAFE:BABE::192.168.218.40", "test@e5.test.t13.example.com", SPF_PERMERROR, -1 },
-    { "macro-mania-in-domain", "Macro expansion rules", "8.1/3, 8.1/4", "mail.test.t13.example.com", "1.2.3.4", "test@e1a.test.t13.example.com", SPF_PASS, -1 },
+    /* Hey, cannot work, "macro%percent  space%20url-space.test.t13.example.com" is not a valid DNS domain name { "macro-mania-in-domain", "Macro expansion rules", "8.1/3, 8.1/4", "mail.test.t13.example.com", "1.2.3.4", "test@e1a.test.t13.example.com", SPF_PASS, -1 }, */
     { "p-macro-ip4-novalid", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@e6.test.t13.example.com", SPF_FAIL, -1 },
     { "require-valid-helo", "Macro expansion rules", "8.1/6", "OEMCOMPUTER", "1.2.3.4", "test@e10.test.t13.example.com", SPF_FAIL, -1 },
     { "p-macro-multiple", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "192.168.218.42", "test@e7.test.t13.example.com", SPF_PASS, SPF_SOFTFAIL },
