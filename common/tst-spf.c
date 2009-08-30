@@ -228,7 +228,7 @@ static void spf_test_next(spf_test_t* current) {
 int main(int argc, char *argv[])
 {
     dns_use_local_conf("resolv.conf");
-    log_level = LOG_DEBUG;
+    log_level = LOG_WARNING;
     spf_test_next(NULL);
     return server_loop(NULL, NULL, NULL, NULL, NULL);
 }

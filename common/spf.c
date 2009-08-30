@@ -155,12 +155,12 @@ static bool spf_release(spf_t* spf, bool decrement)
     if (spf->canceled && spf->queries == 0) {
         array_append(spf_rule_pool, array_start(spf->rules), array_len(spf->rules));
         array_len(spf->rules) = 0;
-        array_len(spf->domain) = 0;
-        array_len(spf->ip) = 0;
-        array_len(spf->sender) = 0;
-        array_len(spf->record) = 0;
-        array_len(spf->helo) = 0;
-        array_len(spf->domainspec) = 0;
+        buffer_reset(&spf->domain);
+        buffer_reset(&spf->ip);
+        buffer_reset(&spf->sender);
+        buffer_reset(&spf->record);
+        buffer_reset(&spf->helo);
+        buffer_reset(&spf->domainspec);
         array_add(spf_pool, spf);
         return true;
     }
@@ -198,7 +198,7 @@ static bool spf_validate_domain(const char* domain) {
 
 static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_callback_t cb)
 {
-    array_len(query_buffer) = 0;
+    buffer_reset(&query_buffer);
     buffer_addstr(&query_buffer, query);
     if (array_last(query_buffer) != '.') {
         buffer_addch(&query_buffer, '.');
@@ -355,7 +355,7 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
         debug("spf (depth=%d): cidr length found, but no cidr requested on %s", spf->recursions, macrostring);
         return NULL;
     }
-    array_len(expand_buffer) = 0;
+    buffer_reset(&expand_buffer);
     if (expand) {
         while (macrostring < cidrStart) {
             const char* next_format = strchr(macrostring, '%');
@@ -741,7 +741,7 @@ static void spf_next(spf_t* spf, bool start)
             }
             ++spf->mech_withdns;
             const char* domain = NULL;
-            if (array_len(rule->content) == 0) {
+            if (array_len(rule->content) > 0) {
                 domain = spf_expand(spf, array_start(rule->content), NULL, NULL, true);
                 if (domain == NULL) {
                     spf_exit(spf, SPF_PERMERROR);
@@ -754,12 +754,12 @@ static void spf_next(spf_t* spf, bool start)
             } else {
                 domain = array_start(spf->domain);
             }
-            array_len(spf->domainspec) = 0;
+            buffer_reset(&spf->domainspec);
             buffer_addstr(&spf->domainspec, domain);
             if (array_last(spf->domainspec) != '.') {
                 buffer_addch(&spf->domainspec, '.');
             }
-            array_len(dns_buffer) = 0;
+            buffer_reset(&dns_buffer);
             if (!spf->is_ip6) {
                 buffer_addf(&dns_buffer, "%d.%d.%d.%d.in-addr.arpa.",
                             spf->ip4 & 0xff, (spf->ip4 >> 8) & 0xff,
@@ -900,7 +900,7 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
     if (err == 0) {
         for (i = 0 ; result->data[i] != NULL ; ++i) {
             const char* pos = result->data[i] + 2;
-            array_len(dns_buffer) = 0;
+            buffer_reset(&dns_buffer);
             if (i >= 10) {
                 notice("spf (depth=%d): too many MX entries for %s", spf->recursions, result->qname);
                 break;
@@ -1013,7 +1013,7 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
         int i;
         for (i = 0 ; result->data[i] != NULL ; ++i) {
             const char* pos = result->data[i];
-            array_len(dns_buffer) = 0;
+            buffer_reset(&dns_buffer);
             if (spf->a_resolutions >= 10) {
                 notice("spf (depth=%d): too many PTR entries for %s", spf->recursions, result->qname);
                 break;
@@ -1389,7 +1389,7 @@ static bool spf_parse(spf_t* spf) {
         }
         rule.qualifier = qual;
         rule.rule = id;
-        array_len(rule.content) = 0;
+        buffer_reset(&rule.content);
         if (name_end != pos) {
             buffer_add(&rule.content, name_end, pos - name_end);
         }
@@ -1433,7 +1433,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
              */
             const char* pos = result->data[i];
             const char* const end = pos + result->len[i];
-            array_len(expand_buffer) = 0;
+            buffer_reset(&expand_buffer);
             while (pos < end) {
                 const int len = *pos;
                 buffer_add(&expand_buffer, pos + 1, len);
@@ -1472,14 +1472,14 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
                                 return;
                             } else {
                                 spf->txt_toomany = true;
-                                array_len(spf->record) = 0;
+                                buffer_reset(&spf->record);
                                 return;
                             }
                         } else {
                             /* 2. If any record of type SPF are in the set, then all records
                              *    of type TXT are discarded
                              */
-                            array_len(spf->record) = 0;
+                            buffer_reset(&spf->record);
                         }
                     }
                     buffer_add(&spf->record, str, len);
@@ -1574,7 +1574,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     buffer_addstr(&spf->helo, helo);
     const char* sender_domain = strchr(array_start(spf->sender), '@');
     if (sender_domain == array_start(spf->sender)) {
-        array_len(spf->sender) = 0;
+        buffer_reset(&spf->sender);
         buffer_addstr(&spf->sender, "postmaster");
         buffer_addstr(&spf->sender, sender);
         sender_domain = strchr(array_start(spf->sender), '@');
@@ -1583,7 +1583,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
         || !spf_validate_domain(array_start(spf->domain))
         || !spf_validate_domain(sender_domain + 1)) {
         *code = SPF_NONE;
-        err("spf: malformed query");
+        debug("spf: malformed query");
         spf_release(spf, false);
         return NULL;
     }

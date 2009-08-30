@@ -59,6 +59,7 @@ static inline void buffer_reset(buffer_t *buf) {
     if (buf->data) {
         buf->data[buf->len = 0] = '\0';
     }
+    array_len(*buf) = 0;
 }
 
 static inline char *buffer_unwrap(buffer_t **buf) {
