@@ -57,6 +57,8 @@ DECLARE_MAIN
 typedef struct srs_config_t {
     srs_t* srs;
     const char* domain;
+    int domainlen;
+    int ignore_ext;
 } srs_config_t;
 
 
@@ -75,7 +77,7 @@ static void *srsd_starter(listener_t *server)
 /* Processing {{{1
  */
 
-void urldecode(char *s, char *end)
+char *urldecode(char *s, char *end)
 {
     char *p = s;
 
@@ -92,7 +94,8 @@ void urldecode(char *s, char *end)
 
         *s++ = *p++;
     }
-    *s++ = '\0';
+    *s = '\0';
+    return s;
 }
 
 int process_srs(client_t *srsd, void* vconfig)
@@ -136,9 +139,21 @@ int process_srs(client_t *srsd, void* vconfig)
             goto skip;
         }
 
-        urldecode(p, q);
+        q = urldecode(p, q);
 
         if (decoder) {
+            if (config->ignore_ext) {
+                int dlen = config->domainlen;
+
+                if (q - p <= dlen || q[-1 - dlen] != '@' ||
+                    memcmp(q - dlen, config->domain, dlen))
+                {
+                    buffer_addstr(obuf, "200 ");
+                    buffer_add(obuf, p, q - p);
+                    buffer_addch(obuf, '\n');
+                    goto skip;
+                }
+            }
             err = srs_reverse(config->srs, buf, ssizeof(buf), p);
         } else {
             err = srs_forward(config->srs, buf, ssizeof(buf), p, config->domain);
@@ -260,6 +275,7 @@ void usage(void)
           "                 (default: "STR(DEFAULT_DECODER_PORT)")\n"
           "    -p <pidfile> file to write our pid to\n"
           "    -u           unsafe mode: don't drop privilegies\n"
+          "    -I           do not touch mails outside of \"domain\" in decoding mode\n"
           "    -f           stay in foreground\n"
          , stderr);
 }
@@ -275,7 +291,7 @@ int main(int argc, char *argv[])
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
 
-    for (int c = 0; (c = getopt(argc, argv, "hfu" "e:d:p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "hfuI" "e:d:p:")) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
@@ -291,6 +307,9 @@ int main(int argc, char *argv[])
             break;
           case 'u':
             unsafe = true;
+            break;
+          case 'I':
+            config.ignore_ext = true;
             break;
           default:
             usage();
@@ -310,6 +329,7 @@ int main(int argc, char *argv[])
     info("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     config.domain = argv[optind];
+    config.domainlen = strlen(config.domain);
     config.srs = srs_read_secrets(argv[optind + 1]);
     if (!config.srs
         || common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP,
