@@ -123,7 +123,7 @@ int process_srs(client_t *srsd, void* vconfig)
         }
 
         if (strncmp("get ", ibuf->data, 4)) {
-						err("bad request, not starting with \"get \"");
+            err("bad request, not starting with \"get \"");
             return -1;
         }
 
@@ -131,7 +131,7 @@ int process_srs(client_t *srsd, void* vconfig)
         for (q = nl++; q >= p && isspace(*q); *q-- = '\0');
 
         if (p == q) {
-            buffer_addstr(&*obuf, "400 empty request ???\n");
+            buffer_addstr(obuf, "400 empty request ???\n");
             warn("empty request");
             goto skip;
         }
@@ -145,16 +145,16 @@ int process_srs(client_t *srsd, void* vconfig)
         }
 
         if (err == 0) {
-            buffer_addstr(&*obuf, "200 ");
-            buffer_addstr(&*obuf, buf);
+            buffer_addstr(obuf, "200 ");
+            buffer_addstr(obuf, buf);
         } else {
             switch (SRS_ERROR_TYPE(err)) {
               case SRS_ERRTYPE_SRS:
               case SRS_ERRTYPE_SYNTAX:
-                buffer_addstr(&*obuf, "500 ");
+                buffer_addstr(obuf, "500 ");
                 break;
               default:
-                buffer_addstr(&*obuf, "400 ");
+                buffer_addstr(obuf, "400 ");
                 break;
             }
             buffer_addstr(obuf, srs_strerror(err));
