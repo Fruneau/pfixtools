@@ -45,7 +45,7 @@
 #include "common.h"
 
 bool daemon_process   = true;
-int  log_level        = LOG_INFO;
+int  log_level        = LOG_NOTICE;
 bool log_syslog       = false;
 const char *log_state = "";
 
