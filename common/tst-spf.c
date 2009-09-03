@@ -191,11 +191,11 @@ static spf_test_t testcases[] = {
     { "include-at-limit", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e8.test.t14.example.com", SPF_PASS, -1 },
     { "mx-limit", "Processing limits", "10.1/7", "mail.test.t14.example.com", "1.2.3.5", "foo@e4.test.t14.example.com", SPF_NEUTRAL, SPF_PASS },
     { "mech-over-limit", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e7.test.t14.example.com", SPF_PERMERROR, -1 },
-    { "ptr-limit", "Processing limits", "10.1/7", "mail.test.t14.example.com", "1.2.3.5", "foo@e5.test.t14.example.com", SPF_NEUTRAL, SPF_PASS },
     { "include-over-limit", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e9.test.t14.example.com", SPF_PERMERROR, -1 },
     { "redirect-loop", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e1.test.t14.example.com", SPF_PERMERROR, -1 },
     { "mech-at-limit", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e6.test.t14.example.com", SPF_PASS, -1 },
     { "include-loop", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e2.test.t14.example.com", SPF_PERMERROR, -1 },
+    { "ptr-limit", "Processing limits", "10.1/7", "mail.test.t14.example.com", "1.2.3.5", "foo@e5.test.t14.example.com", SPF_NEUTRAL, SPF_PASS },
     { NULL, NULL, NULL, NULL, NULL, NULL, -1, -1 }
 };
 static int tested = 0;

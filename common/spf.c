@@ -98,8 +98,14 @@ static buffer_t expand_buffer = ARRAY_INIT;
 static buffer_t query_buffer = ARRAY_INIT;
 static buffer_t dns_buffer = ARRAY_INIT;
 
+static int created = 0;
+static int acquired = 0;
+static int deleted = 0;
+static int released = 0;
+
 static spf_t* spf_new(void)
 {
+    ++created;
     return p_new(spf_t, 1);
 }
 
@@ -124,6 +130,7 @@ static void spf_wipe(spf_t* spf)
 static void spf_delete(spf_t **spf)
 {
     if (*spf) {
+        ++deleted;
         spf_wipe(*spf);
         p_delete(spf);
     }
@@ -131,10 +138,15 @@ static void spf_delete(spf_t **spf)
 
 static spf_t* spf_acquire(void)
 {
+    ++acquired;
+    spf_t* spf = NULL;
     if (array_len(spf_pool)) {
-        return array_pop_last(spf_pool);
+        spf = array_pop_last(spf_pool);
+    } else {
+        spf = spf_new();
     }
-    return spf_new();
+    debug("acquiring %p - pool length: %d (created %d)", spf, array_len(spf_pool), created);
+    return spf;
 }
 
 static void spf_module_exit(void)
@@ -144,6 +156,7 @@ static void spf_module_exit(void)
     buffer_wipe(&expand_buffer);
     buffer_wipe(&query_buffer);
     buffer_wipe(&dns_buffer);
+    debug("spf: reated: %d, Deleted: %d, Acquired: %d, Release: %d", created, deleted, acquired, released);
 }
 module_exit(spf_module_exit);
 
@@ -153,6 +166,8 @@ static bool spf_release(spf_t* spf, bool decrement)
         --spf->queries;
     }
     if (spf->canceled && spf->queries == 0) {
+        ++released;
+        debug("Releasing %p - pool length: %d (created: %d)", spf, array_len(spf_pool) + 1, created);
         array_append(spf_rule_pool, array_start(spf->rules), array_len(spf->rules));
         array_len(spf->rules) = 0;
         buffer_reset(&spf->domain);
@@ -1548,7 +1563,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
         if (!parse_ip6(spf->ip6, ip)) {
             *code = SPF_NONE;
             err("spf: invalid ip: %s", ip);
-            spf_release(spf, false);
+            spf_cancel(spf);
             return NULL;
         }
         spf->is_ip6 = true;
@@ -1579,7 +1594,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
         || !spf_validate_domain(sender_domain + 1)) {
         *code = SPF_NONE;
         debug("spf: malformed query");
-        spf_release(spf, false);
+        spf_cancel(spf);
         return NULL;
     }
     spf->exit = resultcb;
@@ -1590,7 +1605,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     spf_query(spf, domain, DNS_RRT_TXT, spf_line_callback);
     if (spf->queries == 0) {
         *code = SPF_TEMPERROR;
-        spf_release(spf, false);
+        spf_cancel(spf);
         return NULL;
     } else {
         return spf;
