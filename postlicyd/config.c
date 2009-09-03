@@ -40,6 +40,7 @@
 #include "config.h"
 #include "str.h"
 #include "resources.h"
+#include "dns.h"
 
 #define config_param_register(Param)
 
@@ -88,6 +89,13 @@ config_param_register("port");
 config_param_register("log_format");
 
 
+/* Use resolv.conf file
+ * If set, forward DNS queries to according to the given configuration file.
+ * Postlicyd MUST be restarted to use this configuration variable.
+ */
+config_param_register("use_resolv_conf");
+
+
 static config_t *global_config = NULL;
 
 static inline config_t *config_new(void)
@@ -105,6 +113,7 @@ static void config_close(config_t *config)
     array_deep_wipe(config->filters, filter_wipe);
     array_deep_wipe(config->params, filter_params_wipe);
     p_delete(&config->log_format);
+    p_delete(&config->resolv_conf);
 }
 
 void config_delete(config_t **config)
@@ -407,6 +416,7 @@ static bool config_build_structure(config_t *config)
 #undef    CASE
           FILTER_PARAM_PARSE_INT(PORT, config->port);
           FILTER_PARAM_PARSE_STRING(LOG_FORMAT, config->log_format, true);
+          FILTER_PARAM_PARSE_STRING(USE_RESOLV_CONF, config->resolv_conf, true);
           default: break;
         }
     }}
@@ -448,6 +458,9 @@ static bool config_load(config_t *config) {
     if (!config_build_filters(config)) {
         err("Invalid configuration: invalid filter");
         return false;
+    }
+    if (config->resolv_conf != NULL) {
+        dns_use_local_conf(config->resolv_conf);
     }
 
     resource_garbage_collect();

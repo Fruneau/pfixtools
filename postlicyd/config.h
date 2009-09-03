@@ -72,6 +72,10 @@ struct config_t {
     /* Log message.
      */
     char *log_format;
+
+    /* Resolv.conf to use
+     */
+    char *resolv_conf;
 };
 
 #define DEFAULT_LOG_FORMAT                                                     \
