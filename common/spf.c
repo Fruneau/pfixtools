@@ -565,10 +565,11 @@ static bool spf_checkip4(spf_t* spf, uint32_t ip, int cidr)
     if (spf->is_ip6) {
         return false;
     }
-    if (cidr < 0) {
-        cidr = 32;
+    if (cidr == 0) {
+        mask = 0;
+    } else if (cidr > 0) {
+        mask <<= (32 - cidr);
     }
-    mask <<= 32 - cidr;
     return (spf->ip4 & mask) == (ip & mask);
 }
 
