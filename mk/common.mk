@@ -53,7 +53,7 @@ DOCS_HTML = $(DOCS_SRC:.txt=.html)
 DOCS_XML  = $(DOCS_SRC:.txt=.xml)
 doc: $(DOCS) $(DOCS_HTML)
 
-install: all $(INSTALL_PROGS) install-doc
+install: all $(INSTALL_PROGS)
 
 install-doc: doc
 	$(if $(DOCS),\
