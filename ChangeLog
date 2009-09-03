@@ -8,7 +8,9 @@ version 0.7
 
   * postlicyd:
     NEW: spf support                                                       FRU
-    NEW: add default behaviour for some results to have simpler conf.      FRU
+    NEW: add default behaviour for some results to have simpler conf       FRU
+    NEW: can forward DNS lookup according to a resolv.conf file            FRU
+    CHA: default logging level is LOG_NOTICE (it was LOG_INFO)             FRU
 
 ------------------------------------------------------------------------------
 version 0.6                                                       Feb 26, 2009
