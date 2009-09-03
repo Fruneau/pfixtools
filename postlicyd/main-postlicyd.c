@@ -87,7 +87,7 @@ static bool config_refresh(void *mconfig)
         return true;
     }
     log_state = "refreshing ";
-    info("reloading configuration");
+    notice("reloading configuration");
     bool ret = config_reload(mconfig);
     log_state = "";
     foreach (client_t **server, busy) {
@@ -339,7 +339,7 @@ int main(int argc, char *argv[])
     if (check_conf) {
         return config_check(argv[optind]) ? EXIT_SUCCESS : EXIT_FAILURE;
     }
-    info("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
+    notice("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     if (pidfile_open(pidfile) < 0) {
         crit("unable to write pidfile %s", pidfile);

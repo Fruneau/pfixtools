@@ -159,7 +159,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     db->filename = m_strdup(file);
     db->ips = res->ips;
     if (map.st.st_size == res->size && map.st.st_mtime == res->mtime) {
-        info("%s loaded: already up-to-date", file);
+        notice("%s loaded: already up-to-date", file);
         file_map_close(&map);
         return db;
     }
@@ -213,7 +213,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         }
     }
 
-    info("%s loaded: done in %us, %u IPs", file, (uint32_t)(time(0) - now), ips);
+    notice("%s loaded: done in %us, %u IPs", file, (uint32_t)(time(0) - now), ips);
     return db;
 }
 

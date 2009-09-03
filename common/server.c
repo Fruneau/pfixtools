@@ -325,9 +325,9 @@ static void refresh_cb(EV_P_ struct ev_signal *w, int event)
     log_state = "refreshing ";
     if (!gl_config_refresh(gl_config)) {
         ev_unloop(EV_A_ EVUNLOOP_ALL);
-        info("failed");
+        notice("failed");
     } else {
-        info("done");
+        notice("done");
     }
     log_state = "";
 }
@@ -360,9 +360,9 @@ int server_loop(start_client_t starter, delete_client_t deleter,
     ev_signal_start(gl_loop, &ev_sigterm);
 
     log_state = "";
-    info("entering processing loop");
+    notice("entering processing loop");
     ev_loop(gl_loop, 0);
-    info("exit requested");
+    notice("exit requested");
     return EXIT_SUCCESS;
 }
 

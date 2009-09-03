@@ -156,7 +156,7 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
         }
     }
     if (!greylist_db_need_cleanup(config, awl_db) || config->max_age <= 0) {
-        info("%s loaded: no cleanup needed", path);
+        notice("%s loaded: no cleanup needed", path);
         res->db = awl_db;
         return &res->db;
     } else {
@@ -219,10 +219,10 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
         /** Cleanup successful, replace the old database with the new one.
          */
         if (trashable) {
-            info("%s cleanup: database was corrupted, create a new one", path);
+            notice("%s cleanup: database was corrupted, create a new one", path);
             unlink(path);
         } else if (replace) {
-            info("%s cleanup: done in %us, before %u, after %u entries",
+            notice("%s cleanup: done in %us, before %u, after %u entries",
                  path, (uint32_t)(time(0) - now), old_count, new_count);
             unlink(path);
             if (rename(tmppath, path) != 0) {
@@ -232,7 +232,7 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
             }
         } else {
             unlink(tmppath);
-            info("%s cleanup: done in %us, nothing to do, %u entries",
+            notice("%s cleanup: done in %us, nothing to do, %u entries",
                  path, (uint32_t)(time(0) - now), old_count);
         }
     }
@@ -248,7 +248,7 @@ static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path
         return NULL;
     }
 
-    info("%s loaded", path);
+    notice("%s loaded", path);
     res->db = awl_db;
     return &res->db;
 }

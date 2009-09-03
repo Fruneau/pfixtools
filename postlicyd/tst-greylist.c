@@ -84,7 +84,7 @@ static void fill_tree(TCBDB *db)
                            val.b.e, val.b.f, val.b.g, val.b.h);
         tcbdbput(db, key, key_len, &entry, sizeof(entry));
         if (i && i % 10000 == 0) {
-            info("%u inserted... sill %u to go", i, 1000000 - i);
+            notice("%u inserted... sill %u to go", i, 1000000 - i);
         }
     }
     tcbdbsync(db);
@@ -108,7 +108,7 @@ static void enumerate_tree(TCBDB *src, TCBDB *dest)
                       tcxstrptr(value), sizeof(struct awl_entry));
             ++new_count;
             if (new_count % 10000 == 0) {
-                info("%u enumerated... strill %u to go", new_count, 1000000 - new_count);
+                notice("%u enumerated... strill %u to go", new_count, 1000000 - new_count);
             }
         } while (tcbdbcurnext(cur));
     }
@@ -124,7 +124,7 @@ int main(void)
     TCBDB *tmp;
     common_startup();
 
-    info("Fill the database with 1.000.000 of random entries");
+    notice("Fill the database with 1.000.000 of random entries");
     db = tcbdbnew();
     if (!tcbdbopen(db, "/tmp/test_greylist_perf", BDBOWRITER | BDBOCREAT | BDBOTRUNC)) {
         err("can not open database: %s", tcbdberrmsg(tcbdbecode(db)));
@@ -133,11 +133,11 @@ int main(void)
     }
 
     fill_tree(db);
-    info("Done");
+    notice("Done");
     tcbdbclose(db);
     tcbdbdel(db);
 
-    info("Enumerate the database in a new one");
+    notice("Enumerate the database in a new one");
     tmp = tcbdbnew();
     if (!tcbdbopen(tmp, "/tmp/test_greylist_perf.tmp",
                    BDBOWRITER | BDBOCREAT | BDBOTRUNC)) {
@@ -154,7 +154,7 @@ int main(void)
     }
 
     enumerate_tree(db, tmp);
-    info("done");
+    notice("done");
     tcbdbclose(db);
     tcbdbdel(db);
     tcbdbclose(tmp);

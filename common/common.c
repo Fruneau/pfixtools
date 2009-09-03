@@ -299,7 +299,7 @@ static void common_shutdown(void)
 {
     log_state = "stopping ";
     if (daemon_process && log_syslog) {
-        info("");
+        notice("");
     }
     pidfile_close();
     for (int i = array_len(__exit) - 1 ; i >= 0 ; --i) {

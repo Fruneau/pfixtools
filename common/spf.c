@@ -251,7 +251,7 @@ static void spf_exit(spf_t* spf, spf_code_t code)
           case SPF_TEMPERROR: str = "TEMPERROR"; break;
           case SPF_PERMERROR: str = "PERMERROR"; break;
         }
-        notice("spf (depth=%d): result for query is %s", spf->recursions, str);
+        info("spf (depth=%d): result for query is %s", spf->recursions, str);
     }
     if (spf->exit) {
         spf->exit(code, NULL, spf->data);
@@ -641,7 +641,7 @@ static void spf_next(spf_t* spf, bool start)
         spf->cidr4 = 32;
         spf->cidr6 = 128;
         spf_rule_t* rule = array_ptr(spf->rules, spf->current_rule);
-        notice("spf (depth=%d): processing rule %s: %s", spf->recursions,
+        info("spf (depth=%d): processing rule %s: %s", spf->recursions,
               rule->rule == SPF_RULE_UNKNOWN ? "unknown" : spftokens[rule->rule],
               array_len(rule->content) == 0 ? "(empty)" : array_start(rule->content));
         switch (rule->rule) {
@@ -926,7 +926,7 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
             const char* pos = result->data[i] + 2;
             buffer_reset(&dns_buffer);
             if (i >= 10) {
-                notice("spf (depth=%d): too many MX entries for %s", spf->recursions, result->qname);
+                info("spf (depth=%d): too many MX entries for %s", spf->recursions, result->qname);
                 break;
             }
             while (*pos != '\0') {
@@ -941,7 +941,7 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
         }
     }
     if (spf->a_resolutions == 0) {
-        notice("spf (depth=%d): no MX entry for %s", spf->recursions, result->qname);
+        info("spf (depth=%d): no MX entry for %s", spf->recursions, result->qname);
         spf_next(spf, false);
     }
 }
@@ -1005,7 +1005,7 @@ static void spf_ptr_a_receive(void* arg, int err, struct ub_result* result)
                 match = (ip == spf->ip4);
             }
             if (match) {
-                notice("spf (depth=%d): PTR validated by domain %s", spf->recursions, result->qname);
+                info("spf (depth=%d): PTR validated by domain %s", spf->recursions, result->qname);
                 spf_match(spf);
                 return;
             }
@@ -1039,7 +1039,7 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
             const char* pos = result->data[i];
             buffer_reset(&dns_buffer);
             if (spf->a_resolutions >= 10) {
-                notice("spf (depth=%d): too many PTR entries for %s", spf->recursions, result->qname);
+                info("spf (depth=%d): too many PTR entries for %s", spf->recursions, result->qname);
                 break;
             }
             while (*pos != '\0') {
@@ -1491,7 +1491,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
                     if (array_len(spf->record) != 0) {
                         if (is_mine || result->qtype != DNS_RRT_SPF) {
                             if (spf->spf_received) {
-                                notice("spf (depth=%d): too many records", spf->recursions);
+                                info("spf (depth=%d): too many records", spf->recursions);
                                 spf_exit(spf, SPF_PERMERROR);
                                 return;
                             } else {
@@ -1527,9 +1527,9 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
          * return "None".
          */
         if (spf->txt_toomany) {
-            notice("spf (depth=%d): too many records", spf->recursions);
+            info("spf (depth=%d): too many records", spf->recursions);
         } else {
-            notice("spf (depth=%d): no record found", spf->recursions);
+            info("spf (depth=%d): no record found", spf->recursions);
         }
         spf_exit(spf, spf->txt_toomany ? SPF_PERMERROR : SPF_NONE);
     } else if (array_len(spf->record) != 0) {
@@ -1541,10 +1541,10 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
          * the result "PermError".
          */
         if (!spf_parse(spf)) {
-            notice("spf (depth=%d): cannot parse spf entry: \"%s\"", spf->recursions, array_start(spf->record));
+            info("spf (depth=%d): cannot parse spf entry: \"%s\"", spf->recursions, array_start(spf->record));
             spf_exit(spf, SPF_PERMERROR);
         } else {
-            notice("spf (depth=%d): record selected: \"%s\"", spf->recursions, array_start(spf->record));
+            info("spf (depth=%d): record selected: \"%s\"", spf->recursions, array_start(spf->record));
             spf_next(spf, true);
         }
     }
@@ -1554,7 +1554,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
 spf_t* spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
                  spf_result_t resultcb, bool no_spf_lookup, void *data, spf_code_t* code)
 {
-    notice("spf: new SPF lookup of (%s, %s, %s)", ip, domain, sender);
+    info("spf: new SPF lookup of (%s, %s, %s)", ip, domain, sender);
     spf_t* spf = spf_acquire();
     spf->redirect = -1;
 

@@ -185,7 +185,7 @@ static bool strlist_create(strlist_local_t *local,
     local->reverse = reverse;
     local->partial = partial;
     if (res->size == map.st.st_size && res->mtime == map.st.st_mtime) {
-        info("%s loaded: already up-to-date", file);
+        notice("%s loaded: already up-to-date", file);
         file_map_close(&map);
         return true;
     }
@@ -251,7 +251,7 @@ static bool strlist_create(strlist_local_t *local,
         err("%s not loaded: invalid data", file);
         return false;
     }
-    info("%s loaded: done in %us, %u entries", file, (uint32_t)(time(0) - now), count);
+    notice("%s loaded: done in %us, %u entries", file, (uint32_t)(time(0) - now), count);
     return true;
 }
 
@@ -299,7 +299,7 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
     domain_count = 0;
 
     if (map.st.st_size == res->size && map.st.st_mtime == res->mtime) {
-        info("%s loaded: already up-to-date", file);
+        notice("%s loaded: already up-to-date", file);
         file_map_close(&map);
         return true;
     }
@@ -371,7 +371,7 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
         strlist_local_wipe(hosts);
         return false;
     }
-    info("%s loaded: done in %us, %u hosts, %u domains", file,
+    notice("%s loaded: done in %us, %u hosts, %u domains", file,
          (uint32_t)(time(0) - now), host_count, domain_count);
     return true;
 }
