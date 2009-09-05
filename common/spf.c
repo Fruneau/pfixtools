@@ -145,7 +145,7 @@ static spf_t* spf_acquire(void)
     } else {
         spf = spf_new();
     }
-    debug("acquiring %p - pool length: %d (created %d)", spf, array_len(spf_pool), created);
+    debug("spf pool: acquiring %p - pool length: %d (created %d)", spf, array_len(spf_pool), created);
     return spf;
 }
 
@@ -167,7 +167,7 @@ static bool spf_release(spf_t* spf, bool decrement)
     }
     if (spf->canceled && spf->queries == 0) {
         ++released;
-        debug("Releasing %p - pool length: %d (created: %d)", spf, array_len(spf_pool) + 1, created);
+        debug("spf pool: eleasing %p - pool length: %d (created: %d)", spf, array_len(spf_pool) + 1, created);
         array_append(spf_rule_pool, array_start(spf->rules), array_len(spf->rules));
         array_len(spf->rules) = 0;
         buffer_reset(&spf->domain);
