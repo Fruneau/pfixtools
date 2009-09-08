@@ -281,7 +281,7 @@ static void spf_write_macro(buffer_t* buffer, static_str_t str, bool escape)
 
 static bool spf_expand_pattern(spf_t* spf, buffer_t* buffer, char identifier, int parts, bool reverse,
                                bool escape, const char* delimiters, int delimiters_count) {
-    static_str_t sections[256];
+    static_str_t sections[256] = { { .str = 0, .len = 0}, };
     static_str_t* pos = sections;
     switch (identifier) {
       case 's':
