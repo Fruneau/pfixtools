@@ -7,6 +7,9 @@ version 0.7
     FIX: build with gcc 4.3                                                VZA
     FIX: regexp in trie when reverse lookup is disabled                    FRU
 
+  * pfix-srsd:
+    NEW: command line option to ignore external domains                     MC
+
   * postlicyd:
     NEW: spf filter                                                        FRU
     NEW: hang filter                                                       FRU
