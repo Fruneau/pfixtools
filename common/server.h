@@ -42,14 +42,17 @@
 #include "buffer.h"
 
 typedef struct client_t client_t;
+typedef struct timer_t timer_t;
 typedef struct listener_t listener_t;
 PARRAY(client_t)
+PARRAY(timer_t);
 PARRAY(listener_t)
 
 typedef void *(*start_listener_t)(void);
 typedef void  (*delete_client_t)(void*);
 typedef void *(*start_client_t)(listener_t*);
 typedef int   (*run_client_t)(client_t*, void*);
+typedef void  (*run_timer_t)(void*);
 typedef bool	(*refresh_t)(void*);
 
 
@@ -67,6 +70,10 @@ ssize_t client_read(client_t *client);
 buffer_t *client_input_buffer(client_t *client);
 buffer_t *client_output_buffer(client_t *client);
 void *client_data(client_t *client);
+
+timer_t *start_timer(int milliseconds, run_timer_t runner, void *data);
+void timer_cancel(timer_t* timer);
+
 
 int server_loop(start_client_t starter, delete_client_t deleter,
                 run_client_t runner, refresh_t refresh, void *config);

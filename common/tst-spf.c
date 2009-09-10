@@ -284,7 +284,6 @@ static void spf_test_next(spf_test_t* current) {
     }
 }
 
-
 int main(int argc, char *argv[])
 {
     dns_use_local_conf("resolv.conf");

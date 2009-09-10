@@ -60,9 +60,16 @@ struct client_t {
     void* data;
 };
 
+struct timer_t {
+    struct ev_timer timer;
+    run_timer_t run;
+    void* data;
+};
+
 
 static PA(listener_t) listeners = ARRAY_INIT;
 static PA(client_t) client_pool = ARRAY_INIT;
+static PA(timer_t) timer_pool = ARRAY_INIT;
 
 static struct ev_loop *gl_loop           = NULL;
 static start_client_t  gl_client_start   = NULL;
@@ -301,6 +308,66 @@ listener_t *start_listener(int port)
 
 
 
+/* Timers
+ */
+
+static timer_t* timer_new(void)
+{
+    return p_new(timer_t, 1);
+}
+
+static void timer_wipe(timer_t *timer)
+{
+    ev_timer_stop(gl_loop, &timer->timer);
+}
+
+static void timer_delete(timer_t** timer)
+{
+    if (*timer) {
+        timer_wipe(*timer);
+        p_delete(timer);
+    }
+}
+
+static void timer_release(timer_t* timer)
+{
+    timer_wipe(timer);
+    array_add(timer_pool, timer);
+}
+
+static void timer_cb(EV_P_ struct ev_timer *w, int revents)
+{
+    timer_t *timer = (timer_t*)w;
+
+    if (timer->run) {
+        timer->run(timer->data);
+    }
+    timer_release(timer);
+}
+
+timer_t* start_timer(int milliseconds, run_timer_t runner, void *data)
+{
+    timer_t* timer = NULL;
+    float timeout = ((float)milliseconds) / 1000.;
+    if (array_len(timer_pool) > 0) {
+        timer = array_pop_last(timer_pool);
+        ev_timer_set(&timer->timer, timeout, 0.);
+    } else {
+        timer = timer_new();
+        ev_timer_init(&timer->timer, timer_cb, timeout, 0.);
+    }
+    timer->run = runner;
+    timer->data = data;
+    ev_timer_start(gl_loop, &timer->timer);
+    return timer;
+}
+
+void timer_cancel(timer_t* timer)
+{
+    timer_release(timer);
+}
+
+
 
 /* Server runtime stuff.
  */
@@ -315,6 +382,7 @@ static void server_shutdown(void)
 {
     array_deep_wipe(listeners, listener_delete);
     array_deep_wipe(client_pool, client_delete);
+    array_deep_wipe(timer_pool, timer_delete);
 }
 module_init(server_init);
 module_exit(server_shutdown);
