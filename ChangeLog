@@ -3,14 +3,17 @@ version 0.7
 
   * common:
     NEW: spf implementation                                                FRU
+    NEW: timer support in server loop                                      FRU
     FIX: build with gcc 4.3                                                VZA
     FIX: regexp in trie when reverse lookup is disabled                    FRU
 
   * postlicyd:
-    NEW: spf support                                                       FRU
+    NEW: spf filter                                                        FRU
+    NEW: hang filter                                                       FRU
     NEW: add default behaviour for some results to have simpler conf       FRU
     NEW: can forward DNS lookup according to a resolv.conf file            FRU
     CHA: default logging level is LOG_NOTICE (it was LOG_INFO)             FRU
+
 
 ------------------------------------------------------------------------------
 version 0.6                                                       Feb 26, 2009
@@ -26,6 +29,7 @@ version 0.6                                                       Feb 26, 2009
     NEW: match operator can compare query fields together                  FRU
     FIX: crash when using rbldns strlist                                   FRU
     FIX: mem leak when reloading an iplist from disk                       FRU
+
 
 ------------------------------------------------------------------------------
 version 0.5                                                       Nov 11, 2008
