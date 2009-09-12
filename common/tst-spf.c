@@ -214,26 +214,26 @@ static spf_test_t testcases[] = {
     { "exp-no-txt", "Semantics of exp and other modifiers", "6.2/4", "mail.test.t12.example.com", "1.2.3.4", "foo@e22.test.t12.example.com", SPF_FAIL, -1 },
     { "redirect-cancels-prior-exp", "Semantics of exp and other modifiers", "6.2/13", "mail.test.t12.example.com", "1.2.3.4", "foo@e3.test.t12.example.com", SPF_FAIL, -1 },
     { "include-ignores-exp", "Semantics of exp and other modifiers", "6.2/13", "mail.test.t12.example.com", "1.2.3.4", "foo@e7.test.t12.example.com", SPF_FAIL, -1 },
-    { "p-macro-ip4-valid", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "192.168.218.41", "test@e6.test.t13.example.com", SPF_FAIL, -1 },
-    { "domain-name-truncation", "Macro expansion rules", "8.1/25", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@somewhat.test.t13.example.com", SPF_FAIL, -1 },
-    { "hello-macro", "Macro expansion rules", "8.1/6", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@e9.test.t13.example.com", SPF_PASS, -1 },
-    { "trailing-dot-exp", "Macro expansion rules", "8.1", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@exp.test.t13.example.com", SPF_FAIL, -1 },
-    { "trailing-dot-domain", "Macro expansion rules", "8.1/16", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@test.t13.example.com", SPF_PASS, -1 },
+    { "p-macro-ip4-valid", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "1.2.218.41", "test@e6.test.t13.example.com", SPF_FAIL, -1 },
+    { "domain-name-truncation", "Macro expansion rules", "8.1/25", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@somewhat.test.t13.example.com", SPF_FAIL, -1 },
+    { "hello-macro", "Macro expansion rules", "8.1/6", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@e9.test.t13.example.com", SPF_PASS, -1 },
+    { "trailing-dot-exp", "Macro expansion rules", "8.1", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@exp.test.t13.example.com", SPF_FAIL, -1 },
+    { "trailing-dot-domain", "Macro expansion rules", "8.1/16", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@test.t13.example.com", SPF_PASS, -1 },
     { "macro-reverse-split-on-dash", "Macro expansion rules", "['8.1/15', '8.1/16', '8.1/17', '8.1/18']", "mail.test.t13.example.com", "1.2.3.4", "philip-gladstone-test@e11.test.t13.example.com", SPF_PASS, -1 },
     { "p-macro-ip6-valid", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "CAFE:BABE::3", "test@e6.test.t13.example.com", SPF_FAIL, -1 },
-    { "exp-txt-macro-char", "Macro expansion rules", "8.1/20", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@e3.test.t13.example.com", SPF_FAIL, -1 },
-    { "invalid-macro-char", "Macro expansion rules", "8.1/9", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@e1.test.t13.example.com", SPF_PERMERROR, -1 },
+    { "exp-txt-macro-char", "Macro expansion rules", "8.1/20", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@e3.test.t13.example.com", SPF_FAIL, -1 },
+    { "invalid-macro-char", "Macro expansion rules", "8.1/9", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@e1.test.t13.example.com", SPF_PERMERROR, -1 },
     { "p-macro-ip6-novalid", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "CAFE:BABE::1", "test@e6.test.t13.example.com", SPF_FAIL, -1 },
-    { "hello-domain-literal", "Macro expansion rules", "8.1/2", "[192.168.218.40]", "192.168.218.40", "test@e9.test.t13.example.com", SPF_FAIL, -1 },
-    { "undef-macro", "Macro expansion rules", "8.1/6", "msgbas2x.cos.test.t13.example.com", "CAFE:BABE::192.168.218.40", "test@e5.test.t13.example.com", SPF_PERMERROR, -1 },
+    { "hello-domain-literal", "Macro expansion rules", "8.1/2", "[1.2.218.40]", "1.2.218.40", "test@e9.test.t13.example.com", SPF_FAIL, -1 },
+    { "undef-macro", "Macro expansion rules", "8.1/6", "msgbas2x.cos.test.t13.example.com", "CAFE:BABE::1.2.218.40", "test@e5.test.t13.example.com", SPF_PERMERROR, -1 },
     { "macro-mania-in-domain", "Macro expansion rules", "8.1/3, 8.1/4", "mail.test.t13.example.com", "1.2.3.4", "test@e1a.test.t13.example.com", SPF_PASS, SPF_FAIL },
-    { "p-macro-ip4-novalid", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@e6.test.t13.example.com", SPF_FAIL, -1 },
+    { "p-macro-ip4-novalid", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@e6.test.t13.example.com", SPF_FAIL, -1 },
     { "require-valid-helo", "Macro expansion rules", "8.1/6", "OEMCOMPUTER", "1.2.3.4", "test@e10.test.t13.example.com", SPF_FAIL, -1 },
-    { "p-macro-multiple", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "192.168.218.42", "test@e7.test.t13.example.com", SPF_PASS, SPF_SOFTFAIL },
-    { "upper-macro", "Macro expansion rules", "8.1/26", "msgbas2x.cos.test.t13.example.com", "192.168.218.42", "jack&jill=up@e8.test.t13.example.com", SPF_FAIL, -1 },
-    { "invalid-hello-macro", "Macro expansion rules", "8.1/2", "JUMPIN' JUPITER", "192.168.218.40", "test@e9.test.t13.example.com", SPF_FAIL, -1 },
-    { "exp-only-macro-char", "Macro expansion rules", "8.1/8", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@e2.test.t13.example.com", SPF_PERMERROR, -1 },
-    { "v-macro-ip4", "Macro expansion rules", "8.1/6", "msgbas2x.cos.test.t13.example.com", "192.168.218.40", "test@e4.test.t13.example.com", SPF_FAIL, -1 },
+    { "p-macro-multiple", "Macro expansion rules", "8.1/22", "msgbas2x.cos.test.t13.example.com", "1.2.218.42", "test@e7.test.t13.example.com", SPF_PASS, SPF_SOFTFAIL },
+    { "upper-macro", "Macro expansion rules", "8.1/26", "msgbas2x.cos.test.t13.example.com", "1.2.218.42", "jack&jill=up@e8.test.t13.example.com", SPF_FAIL, -1 },
+    { "invalid-hello-macro", "Macro expansion rules", "8.1/2", "JUMPIN' JUPITER", "1.2.218.40", "test@e9.test.t13.example.com", SPF_FAIL, -1 },
+    { "exp-only-macro-char", "Macro expansion rules", "8.1/8", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@e2.test.t13.example.com", SPF_PERMERROR, -1 },
+    { "v-macro-ip4", "Macro expansion rules", "8.1/6", "msgbas2x.cos.test.t13.example.com", "1.2.218.40", "test@e4.test.t13.example.com", SPF_FAIL, -1 },
     { "v-macro-ip6", "Macro expansion rules", "8.1/6", "msgbas2x.cos.test.t13.example.com", "CAFE:BABE::1", "test@e4.test.t13.example.com", SPF_FAIL, -1 },
     { "false-a-limit", "Processing limits", "10.1/7", "mail.test.t14.example.com", "1.2.3.12", "foo@e10.test.t14.example.com", SPF_PASS, -1 },
     { "include-at-limit", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e8.test.t14.example.com", SPF_PASS, -1 },
@@ -248,6 +248,7 @@ static spf_test_t testcases[] = {
 };
 static int tested = 0;
 static int passed = 0;
+static const char* to_run = NULL;
 
 static void spf_test_next(spf_test_t* current);
 
@@ -265,15 +266,17 @@ static void spf_test_done(spf_code_t code, const char* explanation, void* data)
 }
 
 static void spf_test_next(spf_test_t* current) {
-    if (current == NULL) {
-        current = testcases;
-    } else {
-        current = current + 1;
-    }
-    if (current->testid == NULL) {
-        fprintf(stderr, "DONE: %d tests %d success (%d%%)\n", tested, passed, (passed * 100) / tested);
-        exit(0);
-    }
+    do {
+        if (current == NULL) {
+            current = testcases;
+        } else {
+            current = current + 1;
+        }
+        if (current->testid == NULL) {
+            fprintf(stderr, "DONE: %d tests %d success (%d%%)\n", tested, passed, (passed * 100) / tested);
+            exit(0);
+        }
+    } while (to_run != NULL && strcmp(to_run, current->testid) != 0);
     const char* domain = strchr(current->sender, '@');
     if (domain != NULL) {
         ++domain;
@@ -294,6 +297,8 @@ int main(int argc, char *argv[])
                     ++log_level;
                     ++p;
                 }
+            } else {
+                to_run = argv[i];
             }
         }
     }
