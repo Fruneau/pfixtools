@@ -130,11 +130,11 @@ static spf_test_t testcases[] = {
     { "a-bad-cidr6", "A mechanism syntax", "5.3/2", "mail.test.t6.example.com", "1.2.3.4", "foo@e7.test.t6.example.com", SPF_PERMERROR, -1 },
     { "a-numeric", "A mechanism syntax", "8.1/2", "mail.test.t6.example.com", "1.2.3.4", "foo@e4.test.t6.example.com", SPF_PERMERROR, -1 },
     { "a-dash-in-toplabel", "A mechanism syntax", "8.1/2", "mail.test.t6.example.com", "1.2.3.4", "foo@e14.test.t6.example.com", SPF_PASS, -1 },
-    /* test something that is not compliant with DNS { "a-colon-domain-ip4mapped", "A mechanism syntax", "8.1/2", "mail.test.t6.example.com", "::FFFF:1.2.3.4", "foo@e11.test.t6.example.com", SPF_PASS, -1 }, */
+    { "a-colon-domain-ip4mapped", "A mechanism syntax", "8.1/2", "mail.test.t6.example.com", "::FFFF:1.2.3.4", "foo@e11.test.t6.example.com", SPF_PASS, SPF_NEUTRAL },
     { "a-cidr6-0-ip4mapped", "A mechanism syntax", "5.3/3", "mail.test.t6.example.com", "::FFFF:1.2.3.4", "foo@e2a.test.t6.example.com", SPF_FAIL, -1 },
     { "a-only-toplabel", "A mechanism syntax", "8.1/2", "mail.test.t6.example.com", "1.2.3.4", "foo@e5a.test.t6.example.com", SPF_PERMERROR, -1 },
     { "a-empty-domain", "A mechanism syntax", "5.3/2", "mail.test.t6.example.com", "1.2.3.4", "foo@e13.test.t6.example.com", SPF_PERMERROR, -1 },
-    /* test something that is not compliant with DNS { "a-colon-domain", "A mechanism syntax", "8.1/2", "mail.test.t6.example.com", "1.2.3.4", "foo@e11.test.t6.example.com", SPF_PASS, -1 }, */
+    { "a-colon-domain", "A mechanism syntax", "8.1/2", "mail.test.t6.example.com", "1.2.3.4", "foo@e11.test.t6.example.com", SPF_PASS, SPF_NEUTRAL },
     { "a-cidr6-0-ip6", "A mechanism syntax", "5.3/3", "mail.test.t6.example.com", "1234::1", "foo@e2a.test.t6.example.com", SPF_PASS, -1 },
     { "a-multi-ip1", "A mechanism syntax", "5.3/3", "mail.test.t6.example.com", "1.2.3.4", "foo@e10.test.t6.example.com", SPF_PASS, -1 },
     { "a-multi-ip2", "A mechanism syntax", "5.3/3", "mail.test.t6.example.com", "1.2.3.4", "foo@e10.test.t6.example.com", SPF_PASS, -1 },
@@ -154,7 +154,7 @@ static spf_test_t testcases[] = {
     { "include-cidr", "Include mechanism semantics and syntax", "5.2/1", "mail.test.t7.example.com", "1.2.3.4", "foo@e9.test.t7.example.com", SPF_PERMERROR, -1 },
     { "mx-cidr4-0-ip6", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1234::1", "foo@e2.test.t8.example.com", SPF_FAIL, -1 },
     /* Not Applicable, empty MX entry not accepted by bind { "mx-empty", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1.2.3.4", "", SPF_NEUTRAL, -1 }, */
-    /* test something that is not compliant with DNS rfc { "mx-colon-domain-ip4mapped", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "::FFFF:1.2.3.4", "foo@e11.test.t8.example.com", SPF_PASS, -1 }, */
+    { "mx-colon-domain-ip4mapped", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "::FFFF:1.2.3.4", "foo@e11.test.t8.example.com", SPF_PASS, SPF_NEUTRAL },
     { "mx-nxdomain", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1.2.3.4", "foo@e1.test.t8.example.com", SPF_FAIL, -1 },
     { "mx-numeric-top-label", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "1.2.3.4", "foo@e5.test.t8.example.com", SPF_PERMERROR, -1 },
     { "mx-null", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "1.2.3.5", "foo@e3.test.t8.example.com", SPF_PERMERROR, -1 },
@@ -169,7 +169,7 @@ static spf_test_t testcases[] = {
     { "mx-multi-ip1", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1.2.3.4", "foo@e10.test.t8.example.com", SPF_PASS, -1 },
     { "mx-bad-cidr6", "MX mechanism syntax", "5.4/2", "mail.test.t8.example.com", "1.2.3.4", "foo@e7.test.t8.example.com", SPF_PERMERROR, -1 },
     { "mx-bad-domain", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "1.2.3.4", "foo@e9.test.t8.example.com", SPF_PERMERROR, -1 },
-    /* test something that is not compliant with DNS rfc { "mx-colon-domain", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "1.2.3.4", "foo@e11.test.t8.example.com", SPF_PASS, -1 }, */
+    { "mx-colon-domain", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "1.2.3.4", "foo@e11.test.t8.example.com", SPF_PASS, SPF_NEUTRAL },
     { "mx-bad-cidr4", "MX mechanism syntax", "5.4/2", "mail.test.t8.example.com", "1.2.3.4", "foo@e6a.test.t8.example.com", SPF_PERMERROR, -1 },
     { "mx-cidr4-0", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1.2.3.4", "foo@e2.test.t8.example.com", SPF_PASS, -1 },
     { "mx-empty-domain", "MX mechanism syntax", "5.2/1", "mail.test.t8.example.com", "1.2.3.4", "foo@e13.test.t8.example.com", SPF_PERMERROR, -1 },

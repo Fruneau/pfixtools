@@ -45,13 +45,21 @@
 
 #define SPF_MAX_RECUSION 15
 
+typedef union ip_t {
+    uint32_t v4;
+    uint8_t  v6[16];
+} ip_t;
+
 typedef struct spf_rule_t {
     spf_code_t qualifier;
     spf_ruleid_t rule;
     buffer_t content;
+    ip_t ip;
+    uint8_t cidr4;
+    uint8_t cidr6;
 } spf_rule_t;
 ARRAY(spf_rule_t);
-#define SPF_RULE_INIT { 0, 0, ARRAY_INIT }
+#define SPF_RULE_INIT { 0, 0, ARRAY_INIT, { .v6 = { 0 } }, 0, 0 }
 
 struct spf_t {
     unsigned txt_received : 1;
@@ -75,8 +83,6 @@ struct spf_t {
     uint8_t current_rule;
     int8_t redirect;
 
-    int cidr4;
-    int cidr6;
     buffer_t domainspec;
 
     int recursions;
@@ -90,6 +96,8 @@ struct spf_t {
     spf_result_t exit;
     void* data;
 };
+
+#define current_rule(spf) array_elt((spf)->rules, (spf)->current_rule)
 
 static PA(spf_t) spf_pool = ARRAY_INIT;
 static A(spf_rule_t) spf_rule_pool = ARRAY_INIT;
@@ -359,36 +367,19 @@ static bool spf_expand_pattern(spf_t* spf, buffer_t* buffer, char identifier, in
     return true;
 }
 
-static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, int* cidr6, bool expand)
+static const char* spf_expand(spf_t* spf, const char* macrostring, bool expand)
 {
-    const char* const macrostart = macrostring;
-    bool getCidr = false;
-    if (cidr4 != NULL) {
-        getCidr = true;
-        *cidr4 = 32;
-    }
-    if (cidr6 != NULL) {
-        getCidr = true;
-        *cidr6 = 128;
-    }
     if (macrostring == NULL) {
         macrostring = "";
     }
-    const char* cidrStart = m_strchrnul(macrostring, '/');
-    if (*cidrStart != '\0' && !getCidr) {
-        debug("spf (depth=%d): cidr length found, but no cidr requested on %s", spf->recursions, macrostring);
-        return NULL;
-    }
+    const char* const macrostart = macrostring;
     buffer_reset(&expand_buffer);
     if (expand) {
-        while (macrostring < cidrStart) {
-            const char* next_format = strchr(macrostring, '%');
-            if (next_format == NULL || next_format >= cidrStart) {
-                next_format = cidrStart;
-            }
+        while (*macrostring != '\0') {
+            const char* next_format = m_strchrnul(macrostring, '%');
             buffer_add(&expand_buffer, macrostring, next_format - macrostring);
             macrostring = next_format;
-            if (macrostring < cidrStart) {
+            if (*macrostring != '\0') {
                 ++macrostring;
                 switch (*macrostring) {
                   case '%':
@@ -403,7 +394,7 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
                   case '{': {
                     ++macrostring;
                     next_format = strchr(macrostring, '}');
-                    if (next_format == NULL || next_format >= cidrStart) {
+                    if (next_format == NULL) {
                         debug("spf (depth=%d): unmatched %%{ in macro \"%s\"", spf->recursions, macrostring);
                         return NULL;
                     }
@@ -443,73 +434,9 @@ static const char* spf_expand(spf_t* spf, const char* macrostring, int* cidr4, i
             }
         }
     } else {
-        buffer_add(&expand_buffer, macrostring, cidrStart - macrostring);
+        buffer_addstr(&expand_buffer, macrostring);
     }
-    if (*cidrStart != '\0') {
-        char* end;
-        ++cidrStart;
-        if (*cidrStart == '/') {
-            if (cidr4 == NULL || cidr6 == NULL) {
-                debug("spf (depth=%d): invalid cidr4 length in macrostring \"%s\"", spf->recursions, macrostart);
-                return NULL;
-            }
-            ++cidrStart;
-            *cidr6 = strtol(cidrStart, &end, 10);
-            if (end == cidrStart || *end != '\0' || *cidr6 < 0 || *cidr6 > 128
-                || (*cidr6 != 0 && *cidrStart == '0')) {
-                debug("spf (depth=%d): invalid cidr6 length in macrostring \"%s\"", spf->recursions, macrostart);
-                return NULL;
-            }
-        } else {
-            int count = strtol(cidrStart, &end, 10);
-            if (end == cidrStart || (count != 0 && *cidrStart == '0')) {
-                debug("spf (depth=%d): invalid cidr length in macrostring \"%s\"", spf->recursions, macrostart);
-                return NULL;
-            }
-            cidrStart = end;
-            if (cidr4 != NULL) {
-                if (count < 0 || count > 32) {
-                    debug("spf (depth=%d): invalid cidr4 length in macrostring \"%s\"", spf->recursions, macrostart);
-                    return NULL;
-                }
-                *cidr4 = count;
-                if (*cidrStart == '/') {
-                    ++cidrStart;
-                    if (cidr6 == NULL || *cidrStart != '/') {
-                        debug("spf (depth=%d): invalid cidr6 length in macrostring \"%s\"", spf->recursions, macrostart);
-                        return NULL;
-                    }
-                    ++cidrStart;
-                    *cidr6 = strtol(cidrStart, &end, 10);
-                    if (end == cidrStart || *end != '\0' || *cidr6 < 0 || *cidr6 > 128
-                        || (*cidr6 != 0 && *cidrStart == '0')) {
-                        debug("spf (depth=%d): invalid cidr6 length in macrostring \"%s\"", spf->recursions, macrostart);
-                        return NULL;
-                    }
-                }
-            } else {
-                if (count < 0 || count > 128 || *cidrStart != '\0') {
-                    debug("spf (depth=%d): invalid cidr6 length in macrostring \"%s\"", spf->recursions, macrostart);
-                    return NULL;
-                }
-                *cidr6 = count;
-            }
-        }
-    }
-    if (cidr4 != NULL) {
-        if (cidr6 != NULL) {
-            debug("spf (depth=%d): macro \"%s\" parsed: \"%s\" with cidr4=%d cidr6=%d", spf->recursions,
-                  macrostart, array_start(expand_buffer), *cidr4, *cidr6);
-        } else {
-            debug("spf (depth=%d): macro \"%s\" parsed: \"%s\" with cidr4=%d", spf->recursions,
-                  macrostart, array_start(expand_buffer), *cidr4);
-        }
-    } else if (cidr6 != NULL) {
-        debug("spf (depth=%d): macro \"%s\" parsed: \"%s\" with cidr6=%d", spf->recursions,
-              macrostart, array_start(expand_buffer), *cidr6);
-    } else {
-        debug("spf (depth=%d): macro \"%s\" parsed: \"%s\"", spf->recursions, macrostart, array_start(expand_buffer));
-    }
+    debug("spf (depth=%d): macro \"%s\" parsed: \"%s\"", spf->recursions, macrostart, array_start(expand_buffer));
     return array_start(expand_buffer);
 }
 
@@ -542,18 +469,26 @@ static bool spf_subquery(spf_t* spf, const char* domain, spf_result_t cb)
     }
 }
 
-static bool parse_ip4(uint32_t* result, const char* txt)
+static bool parse_ip4(uint32_t* result, const char* txt, const char* end)
 {
-    if (inet_pton(AF_INET, txt, result) != 1) {
+    char str[BUFSIZ];
+    if (m_strncpy(str, BUFSIZ, txt, end - txt) > BUFSIZ) {
+        return false;
+    }
+    if (inet_pton(AF_INET, str, result) != 1) {
         return false;
     }
     *result = ntohl(*result);
     return true;
 }
 
-static bool parse_ip6(uint8_t* result, const char* txt)
+static bool parse_ip6(uint8_t* result, const char* txt, const char* end)
 {
-    if (inet_pton(AF_INET6, txt, result) != 1) {
+    char str[BUFSIZ];
+    if (m_strncpy(str, BUFSIZ, txt, end - txt) > BUFSIZ) {
+        return false;
+    }
+    if (inet_pton(AF_INET6, str, result) != 1) {
         return false;
     }
     return true;
@@ -618,12 +553,11 @@ static void spf_next(spf_t* spf, bool start)
                 ++spf->mech_withdns;
                 debug("spf (debug=%d): reached the end of spf record, running redirect", spf->recursions);
                 spf_rule_t* rule = array_ptr(spf->rules, spf->redirect);
-                const char* domain = spf_expand(spf, array_start(rule->content), NULL, NULL, true);
+                const char* domain = spf_expand(spf, array_start(rule->content), true);
                 if (domain == NULL) {
                     spf_exit(spf, SPF_PERMERROR);
                     return;
                 }
-                ++domain;
                 if (!spf_validate_domain(domain)) {
                     spf_exit(spf, SPF_PERMERROR);
                     return;
@@ -639,8 +573,6 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
         }
-        spf->cidr4 = 32;
-        spf->cidr6 = 128;
         spf_rule_t* rule = array_ptr(spf->rules, spf->current_rule);
         info("spf (depth=%d): processing rule %s: %s", spf->recursions,
               rule->rule == SPF_RULE_UNKNOWN ? "unknown" : spftokens[rule->rule],
@@ -656,12 +588,11 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
             ++spf->mech_withdns;
-            const char* domain = spf_expand(spf, array_start(rule->content), NULL, NULL, true);
+            const char* domain = spf_expand(spf, array_start(rule->content), true);
             if (domain == NULL) {
                 spf_exit(spf, SPF_PERMERROR);
                 return;
             }
-            ++domain;
             if (!spf_validate_domain(domain)) {
                 break;
             }
@@ -685,15 +616,14 @@ static void spf_next(spf_t* spf, bool start)
             ++spf->mech_withdns;
             const char* domain = NULL;
             if (array_start(rule->content) != 0) {
-                domain = spf_expand(spf, array_start(rule->content), &spf->cidr4, &spf->cidr6, true);
-                if (domain == NULL) {
-                    spf_exit(spf, SPF_PERMERROR);
-                    return;
-                }
-                if (*domain != ':') {
-                    domain = array_start(spf->domain);
+                if (array_len(rule->content) > 0) {
+                    domain = spf_expand(spf, array_start(rule->content), true);
+                    if (domain == NULL) {
+                        spf_exit(spf, SPF_PERMERROR);
+                        return;
+                    }
                 } else {
-                    ++domain;
+                    domain = array_start(spf->domain);
                 }
                 if (!spf_validate_domain(domain)) {
                     break;
@@ -715,26 +645,14 @@ static void spf_next(spf_t* spf, bool start)
           } break;
 
           case SPF_RULE_IP4: {
-            const char* ip = spf_expand(spf, array_start(rule->content), &spf->cidr4, NULL, false);
-            uint32_t val;
-            if (ip == NULL || !parse_ip4(&val, ip + 1)) {
-                spf_exit(spf, SPF_PERMERROR);
-                return;
-            }
-            if (spf_checkip4(spf, val, spf->cidr4)) {
+            if (spf_checkip4(spf, rule->ip.v4, rule->cidr4)) {
                 spf_match(spf);
                 return;
             }
           } break;
 
           case SPF_RULE_IP6: {
-            const char* ip = spf_expand(spf, array_start(rule->content), NULL, &spf->cidr6, false);
-            uint8_t val[16];
-            if (ip == NULL || !parse_ip6(val, ip + 1)) {
-                spf_exit(spf, SPF_PERMERROR);
-                return;
-            }
-            if (spf_checkip6(spf, val, spf->cidr6)) {
+            if (spf_checkip6(spf, rule->ip.v6, rule->cidr6)) {
                 spf_match(spf);
                 return;
             }
@@ -746,12 +664,11 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
             ++spf->mech_withdns;
-            const char* domain = spf_expand(spf, array_start(rule->content), NULL, NULL, true);
+            const char* domain = spf_expand(spf, array_start(rule->content), true);
             if (domain == NULL) {
                 spf_exit(spf, SPF_PERMERROR);
                 return;
             }
-            ++domain;
             if (!spf_validate_domain(domain)) {
                 break;
             }
@@ -767,12 +684,11 @@ static void spf_next(spf_t* spf, bool start)
             ++spf->mech_withdns;
             const char* domain = NULL;
             if (array_len(rule->content) > 0) {
-                domain = spf_expand(spf, array_start(rule->content), NULL, NULL, true);
+                domain = spf_expand(spf, array_start(rule->content), true);
                 if (domain == NULL) {
                     spf_exit(spf, SPF_PERMERROR);
                     return;
                 }
-                ++domain;
                 if (!spf_validate_domain(domain)) {
                     break;
                 }
@@ -844,8 +760,9 @@ static void spf_aaaa_receive(void* arg, int err, struct ub_result* result)
     debug("spf (depth=%d): AAAA answer received for %s", spf->recursions, result->qname);
     if (err == 0) {
         for (i = 0 ; result->data[i] != NULL ; ++i) {
-            if (spf_checkip6(spf, (uint8_t*)result->data[i], spf->cidr6)) {
-                debug("spf (depth=%d): IPv6 matches with cidr=%d for query on %s", spf->recursions, spf->cidr6, result->qname);
+            if (spf_checkip6(spf, (uint8_t*)result->data[i], current_rule(spf).cidr6)) {
+                debug("spf (depth=%d): IPv6 matches with cidr=%d for query on %s", 
+                      spf->recursions, current_rule(spf).cidr6, result->qname);
                 spf_match(spf);
                 return;
             }
@@ -884,16 +801,16 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result)
                         | (((uint8_t)result->data[i][1]) << 16)
                         | (((uint8_t)result->data[i][2]) << 8)
                         | (((uint8_t)result->data[i][3]));
-            if (spf_checkip4(spf, ip, spf->cidr4)) {
+            if (spf_checkip4(spf, ip, current_rule(spf).cidr4)) {
                 debug("spf (depth=%d): IPv4 (%d.%d.%d.%d) matches with cidr=%d for query on %s", spf->recursions,
                       result->data[i][0], result->data[i][1], result->data[i][2], result->data[i][3],
-                      spf->cidr4, result->qname);
+                      current_rule(spf).cidr4, result->qname);
                 spf_match(spf);
                 return;
             } else {
                 debug("spf (depth=%d): IPv4 (%d.%d.%d.%d) does not match with cidr=%d for query on %s", spf->recursions,
                       result->data[i][0], result->data[i][1], result->data[i][2], result->data[i][3],
-                      spf->cidr4, result->qname);
+                      current_rule(spf).cidr4, result->qname);
             }
         }
     }
@@ -1142,48 +1059,9 @@ static spf_code_t spf_qualifier(const char** str)
     }
 }
 
-static bool spf_check_cidrlength(const char* pos, const char* end)
-{
-#define READ_NEXT(CanBeEnd)                                                    \
-    ++pos;                                                                     \
-    if (pos == end) {                                                          \
-        return CanBeEnd;                                                       \
-    }
-
-    if (*pos != '/') {
-        return false;
-    }
-    READ_NEXT(false);
-    if (*pos != '/') {
-        if (!isdigit(*pos)) {
-            return false;
-        }
-        READ_NEXT(true);
-        while (pos < end) {
-            if (*pos == '/') {
-                break;
-            }
-            if (!isdigit(*pos) && *pos != '/') {
-                return false;
-            }
-            READ_NEXT(true);
-        }
-        assert(*pos == '/');
-    }
-    READ_NEXT(false);
-    do {
-        if (!isdigit(*pos)) {
-            return false;
-        }
-        READ_NEXT(true);
-    } while (true);
-
-#undef READ_NEXT
-}
 
 static bool spf_check_domainspec(const char* pos, const char* end,
-                                 bool with_cidr_length, bool allow_empty,
-                                 bool macrostring_only)
+                                 bool allow_empty, bool macrostring_only)
 {
 #define READ_NEXT                                                              \
     ++pos;                                                                     \
@@ -1192,6 +1070,7 @@ static bool spf_check_domainspec(const char* pos, const char* end,
     }
 
     bool can_be_end = allow_empty;
+    debug("spf: starting: %p - %p (%d)", pos, end, end - pos);
     if (pos >= end) {
         return can_be_end;
     }
@@ -1200,15 +1079,8 @@ static bool spf_check_domainspec(const char* pos, const char* end,
         READ_NEXT;
     }
     while (pos < end) {
-        /* cidr length parsing */
-        if (!macrostring_only && *pos == '/') {
-            if (!with_cidr_length || !can_be_end) {
-                return false;
-            }
-            return spf_check_cidrlength(pos, end);
-
         /* final dot */
-        } else if (!macrostring_only && *pos == '.') {
+        if (!macrostring_only && *pos == '.') {
             bool has_dash = false;
             bool has_alpha = false;
             can_be_end = false;
@@ -1289,7 +1161,84 @@ static bool spf_check_domainspec(const char* pos, const char* end,
 #undef READ_NEXT
 }
 
-static bool spf_parse(spf_t* spf) {
+static const char* spf_parse_cidr_simple(const char* start, const char* end, uint8_t* cidr)
+{
+    *cidr = 0;
+    if (end <= start || !isdigit(end[-1])) {
+        return NULL;
+    }
+    while (end > start && isdigit(end[-1])) {
+        --end;
+    }
+    if (end == start || end[-1] != '/') {
+        return NULL;
+    }
+    long l = strtol(end, NULL, 10);
+    if (l < 0 || l > 128 || (l != 0 && *end == '0')) {
+        *cidr = 0xff;
+        return NULL;
+    }
+    *cidr = (uint8_t)l;
+    return end - 1;
+}
+
+static const char* spf_parse_cidr(const char* start, const char* end, uint8_t* cidr4, uint8_t* cidr6)
+{
+    assert(cidr4 != NULL || cidr6 != NULL);
+    if (cidr4 != NULL) {
+        *cidr4 = 32;
+    }
+    if (cidr6 != NULL) {
+        *cidr6 = 128;
+    }
+    const char* last_pos = end;
+    uint8_t cidr1 = 0;
+    end = spf_parse_cidr_simple(start, end, &cidr1);
+    if (end == NULL) {
+        if (cidr1 == 0xff) {
+            return NULL;
+        } else {
+            return last_pos;
+        }
+    }
+    last_pos = end;
+    if (end[-1] != '/') {
+        if (cidr4 != NULL) {
+            if (cidr1 > 32) {
+                return NULL;
+            }
+            *cidr4 = cidr1;
+        } else {
+            *cidr6 = cidr1;
+        }
+        return last_pos;
+    }
+
+    if (cidr4 == NULL || cidr6 == NULL) {
+        return NULL;
+    }
+
+    --end;
+    uint8_t cidr2 = 0;
+    end = spf_parse_cidr_simple(start, end, &cidr2);
+    if (end == NULL) {
+        if (cidr2 == 0xff) {
+            return NULL;
+        } else {
+            *cidr6 = cidr1;
+            return last_pos - 1;
+        }
+    }
+    if (cidr2 > 32) {
+        return NULL;
+    }
+    *cidr4 = cidr2;
+    *cidr6 = cidr1;
+    return end;
+}
+
+static bool spf_parse(spf_t* spf)
+{
     const char* pos = array_start(spf->record);
     const char* end = pos + array_len(spf->record);
     bool has_exp = false;
@@ -1331,10 +1280,14 @@ static bool spf_parse(spf_t* spf) {
             return false;
         }
         spf_ruleid_t id = spf_rule_tokenize(rule_start, name_end - rule_start);
+        ip_t ip = { .v6 = { 0 } };
+        const char* cidr_end = pos;
+        uint8_t cidr4 = 32;
+        uint8_t cidr6 = 128;
         if (is_mechanism) {
             switch (id) {
               case SPF_RULE_ALL:
-                if (*name_end == ':' || *name_end == '/') {
+                if (name_end != pos) {
                     return false;
                 }
                 break;
@@ -1344,27 +1297,50 @@ static bool spf_parse(spf_t* spf) {
                 if (*name_end != ':') {
                     return false;
                 }
-                if (!spf_check_domainspec(name_end, pos, false, false, false)) {
+                if (!spf_check_domainspec(name_end, pos, false, false)) {
                     return false;
                 }
                 break;
 
               case SPF_RULE_A:
               case SPF_RULE_MX:
-                if (!spf_check_domainspec(name_end, pos, true, true, false)) {
+                cidr_end = spf_parse_cidr(name_end, pos, &cidr4, &cidr6);
+                if (cidr_end == NULL) {
+                    return false;
+                }
+                if (!spf_check_domainspec(name_end, cidr_end, true, false)) {
                     return false;
                 }
                 break;
 
               case SPF_RULE_PTR:
-                if (!spf_check_domainspec(name_end, pos, false, true, false)) {
+                if (!spf_check_domainspec(name_end, pos, true, false)) {
                     return false;
                 }
                 break;
 
               case SPF_RULE_IP4:
+                if (*name_end != ':') {
+                    return false;
+                }
+                cidr_end = spf_parse_cidr(name_end, pos, &cidr4, NULL);
+                if (cidr_end == NULL) {
+                    return false;
+                }
+                if (!parse_ip4(&ip.v4, name_end + 1, cidr_end)) {
+                    return false;
+                }
+                break;
+
               case SPF_RULE_IP6:
                 if (*name_end != ':') {
+                    return false;
+                }
+                cidr_end = spf_parse_cidr(name_end, pos, NULL, &cidr6);
+                if (cidr_end == NULL) {
+                    return false;
+                }
+                if (!parse_ip6(ip.v6, name_end + 1, cidr_end)) {
                     return false;
                 }
                 break;
@@ -1382,7 +1358,7 @@ static bool spf_parse(spf_t* spf) {
                     return false;
                 }
                 has_redirect = true;
-                if (!spf_check_domainspec(name_end, pos, false, false, false)) {
+                if (!spf_check_domainspec(name_end, pos, false, false)) {
                     return false;
                 }
                 break;
@@ -1392,13 +1368,13 @@ static bool spf_parse(spf_t* spf) {
                     return false;
                 }
                 has_exp = true;
-                if (!spf_check_domainspec(name_end, pos, false, false, false)) {
+                if (!spf_check_domainspec(name_end, pos, false, false)) {
                     return false;
                 }
                 break;
 
               case SPF_RULE_UNKNOWN:
-                if (!spf_check_domainspec(name_end, pos, false, false, true)) {
+                if (!spf_check_domainspec(name_end, pos, false, true)) {
                     return false;
                 }
                 break;
@@ -1414,9 +1390,15 @@ static bool spf_parse(spf_t* spf) {
         }
         rule.qualifier = qual;
         rule.rule = id;
+        rule.ip = ip;
+        rule.cidr4 = cidr4;
+        rule.cidr6 = cidr6;
         buffer_reset(&rule.content);
         if (name_end != pos) {
-            buffer_add(&rule.content, name_end, pos - name_end);
+            if (cidr_end > name_end && (*name_end == ':' || *name_end == '=')) {
+                ++name_end;
+            }
+            buffer_add(&rule.content, name_end, cidr_end - name_end);
         }
         array_add(spf->rules, rule);
     } while (true);
@@ -1560,8 +1542,8 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     spf->redirect = -1;
 
     buffer_addstr(&spf->ip, ip);
-    if (!parse_ip4(&spf->ip4, ip)) {
-        if (!parse_ip6(spf->ip6, ip)) {
+    if (!parse_ip4(&spf->ip4, array_start(spf->ip), array_end(spf->ip))) {
+        if (!parse_ip6(spf->ip6, array_start(spf->ip), array_end(spf->ip))) {
             *code = SPF_NONE;
             err("spf: invalid ip: %s", ip);
             spf_cancel(spf);
@@ -1576,7 +1558,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
             spf->ip4 = ntohl(spf->ip4);
             spf->is_ip6 = false;
         }
-    } else if (!parse_ip6(spf->ip6, ip)) {
+    } else if (!parse_ip6(spf->ip6, array_start(spf->ip), array_end(spf->ip))) {
         spf->is_ip6 = false;
     }
     spf->spf_received = spf->spf_nolookup = spf->spf_inerror = no_spf_lookup;
