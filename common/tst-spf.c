@@ -244,6 +244,21 @@ static spf_test_t testcases[] = {
     { "mech-at-limit", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e6.test.t14.example.com", SPF_PASS, -1 },
     { "include-loop", "Processing limits", "10.1/6", "mail.test.t14.example.com", "1.2.3.4", "foo@e2.test.t14.example.com", SPF_PERMERROR, -1 },
     { "ptr-limit", "Processing limits", "10.1/7", "mail.test.t14.example.com", "1.2.3.5", "foo@e5.test.t14.example.com", SPF_NEUTRAL, SPF_PASS },
+
+    /* PySPF test suite */
+    { "pyspf-exists-pass", "Check basic exists with macros", "", "mail.test.t15.example.com", "1.2.3.5", "lyme.eater@uk.test.t15.uk.example.com", SPF_PASS, -1 },
+    { "pyspf-exists-fail", "Check basic exists with macros", "", "mail.test.t15.example.com", "1.2.3.4", "lyme.eater@uk.test.t15.uk.example.com", SPF_FAIL, -1 },
+    { "pyspf-incloop", "Permerror detection", "", "mail.test.t16.example.com", "66.150.186.79", "chuckvsr@a.test.t16.example.com", SPF_PERMERROR, -1 },
+    { "pyspf-badall", "Permerror detection", "", "mail.test.t16.example.com", "66.150.186.79", "chuckvsr@c.test.t16.example.com", SPF_PERMERROR, -1 },
+    { "pyspf-baddomain", "Permerror detection", "", "mail.test.t16.example.com", "66.150.186.79", "chuckvsr@d.test.t16.example.com", SPF_PERMERROR, -1 },
+    { "pyspf-badip", "Permerror detection", "", "mail.test.t16.example.com", "66.150.186.79", "chuckvsr@e.test.t16.example.com", SPF_PERMERROR, -1 },
+    { "pyspf-nospace1", "Test no space, test multi-line comment", "", "mail.example1.test.t17.example.com", "1.2.3.4", "foo@example2.test.t17.example.com", SPF_NONE, -1 },
+    { "pyspf-empty", "Test empty", "", "mail1.example1.test.t17.example.com", "1.2.3.4", "foo@example1.test.t17.example.com", SPF_NEUTRAL, -1 },
+    { "pyspf-nospace2", "", "", "mail.example1.test.t17.example.com", "1.2.3.4", "foo@example3.test.t17.example.com", SPF_PASS, -1 },
+    { "pyspf-traildot1", "Trailing dot must be accepted for domains.", "8.1", "sgbas2x.cos.test.t18.example.com", "1.2.218.40", "test@test.t18.example.com", SPF_PASS, -1 },
+    { "pyspf-traildot2", "Trailing dot must not be removed from explanation.", "8.1", "sgbas2x.cos.test.t18.example.com", "1.2.218.40", "test@exp.test.t18.example.com", SPF_FAIL, -1 },
+    { "pyspf-localhost", "Corner cases", "", "mail.test.t19.example.com", "127.0.0.1", "root@test.t19.example.com", SPF_FAIL, -1 },
+
     { NULL, NULL, NULL, NULL, NULL, NULL, -1, -1 }
 };
 static int tested = 0;
