@@ -88,13 +88,13 @@ static void dns_context_release(dns_context_t *context)
 
 static void dns_exit(void)
 {
-    if (ctx != NULL) {
-        ub_ctx_delete(ctx);
-        ctx = NULL;
-    }
     if (async_event != NULL) {
         client_release(async_event);
         async_event = NULL;
+    }
+    if (ctx != NULL) {
+        ub_ctx_delete(ctx);
+        ctx = NULL;
     }
     p_delete(&use_local_config);
     array_deep_wipe(ctx_pool, dns_context_delete);
