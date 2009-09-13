@@ -338,11 +338,13 @@ static void timeout_release(timeout_t* timer)
 static void timeout_cb(EV_P_ struct ev_timer *w, int revents)
 {
     timeout_t *timer = (timeout_t*)w;
-
-    if (timer->run) {
-        timer->run(timer->data);
-    }
+    run_timeout_t run = timer->run;
+    void* data = timer->data;
     timeout_release(timer);
+
+    if (run) {
+        run(data);
+    }
 }
 
 timeout_t* start_timer(int milliseconds, run_timeout_t runner, void *data)

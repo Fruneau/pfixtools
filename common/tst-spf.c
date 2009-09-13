@@ -265,6 +265,11 @@ static void spf_test_done(spf_code_t code, const char* explanation, void* data)
     spf_test_next(current);
 }
 
+static void exit_cb(void* arg)
+{
+    exit(0);
+}
+
 static void spf_test_next(spf_test_t* current) {
     do {
         if (current == NULL) {
@@ -274,7 +279,8 @@ static void spf_test_next(spf_test_t* current) {
         }
         if (current->testid == NULL) {
             fprintf(stderr, "DONE: %d tests %d success (%d%%)\n", tested, passed, (passed * 100) / tested);
-            exit(0);
+            start_timer(2000, exit_cb, NULL);
+            return;
         }
     } while (to_run != NULL && strcmp(to_run, current->testid) != 0);
     const char* domain = strchr(current->sender, '@');
