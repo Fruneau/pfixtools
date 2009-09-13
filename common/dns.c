@@ -107,7 +107,7 @@ module_exit(dns_exit);
 static void dns_callback(void *arg, int err, struct ub_result *result)
 {
     dns_context_t *context = arg;
-    if (err != 0) {
+    if (err != 0 || (result->rcode != DNS_RCODE_NOERROR && result->rcode != DNS_RCODE_NXDOMAIN)) {
         debug("asynchronous request led to an error");
         *context->result = DNS_ERROR;
     } else if (result->nxdomain) {
