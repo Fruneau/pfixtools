@@ -1541,6 +1541,10 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     buffer_addstr(&spf->domain, domain);
     buffer_addstr(&spf->sender, sender);
     buffer_addstr(&spf->helo, helo);
+    if (array_len(spf->sender) == 0) {
+        buffer_addstr(&spf->sender, "postmaster@");
+        buffer_add(&spf->sender, array_start(spf->helo), array_len(spf->helo));
+    }
     const char* sender_domain = strchr(array_start(spf->sender), '@');
     if (sender_domain == array_start(spf->sender)) {
         buffer_reset(&spf->sender);

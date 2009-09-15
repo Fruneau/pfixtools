@@ -153,7 +153,7 @@ static spf_test_t testcases[] = {
     { "include-permerror", "Include mechanism semantics and syntax", "5.2/9", "mail.test.t7.example.com", "1.2.3.4", "foo@e5.test.t7.example.com", SPF_PERMERROR, -1 },
     { "include-cidr", "Include mechanism semantics and syntax", "5.2/1", "mail.test.t7.example.com", "1.2.3.4", "foo@e9.test.t7.example.com", SPF_PERMERROR, -1 },
     { "mx-cidr4-0-ip6", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1234::1", "foo@e2.test.t8.example.com", SPF_FAIL, -1 },
-    /* Not Applicable, empty MX entry not accepted by bind { "mx-empty", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1.2.3.4", "", SPF_NEUTRAL, -1 }, */
+    { "mx-empty", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1.2.3.4", "postmaster@mail.test.t8.example.com", SPF_NEUTRAL, -1 },
     { "mx-colon-domain-ip4mapped", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "::FFFF:1.2.3.4", "foo@e11.test.t8.example.com", SPF_PASS, SPF_NEUTRAL },
     { "mx-nxdomain", "MX mechanism syntax", "5.4/3", "mail.test.t8.example.com", "1.2.3.4", "foo@e1.test.t8.example.com", SPF_FAIL, -1 },
     { "mx-numeric-top-label", "MX mechanism syntax", "8.1/2", "mail.test.t8.example.com", "1.2.3.4", "foo@e5.test.t8.example.com", SPF_PERMERROR, -1 },
