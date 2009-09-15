@@ -15,9 +15,6 @@ Installation instruction for pfixtools
 3)  Prepare the configuration in /etc/pfixtools
       - postlicyd.conf, read postlicyd.example.conf to learn more
       - postlicyd-rsyncrbl.conf, read postlicyd-rsyncrbl.example.conf to learn more
-      - additional files required by the configuration, such as client_whitelist
-        postgrey2postlicyd can be used to migrate from an existing
-        postgrey clients whitelist
     If you are using RBLs, you should add a crontab entry for postlicyd-rsyncrbl
 
 4)  Create the spool:
