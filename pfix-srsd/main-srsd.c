@@ -46,7 +46,7 @@
 #include "server.h"
 
 #define DAEMON_NAME             "pfix-srsd"
-#define DAEMON_VERSION          "0.6"
+#define DAEMON_VERSION          PFIXTOOLS_VERSION
 #define DEFAULT_ENCODER_PORT    10001
 #define DEFAULT_DECODER_PORT    10002
 #define RUNAS_USER              "nobody"
