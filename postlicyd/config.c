@@ -89,6 +89,14 @@ config_param_register("port");
 config_param_register("log_format");
 
 
+/* Include filter explanation in reply to postfix.
+ * If the filter provides an explanation and this parameter is set to true,
+ * the explanation message is included at the end of the reply message sent
+ * to postfix.
+ */
+config_param_register("include_explanation");
+
+
 /* Use resolv.conf file
  * If set, forward DNS queries to according to the given configuration file.
  * Postlicyd MUST be restarted to use this configuration variable.
@@ -417,6 +425,7 @@ static bool config_build_structure(config_t *config)
           FILTER_PARAM_PARSE_INT(PORT, config->port);
           FILTER_PARAM_PARSE_STRING(LOG_FORMAT, config->log_format, true);
           FILTER_PARAM_PARSE_STRING(USE_RESOLV_CONF, config->resolv_conf, true);
+          FILTER_PARAM_PARSE_BOOLEAN(INCLUDE_EXPLANATION, config->include_explanation);
           default: break;
         }
     }}

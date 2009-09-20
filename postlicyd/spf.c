@@ -129,7 +129,7 @@ static filter_result_t spf_code_to_result(spf_code_t code) {
 static void spf_filter_async(spf_code_t result, const char* exp, void *arg)
 {
     filter_context_t* context = arg;
-    filter_post_async_result(context, spf_code_to_result(result));
+    filter_post_async_result_with_explanation(context, spf_code_to_result(result), exp, -1);
 }
 
 

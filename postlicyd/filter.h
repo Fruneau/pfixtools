@@ -105,6 +105,10 @@ typedef struct filter_context_t {
     char instance[64];
     uint32_t counters[MAX_COUNTERS];
 
+    /* filter explanation
+     */
+    static_str_t explanation;
+
     /* connection context
      */
     void *data;
@@ -306,6 +310,14 @@ void filter_context_clean(filter_context_t *context);
 
 __attribute__((nonnull))
 void filter_post_async_result(filter_context_t *context, filter_result_t result);
+
+__attribute__((nonnull(1)))
+void filter_post_async_result_with_explanation(filter_context_t *context,
+                                               filter_result_t result,
+                                               const char *str, ssize_t len);
+
+__attribute__((nonnull(1)))
+void filter_set_explanation(filter_context_t *context, const char* str, ssize_t len);
 
 #endif
 

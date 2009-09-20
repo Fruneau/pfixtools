@@ -282,6 +282,8 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,
 bool filter_test(const filter_t *filter, const query_t *query,
                  filter_context_t *context, filter_result_t result)
 {
+    context->explanation.str = 0;
+    context->explanation.len = 0;
     return !!(runners[filter->type](filter, query, context) == result);
 }
 
@@ -380,6 +382,8 @@ void filter_context_prepare(filter_context_t *context, void *qctx)
         }
     }
     context->current_filter = NULL;
+    context->explanation.str = NULL;
+    context->explanation.len = 0;
     context->data = qctx;
 }
 
@@ -409,6 +413,19 @@ void filter_post_async_result(filter_context_t *context, filter_result_t result)
     --filter_running;
     hook = filter_hook_for_result(filter, result);
     async_handler(context, hook);
+}
+
+void filter_set_explanation(filter_context_t *context, const char* str, ssize_t len)
+{
+    context->explanation.str = str;
+    context->explanation.len = len >= 0 ? len : m_strlen(str);
+}
+
+void filter_post_async_result_with_explanation(filter_context_t *context, filter_result_t result,
+                                               const char* str, ssize_t len)
+{
+    filter_set_explanation(context, str, len);
+    filter_post_async_result(context, result);
 }
 
 /* vim:set et sw=4 sts=4 sws=4: */

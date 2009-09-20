@@ -109,6 +109,13 @@ static void policy_answer(client_t *pcy, const char *message)
     if (!query_format_buffer(buf, message, query)) {
         buffer_addstr(buf, message);
     }
+    if (config->include_explanation) {
+        const static_str_t* exp = &context->context.explanation;
+        if (exp->len > 0) {
+            buffer_addstr(buf, ": ");
+            buffer_add(buf, exp->str, exp->len);
+        }
+    }
     buffer_addstr(buf, "\n\n");
 
     /* Finalize query. */

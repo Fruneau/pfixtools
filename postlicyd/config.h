@@ -76,6 +76,10 @@ struct config_t {
     /* Resolv.conf to use
      */
     char *resolv_conf;
+
+    /* Include the explanation from the filter in answer message if available.
+     */
+    bool include_explanation;
 };
 
 #define DEFAULT_LOG_FORMAT                                                     \
