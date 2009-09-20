@@ -285,7 +285,8 @@ static void exit_cb(void* arg)
     exit(0);
 }
 
-static void spf_test_next(spf_test_t* current) {
+static void spf_test_next(spf_test_t* current)
+{
     do {
         if (current == NULL) {
             current = testcases;
