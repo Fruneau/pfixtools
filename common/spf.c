@@ -340,10 +340,35 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* buffer, char ide
         pos->str = array_start(spf->domain);
         pos->len = array_len(spf->domain);
         break;
-      case 'i':
-        pos->str = array_start(spf->ip);
-        pos->len = array_len(spf->ip);
-        break;
+      case 'i': {
+        buffer_reset(&dns_buffer);
+        if (!spf->is_ip6) {
+            buffer_addf(&dns_buffer, "%d.%d.%d.%d",
+                        (spf->ip4 >> 24) & 0xff, (spf->ip4 >> 16) & 0xff,
+                        (spf->ip4 >> 8) & 0xff, spf->ip4 & 0xff);
+        } else {
+            buffer_addf(&dns_buffer, "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x."
+                        "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x",
+                        spf->ip6[0] & 0x0f, (spf->ip6[0] >> 4) & 0x0f,
+                        spf->ip6[1] & 0x0f, (spf->ip6[1] >> 4) & 0x0f,
+                        spf->ip6[2] & 0x0f, (spf->ip6[2] >> 4) & 0x0f,
+                        spf->ip6[3] & 0x0f, (spf->ip6[3] >> 4) & 0x0f,
+                        spf->ip6[4] & 0x0f, (spf->ip6[4] >> 4) & 0x0f,
+                        spf->ip6[5] & 0x0f, (spf->ip6[5] >> 4) & 0x0f,
+                        spf->ip6[6] & 0x0f, (spf->ip6[6] >> 4) & 0x0f,
+                        spf->ip6[7] & 0x0f, (spf->ip6[7] >> 4) & 0x0f,
+                        spf->ip6[8] & 0x0f, (spf->ip6[8] >> 4) & 0x0f,
+                        spf->ip6[9] & 0x0f, (spf->ip6[9] >> 4) & 0x0f,
+                        spf->ip6[10] & 0x0f, (spf->ip6[10] >> 4) & 0x0f,
+                        spf->ip6[11] & 0x0f, (spf->ip6[11] >> 4) & 0x0f,
+                        spf->ip6[12] & 0x0f, (spf->ip6[12] >> 4) & 0x0f,
+                        spf->ip6[13] & 0x0f, (spf->ip6[13] >> 4) & 0x0f,
+                        spf->ip6[14] & 0x0f, (spf->ip6[14] >> 4) & 0x0f,
+                        spf->ip6[15] & 0x0f, (spf->ip6[15] >> 4) & 0x0);
+        }
+        pos->str = array_start(dns_buffer);
+        pos->len = array_len(dns_buffer);
+      } break;
       case 'p':
         if (array_len(spf->validated) > 0) {
             pos->str = array_start(spf->validated);
@@ -363,6 +388,23 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* buffer, char ide
         pos->str = array_start(spf->helo);
         pos->len = array_len(spf->helo);
         break;
+
+      /* explanation specific macros
+       */
+      case 'c':
+        pos->str = array_start(spf->ip);
+        pos->len = array_len(spf->ip);
+        break;
+      case 'r':
+        pos->str = "unknown";
+        pos->len = m_strlen(pos->str);
+        break;
+      case 't': {
+        buffer_reset(&dns_buffer);
+        buffer_addf(&dns_buffer, "%lu", (long int)time(0));
+        pos->str = array_start(dns_buffer);
+        pos->len = array_len(dns_buffer);
+      } break;
       default:
         return false;
     }
