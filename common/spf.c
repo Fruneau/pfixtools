@@ -105,6 +105,8 @@ struct spf_t {
 static PA(spf_t) spf_pool = ARRAY_INIT;
 static A(spf_rule_t) spf_rule_pool = ARRAY_INIT;
 
+static char domainname[128];
+static uint8_t domainname_len;
 static buffer_t query_buffer = ARRAY_INIT;
 static buffer_t dns_buffer = ARRAY_INIT;
 
@@ -159,6 +161,25 @@ static spf_t* spf_acquire(void)
     debug("spf pool: acquiring %p - pool length: %d (created %d)", spf, array_len(spf_pool), created);
     return spf;
 }
+
+static int spf_module_init(void)
+{
+    if (gethostname(domainname, 128) < 0) {
+        return -1;
+    }
+
+    const char* pos = strchr(domainname, '.');
+    if (pos == NULL) {
+        return -1;
+    }
+    if (strchr(pos + 1, '.') != NULL) {
+        memmove(domainname, pos + 1, 127 - (pos - domainname));
+    }
+    domainname_len = m_strlen(domainname);
+    warn("my domain name is %s", domainname);
+    return 0;
+}
+module_init(spf_module_init);
 
 static void spf_module_exit(void)
 {
@@ -396,8 +417,8 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* buffer, char ide
         pos->len = array_len(spf->ip);
         break;
       case 'r':
-        pos->str = "unknown";
-        pos->len = m_strlen(pos->str);
+        pos->str = domainname;
+        pos->len = domainname_len;
         break;
       case 't': {
         buffer_reset(&dns_buffer);
