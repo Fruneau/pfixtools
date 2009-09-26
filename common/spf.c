@@ -138,6 +138,7 @@ static void spf_wipe(spf_t* spf)
     array_wipe(spf->validated);
     array_wipe(spf->record);
     array_wipe(spf->domainspec);
+    array_wipe(spf->explanation);
     p_clear(spf, 1);
 }
 
@@ -208,6 +209,7 @@ static bool spf_release(spf_t* spf, bool decrement)
         buffer_reset(&spf->helo);
         buffer_reset(&spf->validated);
         buffer_reset(&spf->domainspec);
+        buffer_reset(&spf->explanation);
         spf_t bak = *spf;
         p_clear(spf, 1);
         spf->rules = bak.rules;
@@ -218,6 +220,7 @@ static bool spf_release(spf_t* spf, bool decrement)
         spf->helo = bak.helo;
         spf->validated = bak.validated;
         spf->domainspec = bak.domainspec;
+        spf->explanation = bak.explanation;
         array_add(spf_pool, spf);
         return true;
     }
