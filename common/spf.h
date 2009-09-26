@@ -107,7 +107,8 @@ typedef void (*spf_result_t)(spf_code_t result, const char* exp, void *arg);
  * @return A pointer to an abstract spf context in case of success, NULL in case of error.
  */
 spf_t* spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
-                 spf_result_t cb, bool no_spf_lookup, void* arg, spf_code_t* code);
+                 spf_result_t cb, bool no_spf_lookup, bool no_explanation, void* arg,
+                 spf_code_t* code);
 
 /** Cancel a SPF lookup.
  *

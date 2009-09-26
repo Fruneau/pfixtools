@@ -93,22 +93,22 @@ bool ip_print_6(buffer_t* buffer, const ip6_t ip, bool display, bool reverse)
     if (!reverse) {
         buffer_addf(buffer, "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x."
                     "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x",
-                    ip[0] & 0x0f, (ip[0] >> 4) & 0x0f,
-                    ip[1] & 0x0f, (ip[1] >> 4) & 0x0f,
-                    ip[2] & 0x0f, (ip[2] >> 4) & 0x0f,
-                    ip[3] & 0x0f, (ip[3] >> 4) & 0x0f,
-                    ip[4] & 0x0f, (ip[4] >> 4) & 0x0f,
-                    ip[5] & 0x0f, (ip[5] >> 4) & 0x0f,
-                    ip[6] & 0x0f, (ip[6] >> 4) & 0x0f,
-                    ip[7] & 0x0f, (ip[7] >> 4) & 0x0f,
-                    ip[8] & 0x0f, (ip[8] >> 4) & 0x0f,
-                    ip[9] & 0x0f, (ip[9] >> 4) & 0x0f,
-                    ip[10] & 0x0f, (ip[10] >> 4) & 0x0f,
-                    ip[11] & 0x0f, (ip[11] >> 4) & 0x0f,
-                    ip[12] & 0x0f, (ip[12] >> 4) & 0x0f,
-                    ip[13] & 0x0f, (ip[13] >> 4) & 0x0f,
-                    ip[14] & 0x0f, (ip[14] >> 4) & 0x0f,
-                    ip[15] & 0x0f, (ip[15] >> 4) & 0x0);
+                    (ip[0] >> 4) & 0x0f, ip[0] & 0x0f,
+                    (ip[1] >> 4) & 0x0f, ip[1] & 0x0f,
+                    (ip[2] >> 4) & 0x0f, ip[2] & 0x0f,
+                    (ip[3] >> 4) & 0x0f, ip[3] & 0x0f,
+                    (ip[4] >> 4) & 0x0f, ip[4] & 0x0f,
+                    (ip[5] >> 4) & 0x0f, ip[5] & 0x0f,
+                    (ip[6] >> 4) & 0x0f, ip[6] & 0x0f,
+                    (ip[7] >> 4) & 0x0f, ip[7] & 0x0f,
+                    (ip[8] >> 4) & 0x0f, ip[8] & 0x0f,
+                    (ip[9] >> 4) & 0x0f, ip[9] & 0x0f,
+                    (ip[10] >> 4) & 0x0f, ip[10] & 0x0f,
+                    (ip[11] >> 4) & 0x0f, ip[11] & 0x0f,
+                    (ip[12] >> 4) & 0x0f, ip[12] & 0x0f,
+                    (ip[13] >> 4) & 0x0f, ip[13] & 0x0f,
+                    (ip[14] >> 4) & 0x0f, ip[14] & 0x0f,
+                    (ip[15] >> 4) & 0x0f, ip[15] & 0x0f);
     } else {
         buffer_addf(buffer, "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x."
                     "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x",

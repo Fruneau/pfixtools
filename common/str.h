@@ -202,6 +202,7 @@ static inline ssize_t m_strnlen(const char *s, ssize_t n) {
 /* comparisons                                                              */
 /****************************************************************************/
 
+int m_strcmp(const char* a, const char* b);
 int ascii_strcasecmp(const char *a, const char *b);
 int ascii_strncasecmp(const char *a, const char *b, ssize_t n);
 

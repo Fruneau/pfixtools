@@ -239,6 +239,17 @@ int ascii_strncasecmp(const char *a, const char *b, ssize_t n)
     return 0;
 }
 
+int m_strcmp(const char* a, const char* b)
+{
+    if (a == NULL) {
+        a = "";
+    }
+    if (b == NULL) {
+        b = "";
+    }
+    return strcmp(a, b);
+}
+
 /*@}*/
 
 /* vim:set et sw=4 sts=4 sws=4: */

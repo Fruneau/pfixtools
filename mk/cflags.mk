@@ -43,7 +43,7 @@ endif
 # Use pipes and not temp files.
 CFLAGSBASE += -pipe
 # optimize even more
-CFLAGSBASE += -O2
+CFLAGSBASE += -O0
 # let the type char be unsigned by default
 CFLAGSBASE += -funsigned-char
 CFLAGSBASE += -fno-strict-aliasing
@@ -72,7 +72,7 @@ CFLAGSBASE += -Wsign-compare
 CFLAGSBASE += -Wunused
 CFLAGSBASE += -Wno-unused-parameter
 # warn about variable use before initialization
-CFLAGSBASE += -Wuninitialized
+#CFLAGSBASE += -Wuninitialized
 # warn about variables which are initialized with themselves
 CFLAGSBASE += $(if $(GCC4),-Winit-self)
 # warn about pointer arithmetic on void* and function pointers

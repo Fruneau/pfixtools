@@ -45,6 +45,7 @@
 typedef struct spf_filter_t {
     unsigned use_spf_record : 1;
     unsigned check_helo     : 1;
+    unsigned use_explanation: 1;
 } spf_filter_t;
 
 static filter_type_t filter_type = FTK_UNKNOWN;
@@ -83,6 +84,12 @@ static bool spf_filter_constructor(filter_t *filter)
            * default is false.
            */
           FILTER_PARAM_PARSE_BOOLEAN(USE_SPF_RECORD, data->use_spf_record);
+
+          /* use_explanation parameter is a boolean.
+           *  If use_explanation is true, the SPF 'exp' modifier is used to
+           *  fetch an explanation when SPF lookup fails.
+           */
+          FILTER_PARAM_PARSE_BOOLEAN(USE_EXPLANATION, data->use_explanation);
 
           /* check_helo parameter is a boolean.
            *  If check_helo is true, SPF check is done on the HELO/EHLO domain
@@ -152,7 +159,7 @@ static filter_result_t spf_filter(const filter_t *filter, const query_t *query,
 
     spf_code_t res;
     if (spf_check(array_start(ip), array_start(domain), array_start(sender), query->helo_name.str,
-                  spf_filter_async, !data->use_spf_record, context, &res) == NULL) {
+                  spf_filter_async, !data->use_spf_record, !data->use_explanation, context, &res) == NULL) {
         err("filter %s: error while trying to run spf check", filter->name);
         return spf_code_to_result(res);
     }
@@ -193,6 +200,7 @@ static int spf_init(void)
     /* Parameters.
      */
     (void)filter_param_register(filter_type, "use_spf_record");
+    (void)filter_param_register(filter_type, "use_explanation");
     (void)filter_param_register(filter_type, "check_helo");
     return 0;
 }
