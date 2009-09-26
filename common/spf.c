@@ -944,6 +944,24 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
             spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_a_receive);
         }
     }
+    if (spf->a_resolutions == 0 && spf->in_macro) {
+        for (int i = 0 ; result->data[i] != NULL ; ++i) {
+            const char* pos = result->data[i];
+            buffer_reset(&dns_buffer);
+            if (spf->a_resolutions >= 10) {
+                info("spf (depth=%d): too many PTR entries for %s", spf->recursions, result->qname);
+                break;
+            }
+            while (*pos != '\0') {
+                uint8_t count = *pos;
+                ++pos;
+                buffer_add(&dns_buffer, pos, count);
+                buffer_addch(&dns_buffer, '.');
+                pos += count;
+            }
+            spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_a_receive);
+        }
+    }
     if (spf->a_resolutions == 0) {
         spf_next(spf, false);
     }
