@@ -37,18 +37,13 @@
  */
 
 #include <ctype.h>
-#include <arpa/inet.h>
 
 #include "spf.h"
 #include "spf_tokens.h"
 #include "buffer.h"
+#include "utils.h"
 
 #define SPF_MAX_RECUSION 15
-
-typedef union ip_t {
-    uint32_t v4;
-    uint8_t  v6[16];
-} ip_t;
 
 typedef struct spf_rule_t {
     spf_code_t qualifier;
@@ -74,8 +69,8 @@ struct spf_t {
     unsigned in_macro     : 1;
     unsigned a_dnserror   : 1;
 
-    uint32_t ip4;
-    uint8_t ip6[16];
+    ip4_t ip4;
+    ip6_t ip6;
     buffer_t ip;
     buffer_t domain;
     buffer_t sender;
@@ -176,7 +171,6 @@ static int spf_module_init(void)
         memmove(domainname, pos + 1, 127 - (pos - domainname));
     }
     domainname_len = m_strlen(domainname);
-    warn("my domain name is %s", domainname);
     return 0;
 }
 module_init(spf_module_init);
@@ -224,10 +218,10 @@ static bool spf_release(spf_t* spf, bool decrement)
     return false;
 }
 
-static bool spf_validate_domain(const char* domain) {
+static bool spf_validate_domain(const char* restrict domain) {
     int label_count = 0;
     int label_length = 0;
-    const char* pos = domain;
+    const char* restrict pos = domain;
     while (*pos != '\0') {
         if (*pos == '.') {
             if (label_length == 0) {
@@ -298,7 +292,7 @@ static void spf_exit(spf_t* spf, spf_code_t code)
     spf_cancel(spf);
 }
 
-static void spf_write_macro(buffer_t* buffer, static_str_t str, bool escape)
+static void spf_write_macro(buffer_t* restrict  buffer, static_str_t str, bool escape)
 {
     if (!escape) {
         buffer_add(buffer, str.str, str.len);
@@ -340,8 +334,9 @@ typedef enum {
     SPFEXP_DNS
 } spf_expansion_t;
 
-static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* buffer, char identifier, int parts, bool reverse,
-                                          bool escape, const char* delimiters, int delimiters_count) {
+static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* restrict buffer, char identifier, int parts,
+                                          bool reverse, bool escape, const char* restrict delimiters,
+                                          int delimiters_count) {
     static_str_t sections[256] = { { .str = 0, .len = 0}, };
     static_str_t* pos = sections;
     switch (identifier) {
@@ -364,28 +359,9 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* buffer, char ide
       case 'i': {
         buffer_reset(&dns_buffer);
         if (!spf->is_ip6) {
-            buffer_addf(&dns_buffer, "%d.%d.%d.%d",
-                        (spf->ip4 >> 24) & 0xff, (spf->ip4 >> 16) & 0xff,
-                        (spf->ip4 >> 8) & 0xff, spf->ip4 & 0xff);
+            ip_print_4(&dns_buffer, spf->ip4, false, false);
         } else {
-            buffer_addf(&dns_buffer, "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x."
-                        "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x",
-                        spf->ip6[0] & 0x0f, (spf->ip6[0] >> 4) & 0x0f,
-                        spf->ip6[1] & 0x0f, (spf->ip6[1] >> 4) & 0x0f,
-                        spf->ip6[2] & 0x0f, (spf->ip6[2] >> 4) & 0x0f,
-                        spf->ip6[3] & 0x0f, (spf->ip6[3] >> 4) & 0x0f,
-                        spf->ip6[4] & 0x0f, (spf->ip6[4] >> 4) & 0x0f,
-                        spf->ip6[5] & 0x0f, (spf->ip6[5] >> 4) & 0x0f,
-                        spf->ip6[6] & 0x0f, (spf->ip6[6] >> 4) & 0x0f,
-                        spf->ip6[7] & 0x0f, (spf->ip6[7] >> 4) & 0x0f,
-                        spf->ip6[8] & 0x0f, (spf->ip6[8] >> 4) & 0x0f,
-                        spf->ip6[9] & 0x0f, (spf->ip6[9] >> 4) & 0x0f,
-                        spf->ip6[10] & 0x0f, (spf->ip6[10] >> 4) & 0x0f,
-                        spf->ip6[11] & 0x0f, (spf->ip6[11] >> 4) & 0x0f,
-                        spf->ip6[12] & 0x0f, (spf->ip6[12] >> 4) & 0x0f,
-                        spf->ip6[13] & 0x0f, (spf->ip6[13] >> 4) & 0x0f,
-                        spf->ip6[14] & 0x0f, (spf->ip6[14] >> 4) & 0x0f,
-                        spf->ip6[15] & 0x0f, (spf->ip6[15] >> 4) & 0x0);
+            ip_print_6(&dns_buffer, spf->ip6, false, false);
         }
         pos->str = array_start(dns_buffer);
         pos->len = array_len(dns_buffer);
@@ -429,9 +405,9 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* buffer, char ide
       default:
         return false;
     }
-    const char* c = pos->str;
-    const char* end = pos->str + pos->len;
-    const char* delim_end = delimiters + delimiters_count;
+    const char* restrict c = pos->str;
+    const char* restrict end = pos->str + pos->len;
+    const char* restrict delim_end = delimiters + delimiters_count;
     pos->len = 0;
     while (c < end) {
         const char* delim = delimiters;
@@ -468,7 +444,7 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* buffer, char ide
     return true;
 }
 
-static spf_expansion_t spf_expand(spf_t* spf, const char* macrostring)
+static spf_expansion_t spf_expand(spf_t* spf, const char* restrict macrostring)
 {
     buffer_reset(&spf->domainspec);
     if (m_strlen(macrostring) == 0) {
@@ -546,7 +522,7 @@ static spf_expansion_t spf_expand(spf_t* spf, const char* macrostring)
     }
 }
 
-static bool spf_subquery(spf_t* spf, const char* domain, spf_result_t cb)
+static bool spf_subquery(spf_t* restrict spf, const char* restrict domain, spf_result_t cb)
 {
     if (spf->recursions >= SPF_MAX_RECUSION) {
         return false;
@@ -562,68 +538,6 @@ static bool spf_subquery(spf_t* spf, const char* domain, spf_result_t cb)
         spf->subquery->recursions = spf->recursions + 1;
         return true;
     }
-}
-
-static bool parse_ip4(uint32_t* result, const char* txt, const char* end)
-{
-    char str[BUFSIZ];
-    if (m_strncpy(str, BUFSIZ, txt, end - txt) > BUFSIZ) {
-        return false;
-    }
-    if (inet_pton(AF_INET, str, result) != 1) {
-        return false;
-    }
-    *result = ntohl(*result);
-    return true;
-}
-
-static bool parse_ip6(uint8_t* result, const char* txt, const char* end)
-{
-    char str[BUFSIZ];
-    if (m_strncpy(str, BUFSIZ, txt, end - txt) > BUFSIZ) {
-        return false;
-    }
-    if (inet_pton(AF_INET6, str, result) != 1) {
-        return false;
-    }
-    return true;
-}
-
-static bool spf_checkip4(spf_t* spf, uint32_t ip, int cidr)
-{
-    uint32_t mask = 0xffffffff;
-    if (spf->is_ip6) {
-        return false;
-    }
-    if (cidr == 0) {
-        mask = 0;
-    } else if (cidr > 0) {
-        mask <<= (32 - cidr);
-    }
-    return (spf->ip4 & mask) == (ip & mask);
-}
-
-static bool spf_checkip6(spf_t* spf, const uint8_t* ip, int cidr)
-{
-    if (!spf->is_ip6) {
-        return false;
-    }
-    if (cidr < 0) {
-        cidr = 128;
-    }
-    int bytes = cidr >> 3;
-    int bits  = cidr & 7;
-    if (bytes > 0) {
-        if (memcmp(spf->ip6, ip, bytes) != 0) {
-            return false;
-        }
-    }
-    if (bits > 0) {
-        if ((spf->ip6[bytes] >> (8 - bits)) != (ip[bytes] >> (8 - bits))) {
-            return false;
-        }
-    }
-    return true;
 }
 
 static void spf_match(spf_t* spf)
@@ -745,14 +659,14 @@ static void spf_next(spf_t* spf, bool start)
           } break;
 
           case SPF_RULE_IP4: {
-            if (spf_checkip4(spf, rule->ip.v4, rule->cidr4)) {
+            if (!spf->is_ip6 && ip_compare_4(spf->ip4, rule->ip.v4, rule->cidr4)) {
                 spf_match(spf);
                 return;
             }
           } break;
 
           case SPF_RULE_IP6: {
-            if (spf_checkip6(spf, rule->ip.v6, rule->cidr6)) {
+            if (spf->is_ip6 && ip_compare_6(spf->ip6, rule->ip.v6, rule->cidr6)) {
                 spf_match(spf);
                 return;
             }
@@ -819,13 +733,10 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result)
     for (i = 0 ; result->data[i] != NULL ; ++i) {
         bool match = false;
         if (result->qtype == DNS_RRT_AAAA) {
-            match = spf_checkip6(spf, (uint8_t*)result->data[i], current_rule(spf).cidr6);
+            match = spf->is_ip6 && ip_compare_6(spf->ip6, (uint8_t*)result->data[i], current_rule(spf).cidr6);
         } else {
-            uint32_t ip = (((uint8_t)result->data[i][0]) << 24)
-                        | (((uint8_t)result->data[i][1]) << 16)
-                        | (((uint8_t)result->data[i][2]) << 8)
-                        | (((uint8_t)result->data[i][3]));
-            match = spf_checkip4(spf, ip, current_rule(spf).cidr4);
+            ip4_t ip = ip_read_4((uint8_t*)result->data[i]);
+            match = !spf->is_ip6 && ip_compare_4(spf->ip4, ip, current_rule(spf).cidr4);
         }
         if (match) {
             if (spf->in_macro || current_rule(spf).rule == SPF_RULE_PTR) {
@@ -1002,28 +913,11 @@ static bool spf_run_ptr_resolution(spf_t* spf, const char* domainspec, bool in_m
         }
         buffer_reset(&dns_buffer);
         if (!spf->is_ip6) {
-            buffer_addf(&dns_buffer, "%d.%d.%d.%d.in-addr.arpa.",
-                        spf->ip4 & 0xff, (spf->ip4 >> 8) & 0xff,
-                        (spf->ip4 >> 16) & 0xff, (spf->ip4 >> 24) & 0xff);
+            ip_print_4(&dns_buffer, spf->ip4, false, true);
+            buffer_addstr(&dns_buffer, ".in-addr.arpa.");
         } else {
-            buffer_addf(&dns_buffer, "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x."
-                        "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.ip6.arpa.",
-                        spf->ip6[15] & 0x0f, (spf->ip6[15] >> 4) & 0x0f,
-                        spf->ip6[14] & 0x0f, (spf->ip6[14] >> 4) & 0x0f,
-                        spf->ip6[13] & 0x0f, (spf->ip6[13] >> 4) & 0x0f,
-                        spf->ip6[12] & 0x0f, (spf->ip6[12] >> 4) & 0x0f,
-                        spf->ip6[11] & 0x0f, (spf->ip6[11] >> 4) & 0x0f,
-                        spf->ip6[10] & 0x0f, (spf->ip6[10] >> 4) & 0x0f,
-                        spf->ip6[9] & 0x0f, (spf->ip6[9] >> 4) & 0x0f,
-                        spf->ip6[8] & 0x0f, (spf->ip6[8] >> 4) & 0x0f,
-                        spf->ip6[7] & 0x0f, (spf->ip6[7] >> 4) & 0x0f,
-                        spf->ip6[6] & 0x0f, (spf->ip6[6] >> 4) & 0x0f,
-                        spf->ip6[5] & 0x0f, (spf->ip6[5] >> 4) & 0x0f,
-                        spf->ip6[4] & 0x0f, (spf->ip6[4] >> 4) & 0x0f,
-                        spf->ip6[3] & 0x0f, (spf->ip6[3] >> 4) & 0x0f,
-                        spf->ip6[2] & 0x0f, (spf->ip6[2] >> 4) & 0x0f,
-                        spf->ip6[1] & 0x0f, (spf->ip6[1] >> 4) & 0x0f,
-                        spf->ip6[0] & 0x0f, (spf->ip6[0] >> 4) & 0x0f);
+            ip_print_6(&dns_buffer, spf->ip6, false, true);
+            buffer_addstr(&dns_buffer, ".ip6.arpa.");
         }
         if (spf->use_domain) {
             buffer_addstr(&spf->validated, "unknown");
@@ -1366,7 +1260,7 @@ static bool spf_parse(spf_t* spf)
                     return false;
                 }
                 cidr_end = spf_parse_cidr(name_end, pos, &cidr4, NULL);
-                if (cidr_end == NULL || !parse_ip4(&ip.v4, name_end + 1, cidr_end)) {
+                if (cidr_end == NULL || !ip_parse_4(&ip.v4, name_end + 1, cidr_end - name_end - 1)) {
                     return false;
                 }
                 break;
@@ -1376,7 +1270,7 @@ static bool spf_parse(spf_t* spf)
                     return false;
                 }
                 cidr_end = spf_parse_cidr(name_end, pos, NULL, &cidr6);
-                if (cidr_end == NULL || !parse_ip6(ip.v6, name_end + 1, cidr_end)) {
+                if (cidr_end == NULL || !ip_parse_6(ip.v6, name_end + 1, cidr_end - name_end - 1)) {
                     return false;
                 }
                 break;
@@ -1581,8 +1475,8 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     spf->redirect = -1;
 
     buffer_addstr(&spf->ip, ip);
-    if (!parse_ip4(&spf->ip4, array_start(spf->ip), array_end(spf->ip))) {
-        if (!parse_ip6(spf->ip6, array_start(spf->ip), array_end(spf->ip))) {
+    if (!ip_parse_4(&spf->ip4, array_start(spf->ip), array_len(spf->ip))) {
+        if (!ip_parse_6(spf->ip6, array_start(spf->ip), array_len(spf->ip))) {
             *code = SPF_NONE;
             err("spf: invalid ip: %s", ip);
             spf_cancel(spf);
@@ -1591,13 +1485,12 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
         spf->is_ip6 = true;
 
         /* Find IP4 mapped on IP6 */
-        uint8_t mapped4to6[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
-        if (memcmp(mapped4to6, spf->ip6, 12) == 0) {
-            memcpy(&spf->ip4, spf->ip6 + 12, 4);
-            spf->ip4 = ntohl(spf->ip4);
+        ip6_t mapped4to6 = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0, 0, 0, 0 };
+        if (ip_compare_6(mapped4to6, spf->ip6, 96)) {
+            spf->ip4 = ip_read_4(spf->ip6 + 12);
             spf->is_ip6 = false;
         }
-    } else if (!parse_ip6(spf->ip6, array_start(spf->ip), array_end(spf->ip))) {
+    } else if (!ip_parse_6(spf->ip6, array_start(spf->ip), array_len(spf->ip))) {
         spf->is_ip6 = false;
     }
     spf->spf_received = spf->spf_nolookup = spf->spf_inerror = no_spf_lookup;
