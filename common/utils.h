@@ -51,6 +51,8 @@ typedef union ip_t {
     ip6_t v6;
 } ip_t;
 
+typedef uint8_t cidrlen_t;
+
 
 /** Parse an IPv4 from a string.
  */
@@ -62,40 +64,52 @@ bool ip_parse_4(ip4_t* restrict ip, const char* restrict txt, ssize_t len);
 __attribute__((nonnull))
 static inline ip4_t ip_read_4(const uint8_t* restrict data);
 
+/** Compute the IPv4 network mask for the given CIDR length
+ */
+__attribute__((pure))
+static ip4_t ip_mask_4(cidrlen_t cidr_len);
+
+/** Compare two IPv4 with the given cidr mask len.
+ */
+static inline bool ip_compare_4(ip4_t ip1, ip4_t ip2, cidrlen_t cidr_len);
+
+/** Print an IPv4 in the buffer.
+ */
+bool ip_print_4(buffer_t* buffer, ip4_t ip, bool display, bool reverse);
+
+
 /** Parse an IPv6 from a string.
  */
 __attribute__((nonnull))
 bool ip_parse_6(ip6_t ip, const char* restrict txt, ssize_t len);
 
-/** Compare two IPv4 with the given cidr mask len.
- */
-static inline bool ip_compare_4(ip4_t ip1, ip4_t ip2, int cidr_len);
-
 /** Compare two IPv6 with the given cird mask len.
  */
-static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2, int cidr_len);
-
-/** Print an IPv4 in the buffer.
- */
-bool ip_print_4(buffer_t* buffer, ip4_t ip, bool display, bool reverse);
+static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2, cidrlen_t cidr_len);
 
 /** Print an IPv6 in the buffer.
  */
 bool ip_print_6(buffer_t* buffer, const ip6_t ip, bool display, bool reverse);
 
 
-static inline bool ip_compare_4(ip4_t ip1, ip4_t ip2, int cidr_len)
+static inline ip4_t ip_mask_4(cidrlen_t cidr_len)
 {
-    uint32_t mask = 0xffffffff;
-    if (cidr_len == 0) {
-        mask = 0;
-    } else if (cidr_len > 0) {
-        mask <<= (32 - cidr_len);
+    if (likely(cidr_len > 0 && cidr_len <= 32)) {
+        return (0xffffffff) << (32 - cidr_len);
+    } else if (likely(cidr_len == 0)) {
+        return 0;
+    } else {
+        return 0xffffffff;
     }
+}
+
+static inline bool ip_compare_4(ip4_t ip1, ip4_t ip2, cidrlen_t cidr_len)
+{
+    const ip4_t mask = ip_mask_4(cidr_len);
     return (ip1 & mask) == (ip2 & mask);
 }
 
-static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2, int cidr_len)
+static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2, cidrlen_t cidr_len)
 {
     int bytes = cidr_len >> 3;
     int bits  = cidr_len & 7;

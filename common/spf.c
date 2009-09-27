@@ -50,8 +50,8 @@ typedef struct spf_rule_t {
     spf_ruleid_t rule;
     buffer_t content;
     ip_t ip;
-    uint8_t cidr4;
-    uint8_t cidr6;
+    cidrlen_t cidr4;
+    cidrlen_t cidr6;
 } spf_rule_t;
 ARRAY(spf_rule_t);
 #define SPF_RULE_INIT { 0, 0, ARRAY_INIT, { .v6 = { 0 } }, 0, 0 }
