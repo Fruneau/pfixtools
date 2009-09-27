@@ -48,6 +48,7 @@ typedef struct greylist_config_t {
     unsigned lookup_by_host : 1;
     unsigned no_sender      : 1;
     unsigned no_recipient   : 1;
+    unsigned normalize_sender: 1;
     int delay;
     int retry_window;
     int client_awl;
@@ -63,6 +64,7 @@ typedef struct greylist_config_t {
 #define GREYLIST_INIT { .lookup_by_host = false,       \
                         .no_sender = false,            \
                         .no_recipient = false,         \
+                        .normalize_sender = true,      \
                         .delay = 300,                  \
                         .retry_window = 2 * 24 * 3600, \
                         .client_awl = 5,               \
@@ -298,8 +300,13 @@ static void greylist_shutdown(greylist_config_t *config)
     }
 }
 
-static const char *sender_normalize(const char *sender, char *buf, int len)
+static const char *sender_normalize(const greylist_config_t * config,
+                                    const char *sender, char *buf, int len)
 {
+    if (!config->normalize_sender) {
+        return sender;
+    }
+
     const char *at = strchr(sender, '@');
     int rpos = 0, wpos = 0, userlen;
 
@@ -425,7 +432,7 @@ static bool try_greylist(const greylist_config_t *config,
      */
     klen = snprintf(key, sizeof(key), "%s/%s/%s",
                     c_net(config, c_addr->str, c_name->str, cnet, sizeof(cnet)),
-                    config->no_sender ? "" : sender_normalize(sender->str, sbuf, sizeof(sbuf)),
+                    config->no_sender ? "" : sender_normalize(config, sender->str, sbuf, sizeof(sbuf)),
                     config->no_recipient ? "" : rcpt->str);
     klen = MIN(klen, ssizeof(key) - 1);
 
@@ -516,6 +523,7 @@ static bool greylist_filter_constructor(filter_t *filter)
           FILTER_PARAM_PARSE_BOOLEAN(LOOKUP_BY_HOST, config->lookup_by_host);
           FILTER_PARAM_PARSE_BOOLEAN(NO_SENDER, config->no_sender);
           FILTER_PARAM_PARSE_BOOLEAN(NO_RECIPIENT, config->no_recipient);
+          FILTER_PARAM_PARSE_BOOLEAN(NORMALIZE_SENDER, config->normalize_sender);
           FILTER_PARAM_PARSE_INT(RETRY_WINDOW, config->retry_window);
           FILTER_PARAM_PARSE_INT(CLIENT_AWL,   config->client_awl);
           FILTER_PARAM_PARSE_INT(DELAY,        config->delay);
@@ -574,6 +582,7 @@ static int greylist_init(void)
     /* Parameters.
      */
     (void)filter_param_register(type, "lookup_by_host");
+    (void)filter_param_register(type, "normalize_sender");
     (void)filter_param_register(type, "no_sender");
     (void)filter_param_register(type, "no_recipient");
     (void)filter_param_register(type, "delay");
