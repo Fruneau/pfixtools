@@ -43,7 +43,7 @@ endif
 # Use pipes and not temp files.
 CFLAGSBASE += -pipe
 # optimize even more
-CFLAGSBASE += -O0
+CFLAGSBASE += -O2
 # let the type char be unsigned by default
 CFLAGSBASE += -funsigned-char
 CFLAGSBASE += -fno-strict-aliasing
@@ -65,14 +65,14 @@ CFLAGSBASE += -Wcast-align
 CFLAGSBASE += -Wwrite-strings
 # warn about implicit conversions with side effects
 # fgets, calloc and friends take an int, not size_t...
-#CFLAGSBASE += -Wconversion
+# CFLAGSBASE += -Wconversion
 # warn about comparisons between signed and unsigned values
 CFLAGSBASE += -Wsign-compare
 # warn about unused declared stuff
 CFLAGSBASE += -Wunused
 CFLAGSBASE += -Wno-unused-parameter
 # warn about variable use before initialization
-#CFLAGSBASE += -Wuninitialized
+CFLAGSBASE += -Wuninitialized
 # warn about variables which are initialized with themselves
 CFLAGSBASE += $(if $(GCC4),-Winit-self)
 # warn about pointer arithmetic on void* and function pointers
