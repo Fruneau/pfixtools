@@ -50,11 +50,11 @@
 #define ssizeof(foo)            (ssize_t)sizeof(foo)
 #define countof(foo)            (ssizeof(foo) / ssizeof(foo[0]))
 
-#define p_new(type, count)      ((type *)xmalloc(sizeof(type) * (count)))
-#define p_clear(p, count)       ((void)memset((p), 0, sizeof(*(p)) * (count)))
-#define p_dup(p, count)         xmemdup((p), sizeof(*(p)) * (count))
+#define p_new(type, count)      ((type *)xmalloc(ssizeof(type) * (count)))
+#define p_clear(p, count)       ((void)xmemset((p), 0, sizeof(*(p)) * (count)))
+#define p_dup(p, count)         xmemdup((p), ssizeof(*(p)) * (count))
 #define p_dupstr(p, len)        xmemdupstr((p), (len))
-#define p_realloc(pp, count)    xrealloc((void*)(pp), sizeof(**(pp)) * (count))
+#define p_realloc(pp, count)    xrealloc((void*)(pp), ssizeof(**(pp)) * (count))
 
 #  define p_shrink(pp, goalnb, allocnb)           \
     do {                                          \
@@ -73,7 +73,7 @@
             } else {                                        \
                 *(allocnb) = p_alloc_nr(goalnb);            \
             }                                               \
-            p_realloc(pp, *(allocnb));                      \
+            p_realloc(pp, (ssize_t)*(allocnb));             \
         }                                                   \
     } while (0)
 
@@ -103,7 +103,7 @@ static inline void *xmalloc(ssize_t size) {
     if (size <= 0)
         return NULL;
 
-    mem = calloc(size, 1);
+    mem = calloc((size_t)size, 1);
     if (!mem)
         abort();
     return mem;
@@ -117,18 +117,32 @@ static inline void xrealloc(void **ptr, ssize_t newsize) {
     if (newsize <= 0) {
         p_delete(ptr);
     } else {
-        *ptr = realloc(*ptr, newsize);
+        *ptr = realloc(*ptr, (size_t)newsize);
         if (!*ptr)
             abort();
     }
 }
 
+static inline void *xmemset(void* dst, int c, ssize_t n) {
+    if (n <= 0) {
+        return dst;
+    }
+    return memset(dst, c, (size_t)n);
+}
+
+static inline void *xmemcpy(void* restrict dst, const void* restrict src, ssize_t size) {
+    if (dst == NULL || src == NULL || size <= 0) {
+        return (void*)dst;
+    }
+    return memcpy(dst, src, (size_t)size);
+}
+
 static inline void *xmemdup(const void *src, ssize_t size) {
-    return memcpy(xmalloc(size), src, size);
+    return xmemcpy(xmalloc(size), src, size);
 }
 
 static inline void *xmemdupstr(const void *src, ssize_t len) {
-    char *res = memcpy(xmalloc(len + 1), src, len);
+    char* restrict res = xmemcpy(xmalloc(len + 1), src, len);
     res[len] = '\0';
     return res;
 }

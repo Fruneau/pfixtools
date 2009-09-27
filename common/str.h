@@ -191,8 +191,11 @@ static inline ssize_t m_strlen(const char *s) {
  * \return \c m_strlen(s) if less than \c n, else \c n.
  */
 static inline ssize_t m_strnlen(const char *s, ssize_t n) {
+    if (n <= 0) {
+        return 0;
+    }
     if (s) {
-        const char *p = memchr(s, '\0', n);
+        const char *p = memchr(s, '\0', (size_t)n);
         return p ? p - s : n;
     }
     return 0;
@@ -279,7 +282,7 @@ static inline ssize_t m_strpad(char *dst, ssize_t n, int c, ssize_t len)
 {
     ssize_t dlen = MIN(n - 1, len);
     if (dlen > 0) {
-        memset(dst, c, dlen);
+        xmemset(dst, c, dlen);
         dst[dlen] = '\0';
     }
     return MAX(0, len);

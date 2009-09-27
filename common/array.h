@@ -141,7 +141,7 @@
 
 /** Return the size of an element of the array.
  */
-#define array_elt_len(array) (sizeof(*(array).data))
+#define array_elt_len(array) (ssizeof(*(array).data))
 
 /** Return the number of bytes used by the content of the array.
  */

@@ -125,10 +125,10 @@ static inline bool trie_entry_prefix(const trie_t *trie,
                                      const trie_entry_t *entry, const char *key)
 {
     int len = entry->c_len;
-    if (len > 0 && str(trie, entry)[len -1] == '\0') {
+    if (len > 0 && str(trie, entry)[len - 1] == '\0') {
         --len;
     }
-    return !!(strncmp(str(trie, entry), key, len) == 0);
+    return !!(strncmp(str(trie, entry), key, (size_t)len) == 0);
 }
 
 static inline bool trie_entry_is_leaf(const trie_entry_t *entry)

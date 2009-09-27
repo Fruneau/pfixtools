@@ -114,7 +114,7 @@ ssize_t m_strcpy(char *dst, ssize_t n, const char *src)
 
     if (n > 0) {
         ssize_t dlen = MIN(n - 1, len);
-        memcpy(dst, src, dlen);
+        xmemcpy(dst, src, dlen);
         dst[dlen] = '\0';
     }
 
@@ -139,7 +139,7 @@ ssize_t m_strncpy(char *dst, ssize_t n, const char *src, ssize_t l)
 
     if (n > 0) {
         ssize_t dlen = MIN(n - 1, len);
-        memcpy(dst, src, dlen);
+        xmemcpy(dst, src, dlen);
         dst[dlen] = '\0';
     }
 

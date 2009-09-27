@@ -50,11 +50,11 @@ int buffer_addvf(buffer_t *buf, const char *fmt, va_list ap)
 
     va_copy(ap2, ap);
 
-    len = vsnprintf(buf->data + buf->len, avail, fmt, ap);
+    len = vsnprintf(buf->data + buf->len, (size_t)avail, fmt, ap);
     if (len >= avail) {
         buffer_resize(buf, buf->len + len);
         avail = buf->size - buf->len;
-        len = vsnprintf(buf->data + buf->len, avail, fmt, ap2);
+        len = vsnprintf(buf->data + buf->len, (size_t)avail, fmt, ap2);
     }
     buf->len += len;
     buf->data[buf->len] = '\0';
@@ -85,7 +85,7 @@ int buffer_read(buffer_t *buf, int fd, int count)
 
     buffer_ensure(buf, count);
 
-    res = read(fd, buf->data + buf->len, count);
+    res = read(fd, buf->data + buf->len, (size_t)count);
     if (res < 0) {
         buf->data[buf->len] = '\0';
         return res;
