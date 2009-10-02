@@ -236,7 +236,7 @@ static bool config_parse(config_t *config)
                     } else if (*p == '\\') {                                   \
                         escaped = true;                                        \
                     } else if (*p == '"') {                                    \
-                        READ_NEXT;                                \
+                        READ_NEXT;                                             \
                         break;                                                 \
                     } else {                                                   \
                         ADD_IN_BUFFER(Buffer, Len, *p);                        \

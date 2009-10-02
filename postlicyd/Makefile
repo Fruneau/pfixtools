@@ -44,7 +44,7 @@ TESTS     = tst-rbl tst-filters tst-greylist tst-qf
 
 UB_LIBS   = -lunbound
 
-FILTERS		= iplist.c greylist.c strlist.c match.c counters.c spf.c hang.c
+FILTERS		= iplist.c greylist.c strlist.c match.c counters.c spf.c hang.c rate.c
 
 postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c resources.c $(FILTERS) $(GENERATED)
 postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev -lpcre

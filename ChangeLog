@@ -5,6 +5,7 @@ version 0.8
 
   * postlicyd:
     NEW: filters can add an explanation in their answer                    FRU
+    NEW: the sender normalization of the greylister can be disabled        FRU
 
 
 ------------------------------------------------------------------------------
