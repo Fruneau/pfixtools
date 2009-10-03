@@ -36,13 +36,9 @@
  * Copyright © 2007 Pierre Habouzit
  */
 
-#include <tcbdb.h>
-
 #include "common.h"
 #include "str.h"
-#include "resources.h"
-
-static const static_str_t static_cleanup = { "@@cleanup@@", 11 };
+#include "db.h"
 
 typedef struct greylist_config_t {
     unsigned lookup_by_host : 1;
@@ -55,10 +51,8 @@ typedef struct greylist_config_t {
     int max_age;
     int cleanup_period;
 
-    char  *awlfilename;
-    TCBDB **awl_db;
-    char  *objfilename;
-    TCBDB **obj_db;
+    db_t* awl;
+    db_t* obj;
 } greylist_config_t;
 
 #define GREYLIST_INIT { .lookup_by_host = false,       \
@@ -70,10 +64,8 @@ typedef struct greylist_config_t {
                         .client_awl = 5,               \
                         .max_age = 35 * 3600,          \
                         .cleanup_period = 86400,       \
-                        .awlfilename = NULL,           \
-                        .awl_db = NULL,                \
-                        .objfilename = NULL,           \
-                        .obj_db = NULL }
+                        .awl = NULL,                   \
+                        .obj = NULL }
 
 struct awl_entry {
     int32_t count;
@@ -85,176 +77,33 @@ struct obj_entry {
     time_t last;
 };
 
-typedef struct greylist_resource_t {
-    TCBDB *db;
-} greylist_resource_t;
-
-
-static void greylist_resource_wipe(greylist_resource_t *res)
+static bool greylist_check_objentry(const void* entry, size_t entry_len, time_t now, void* data)
 {
-    if (res->db) {
-        tcbdbsync(res->db);
-        tcbdbdel(res->db);
+    const greylist_config_t* config = data;
+    const struct obj_entry* oent = entry;
+    if (entry_len != sizeof(struct obj_entry)) {
+        return false;
     }
-    p_delete(&res);
-}
-
-static inline bool greylist_check_awlentry(const greylist_config_t *config,
-                                           struct awl_entry *aent, time_t now)
-{
-    return !(config->max_age > 0 && now - aent->last > config->max_age);
-}
-
-static inline bool greylist_check_object(const greylist_config_t *config,
-                                         const struct obj_entry *oent, time_t now)
-{
     return !((config->max_age > 0 && now - oent->last > config->max_age)
              || (oent->last - oent->first < config->delay
                  && now - oent->last > config->retry_window));
 }
 
-typedef bool (*db_entry_checker_t)(const greylist_config_t *, const void *, time_t);
-
-static inline bool greylist_db_need_cleanup(const greylist_config_t *config, TCBDB *db)
+static bool greylist_check_awlentry(const void* entry, size_t entry_len, time_t now, void* data)
 {
-    int len = 0;
-    time_t now = time(NULL);
-    const time_t *last_cleanup = tcbdbget3(db, static_cleanup.str, static_cleanup.len, &len);
-    if (last_cleanup == NULL) {
-        debug("No last cleanup time");
-    } else {
-        debug("Last cleanup time %u, (ie %us ago) max %us",
-              (uint32_t)*last_cleanup, (uint32_t)(now - *last_cleanup),
-              config->cleanup_period);
+    const greylist_config_t* config = data;
+    const struct awl_entry* aent = entry;
+    if (entry_len != sizeof(struct awl_entry)) {
+        return false;
     }
-    return last_cleanup == NULL
-        || len != sizeof(*last_cleanup)
-        || (now - *last_cleanup) >= config->cleanup_period;
+    return !(config->max_age > 0 && now - aent->last > config->max_age);
 }
 
-static TCBDB **greylist_db_get(const greylist_config_t *config, const char *path,
-                              size_t entry_len, db_entry_checker_t check)
+static bool greylist_need_cleanup(time_t last_update, time_t now, void* data)
 {
-    TCBDB *awl_db, *tmp_db;
-    time_t now = time(NULL);
-
-    greylist_resource_t *res = resource_get("greylist", path);
-    if (res == NULL) {
-        res = p_new(greylist_resource_t, 1);
-        resource_set("greylist", path, res, (resource_destructor_t)greylist_resource_wipe);
-    }
-
-    /* Open the database and check if cleanup is needed
-     */
-    awl_db = res->db;
-    res->db = NULL;
-    if (awl_db == NULL) {
-        awl_db = tcbdbnew();
-        if (!tcbdbopen(awl_db, path, BDBOWRITER | BDBOCREAT)) {
-            err("can not open database: %s", tcbdberrmsg(tcbdbecode(awl_db)));
-            tcbdbdel(awl_db);
-            resource_release("greylist", path);
-            return NULL;
-        }
-    }
-    if (!greylist_db_need_cleanup(config, awl_db) || config->max_age <= 0) {
-        notice("%s loaded: no cleanup needed", path);
-        res->db = awl_db;
-        return &res->db;
-    } else {
-        tcbdbsync(awl_db);
-        tcbdbdel(awl_db);
-    }
-
-    /* Rebuild a new database after removing too old entries.
-     */
-    if (config->max_age > 0) {
-        uint32_t old_count = 0;
-        uint32_t new_count = 0;
-        bool replace = false;
-        bool trashable = false;
-        char tmppath[PATH_MAX];
-        snprintf(tmppath, PATH_MAX, "%s.tmp", path);
-
-        awl_db = tcbdbnew();
-        if (tcbdbopen(awl_db, path, BDBOREADER)) {
-            tmp_db = tcbdbnew();
-            if (tcbdbopen(tmp_db, tmppath, BDBOWRITER | BDBOCREAT | BDBOTRUNC)) {
-                BDBCUR *cur = tcbdbcurnew(awl_db);
-                TCXSTR *key, *value;
-
-                key = tcxstrnew();
-                value = tcxstrnew();
-                if (tcbdbcurfirst(cur)) {
-                    replace = true;
-                    do {
-                        tcxstrclear(key);
-                        tcxstrclear(value);
-                        (void)tcbdbcurrec(cur, key, value);
-
-                        if ((size_t)tcxstrsize(value) == entry_len
-                            && check(config, tcxstrptr(value), now)) {
-                            tcbdbput(tmp_db, tcxstrptr(key), tcxstrsize(key),
-                                     tcxstrptr(value), entry_len);
-                            ++new_count;
-                        }
-                        ++old_count;
-                    } while (tcbdbcurnext(cur));
-                    tcbdbput(tmp_db, static_cleanup.str, static_cleanup.len, &now, sizeof(now));
-                }
-                tcxstrdel(key);
-                tcxstrdel(value);
-                tcbdbcurdel(cur);
-                tcbdbsync(tmp_db);
-            } else {
-                warn("cannot run database cleanup: can't open destination database: %s",
-                     tcbdberrmsg(tcbdbecode(awl_db)));
-            }
-            tcbdbdel(tmp_db);
-        } else {
-            int ecode = tcbdbecode(awl_db);
-            warn("can not open database: %s", tcbdberrmsg(ecode));
-            trashable = ecode != TCENOPERM && ecode != TCEOPEN && ecode != TCENOFILE && ecode != TCESUCCESS;
-        }
-        tcbdbdel(awl_db);
-
-        /** Cleanup successful, replace the old database with the new one.
-         */
-        if (trashable) {
-            notice("%s cleanup: database was corrupted, create a new one", path);
-            unlink(path);
-        } else if (replace) {
-            notice("%s cleanup: done in %us, before %u, after %u entries",
-                 path, (uint32_t)(time(0) - now), old_count, new_count);
-            unlink(path);
-            if (rename(tmppath, path) != 0) {
-                UNIXERR("rename");
-                resource_release("greylist", path);
-                return NULL;
-            }
-        } else {
-            unlink(tmppath);
-            notice("%s cleanup: done in %us, nothing to do, %u entries",
-                 path, (uint32_t)(time(0) - now), old_count);
-        }
-    }
-
-    /* Effectively open the database.
-     */
-    res->db = NULL;
-    awl_db = tcbdbnew();
-    if (!tcbdbopen(awl_db, path, BDBOWRITER | BDBOCREAT)) {
-        err("can not open database: %s", tcbdberrmsg(tcbdbecode(awl_db)));
-        tcbdbdel(awl_db);
-        resource_release("greylist", path);
-        return NULL;
-    }
-
-    notice("%s loaded", path);
-    res->db = awl_db;
-    return &res->db;
+    const greylist_config_t* config = data;
+    return now - last_update >= config->cleanup_period;
 }
-
 
 static bool greylist_initialize(greylist_config_t *config,
                                 const char *directory, const char *prefix)
@@ -263,40 +112,35 @@ static bool greylist_initialize(greylist_config_t *config,
 
     if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        config->awl_db = greylist_db_get(config, path,
-                                         sizeof(struct awl_entry),
-                                         (db_entry_checker_t)(greylist_check_awlentry));
-        if (config->awl_db == NULL) {
+        config->awl = db_load(path, config->max_age > 0, greylist_need_cleanup,
+                              greylist_check_awlentry, config);
+        if (config->awl == NULL) {
             return false;
         }
-        config->awlfilename = m_strdup(path);
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    config->obj_db = greylist_db_get(config, path,
-                                     sizeof(struct obj_entry),
-                                     (db_entry_checker_t)(greylist_check_object));
-    if (config->obj_db == NULL) {
-        if (config->awlfilename) {
-            resource_release("greylist", config->awlfilename);
-            p_delete(&config->awlfilename);
+    config->obj = db_load(path, config->max_age > 0, greylist_need_cleanup,
+                          greylist_check_objentry, config);
+    if (config->obj == NULL) {
+        if (config->awl) {
+            db_release(config->awl);
+            config->awl = NULL;
         }
         return false;
     }
-    config->objfilename = m_strdup(path);
-
     return true;
 }
 
 static void greylist_shutdown(greylist_config_t *config)
 {
-    if (config->awlfilename) {
-        resource_release("greylist", config->awlfilename);
-        p_delete(&config->awlfilename);
+    if (config->awl) {
+        db_release(config->awl);
+        config->awl = NULL;
     }
-    if (config->objfilename) {
-        resource_release("greylist", config->objfilename);
-        p_delete(&config->objfilename);
+    if (config->obj) {
+        db_release(config->obj);
+        config->obj = NULL;
     }
 }
 
@@ -384,30 +228,25 @@ static bool try_greylist(const greylist_config_t *config,
     aent.last = now;                                          \
     debug("whitelist entry for %.*s updated, count %d",       \
           (int)c_addr->len, c_addr->str, aent.count);         \
-    tcbdbput(awl_db, c_addr->str, c_addr->len, &aent, sizeof(aent));
+    db_put(config->awl, c_addr->str, c_addr->len, &aent, sizeof(aent));
 
     char sbuf[BUFSIZ], cnet[64], key[BUFSIZ];
-    const void *res;
 
     time_t now = time(NULL);
     struct obj_entry oent = { now, now };
     struct awl_entry aent = { 0, 0 };
 
-    int len, klen;
-    TCBDB * const awl_db = config->awl_db ? *(config->awl_db) : NULL;
-    TCBDB * const obj_db = config->obj_db ? *(config->obj_db) : NULL;
+    size_t klen;
 
     /* Auto whitelist clients.
      */
     if (config->client_awl) {
-        res = tcbdbget3(awl_db, c_addr->str, c_addr->len, &len);
-        if (res && len == sizeof(aent)) {
-            memcpy(&aent, res, len);
+        if (db_get_len(config->awl, c_addr->str, c_addr->len, &aent, sizeof(aent))) {
             debug("client %.*s has a whitelist entry, count is %d",
                   (int)c_addr->len, c_addr->str, aent.count);
         }
 
-        if (!greylist_check_awlentry(config, &aent, now)) {
+        if (!greylist_check_awlentry(&aent, sizeof(aent), now, (void*)config)) {
             aent.count = 0;
             aent.last  = 0;
             debug("client %.*s whitelist entry too old",
@@ -436,28 +275,26 @@ static bool try_greylist(const greylist_config_t *config,
                     config->no_recipient ? "" : rcpt->str);
     klen = MIN(klen, ssizeof(key) - 1);
 
-    res = tcbdbget3(obj_db, key, klen, &len);
-    if (res && len == sizeof(oent)) {
-        memcpy(&oent, res, len);
-        debug("found a greylist entry for %.*s", klen, key);
+    if (db_get_len(config->obj, key, klen, &oent, sizeof(oent))) {
+        debug("found a greylist entry for %.*s", (int)klen, key);
     }
 
     /* Discard stored first-seen if it is the first retrial and
      * it is beyong the retry window and too old entries.
      */
-    if (!greylist_check_object(config, &oent, now)) {
+    if (!greylist_check_objentry(&oent, sizeof(oent), now, (void*)config)) {
         oent.first = now;
-        debug("invalid retry for %.*s: %s", klen, key,
+        debug("invalid retry for %.*s: %s", (int)klen, key,
               (config->max_age > 0 && now - oent.last > config->max_age) ?
                   "too old entry"
                 : (oent.last - oent.first < config->delay ?
-                  "retry too early" : "retry too late" ));
+                  "retry too early" : "retry too late"));
     }
 
     /* Update.
      */
     oent.last = now;
-    tcbdbput(obj_db, key, klen, &oent, sizeof(oent));
+    db_put(config->obj, key, klen, &oent, sizeof(oent));
 
     /* Auto whitelist clients:
      *  algorithm:
@@ -467,7 +304,7 @@ static bool try_greylist(const greylist_config_t *config,
      *        - client whitelisted already ? -> update last-seen timestamp.
      */
     if (oent.first + config->delay < now) {
-        debug("valid retry for %.*s", klen, key);
+        debug("valid retry for %.*s", (int)klen, key);
         if (config->client_awl) {
             INCR_AWL
         }
