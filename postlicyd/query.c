@@ -177,8 +177,9 @@ bool query_parse(query_t *query, char *p)
 static void query_compute_normalized_client(query_t* query)
 {
     char ip2[4], ip3[4];
-    const char *dot, *p;
+    const char *dot, *p, *end;
 
+    end = query->client_address.str + query->client_address.len;
     query->normalized_client = query->client_address;
     if (!(dot = strchr(query->client_address.str, '.'))) {
         return;
@@ -192,11 +193,11 @@ static void query_compute_normalized_client(query_t* query)
     }
     m_strncpy(ip2, sizeof(ip2), p, dot - p);
 
-    p = ++dot;
-    if (!(dot = strchr(dot, '.')) || dot - p > 3) {
+    p = dot + 1;
+    if (strchr(dot + 1, '.') || end - p > 3) {
         return;
     }
-    m_strncpy(ip3, sizeof(ip3), p, dot - p);
+    m_strncpy(ip3, sizeof(ip3), p, end - p);
 
     /* skip if contains the last two ip numbers in the hostname,
        we assume it's a pool of dialup of a provider */

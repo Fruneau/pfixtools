@@ -98,6 +98,9 @@ int main(int argc, char *argv[])
       char str[BUFSIZ];
       for (int i = 0 ; i < iterations ; ++i) {
           query_format(str, BUFSIZ, format, &q);
+          if (i == 0) {
+              printf("%s\n", str);
+          }
       }
       time_t ellapsed = time(0) - now;
       printf("Done %d iterations in %us (%d format per second)\n", iterations,
