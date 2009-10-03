@@ -79,6 +79,8 @@ typedef struct query_t {
     /* useful data extracted from previous ones */
     static_str_t sender_domain;
     static_str_t recipient_domain;
+    static_str_t normalized_sender;
+    static_str_t normalized_client;
 
     /* postfix 2.2+ */
     static_str_t sasl_method;
@@ -99,6 +101,9 @@ typedef struct query_t {
     static_str_t stress;
 
     const char *eoq;
+
+    char n_sender[256];
+    char n_client[64];
 } query_t;
 
 /** Parse the content of the text to fill the query.

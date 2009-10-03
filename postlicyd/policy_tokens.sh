@@ -140,6 +140,8 @@ exit 0
 # helpers
 ## sender_domain
 ## recipient_domain
+## normalized_sender
+## normalized_client
 #
 # postfix 2.2+
 ## sasl_method

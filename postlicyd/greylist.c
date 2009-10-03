@@ -34,8 +34,10 @@
 
 /*
  * Copyright © 2007 Pierre Habouzit
+ * Copyright © 2008-2009 Florent Bruneau
  */
 
+#include "filter.h"
 #include "common.h"
 #include "str.h"
 #include "db.h"
@@ -144,84 +146,7 @@ static void greylist_shutdown(greylist_config_t *config)
     }
 }
 
-static const char *sender_normalize(const greylist_config_t * config,
-                                    const char *sender, char *buf, int len)
-{
-    if (!config->normalize_sender) {
-        return sender;
-    }
-
-    const char *at = strchr(sender, '@');
-    int rpos = 0, wpos = 0, userlen;
-
-    if (!at)
-        return sender;
-
-    /* strip extension used for VERP or alike */
-    userlen = ((char *)memchr(sender, '+', at - sender) ?: at) - sender;
-
-    while (rpos < userlen) {
-        int count = 0;
-
-        while (isdigit(sender[rpos + count]) && rpos + count < userlen)
-            count++;
-        if (count && !isalnum(sender[rpos + count])) {
-            /* replace \<\d+\> with '#' */
-            wpos += m_strputc(buf + wpos, len - wpos, '#');
-            rpos += count;
-            count = 0;
-        }
-        while (isalnum(sender[rpos + count]) && rpos + count < userlen)
-            count++;
-        while (!isalnum(sender[rpos + count]) && rpos + count < userlen)
-            count++;
-        wpos += m_strncpy(buf + wpos, len - wpos, sender + rpos, count);
-        rpos += count;
-    }
-
-    wpos += m_strputc(buf + wpos, len - wpos, '#');
-    wpos += m_strcpy(buf + wpos, len - wpos, at + 1);
-    return buf;
-}
-
-static const char *c_net(const greylist_config_t *config,
-                         const char *c_addr, const char *c_name,
-                         char *cnet, int cnetlen)
-{
-    char ip2[4], ip3[4];
-    const char *dot, *p;
-
-    if (config->lookup_by_host)
-        return c_addr;
-
-    if (!(dot = strchr(c_addr, '.')))
-        return c_addr;
-    if (!(dot = strchr(dot + 1, '.')))
-        return c_addr;
-
-    p = ++dot;
-    if (!(dot = strchr(dot, '.')) || dot - p > 3)
-        return c_addr;
-    m_strncpy(ip2, sizeof(ip2), p, dot - p);
-
-    p = ++dot;
-    if (!(dot = strchr(dot, '.')) || dot - p > 3)
-        return c_addr;
-    m_strncpy(ip3, sizeof(ip3), p, dot - p);
-
-    /* skip if contains the last two ip numbers in the hostname,
-       we assume it's a pool of dialup of a provider */
-    if (strstr(c_name, ip2) && strstr(c_name, ip3))
-        return c_addr;
-
-    m_strncpy(cnet, cnetlen, c_addr, dot - c_addr);
-    return cnet;
-}
-
-
-static bool try_greylist(const greylist_config_t *config,
-                         const static_str_t *sender, const static_str_t *c_addr,
-                         const static_str_t *c_name, const static_str_t *rcpt)
+static bool try_greylist(const greylist_config_t *config, const query_t* query)
 {
 #define INCR_AWL                                              \
     aent.count++;                                             \
@@ -230,11 +155,12 @@ static bool try_greylist(const greylist_config_t *config,
           (int)c_addr->len, c_addr->str, aent.count);         \
     db_put(config->awl, c_addr->str, c_addr->len, &aent, sizeof(aent));
 
-    char sbuf[BUFSIZ], cnet[64], key[BUFSIZ];
+    char key[BUFSIZ];
 
     time_t now = time(NULL);
     struct obj_entry oent = { now, now };
     struct awl_entry aent = { 0, 0 };
+    const static_str_t* c_addr = &query->client_address;
 
     size_t klen;
 
@@ -269,10 +195,16 @@ static bool try_greylist(const greylist_config_t *config,
 
     /* Lookup.
      */
-    klen = snprintf(key, sizeof(key), "%s/%s/%s",
-                    c_net(config, c_addr->str, c_name->str, cnet, sizeof(cnet)),
-                    config->no_sender ? "" : sender_normalize(config, sender->str, sbuf, sizeof(sbuf)),
-                    config->no_recipient ? "" : rcpt->str);
+    const static_str_t* cnet = query_field_for_id(query, config->lookup_by_host ? PTK_CLIENT_ADDRESS
+                                                                                : PTK_NORMALIZED_CLIENT);
+    const static_str_t* sender = NULL;
+    if (!config->no_sender) {
+        sender = query_field_for_id(query, config->normalize_sender ? PTK_NORMALIZED_SENDER
+                                                                    : PTK_SENDER);
+    }
+    klen = snprintf(key, sizeof(key), "%s/%s/%s", cnet->str,
+                    config->no_sender ? "" : sender->str,
+                    config->no_recipient ? "" : query->recipient.str);
     klen = MIN(klen, ssizeof(key) - 1);
 
     if (db_get_len(config->obj, key, klen, &oent, sizeof(oent))) {
@@ -322,7 +254,6 @@ static bool try_greylist(const greylist_config_t *config,
 
 /* postlicyd filter declaration */
 
-#include "filter.h"
 
 static greylist_config_t *greylist_config_new(void)
 {
@@ -400,9 +331,7 @@ static filter_result_t greylist_filter(const filter_t *filter,
         return HTK_ABORT;
     }
 
-    return try_greylist(config, &query->sender, &query->client_address,
-                        &query->client_name, &query->recipient) ?
-           HTK_WHITELIST : HTK_GREYLIST;
+    return try_greylist(config, query) ? HTK_WHITELIST : HTK_GREYLIST;
 }
 
 static int greylist_init(void)

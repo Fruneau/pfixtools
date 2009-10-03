@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
 
     static const int iterations = 50000000;
     {
-      static const char *format = "${sender} ${recipient} and ${client_name}[${client_address}] at ${protocol_state}";
+      static const char *format = "${sender} ${recipient} ${normalized_sender} ${normalized_client} and ${client_name}[${client_address}] at ${protocol_state}";
       time_t now = time(0);
       char str[BUFSIZ];
       for (int i = 0 ; i < iterations ; ++i) {

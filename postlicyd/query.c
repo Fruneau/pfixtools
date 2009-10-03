@@ -174,6 +174,82 @@ bool query_parse(query_t *query, char *p)
 #undef PARSE_CHECK
 }
 
+static void query_compute_normalized_client(query_t* query)
+{
+    char ip2[4], ip3[4];
+    const char *dot, *p;
+
+    query->normalized_client = query->client_address;
+    if (!(dot = strchr(query->client_address.str, '.'))) {
+        return;
+    }
+    if (!(dot = strchr(dot + 1, '.'))) {
+        return;
+    }
+    p = ++dot;
+    if (!(dot = strchr(dot, '.')) || dot - p > 3) {
+        return;
+    }
+    m_strncpy(ip2, sizeof(ip2), p, dot - p);
+
+    p = ++dot;
+    if (!(dot = strchr(dot, '.')) || dot - p > 3) {
+        return;
+    }
+    m_strncpy(ip3, sizeof(ip3), p, dot - p);
+
+    /* skip if contains the last two ip numbers in the hostname,
+       we assume it's a pool of dialup of a provider */
+    if (strstr(query->client_name.str, ip2) && strstr(query->client_name.str, ip3)) {
+        return;
+    }
+
+    m_strncpy(query->n_client, 64, query->client_address.str, dot - query->client_address.str);
+    query->normalized_client.str = query->n_client;
+    query->normalized_client.len = m_strlen(query->n_client);
+}
+
+static void query_compute_normalized_sender(query_t* query)
+{
+    const char *at = strchr(query->sender.str, '@');
+    int rpos = 0, wpos = 0, userlen;
+
+    query->normalized_sender = query->sender;
+    if (!at) {
+        return;
+    }
+
+    /* strip extension used for VERP or alike */
+    userlen = ((char *)memchr(query->sender.str, '+', at - query->sender.str) ?: at) - query->sender.str;
+
+    while (rpos < userlen) {
+        int count = 0;
+
+        while (isdigit(query->sender.str[rpos + count]) && rpos + count < userlen) {
+            count++;
+        }
+        if (count && !isalnum(query->sender.str[rpos + count])) {
+            /* replace \<\d+\> with '#' */
+            wpos += m_strputc(query->n_sender + wpos, 256 - wpos, '#');
+            rpos += count;
+            count = 0;
+        }
+        while (isalnum(query->sender.str[rpos + count]) && rpos + count < userlen) {
+            count++;
+        }
+        while (!isalnum(query->sender.str[rpos + count]) && rpos + count < userlen) {
+            count++;
+        }
+        wpos += m_strncpy(query->n_sender + wpos, 256 - wpos, query->sender.str + rpos, count);
+        rpos += count;
+    }
+
+    wpos += m_strputc(query->n_sender + wpos, 256 - wpos, '#');
+    wpos += m_strcpy(query->n_sender + wpos, 256 - wpos, at + 1);
+    query->normalized_sender.str = query->n_sender;
+    query->normalized_sender.len = m_strlen(query->n_sender);
+}
+
 const static_str_t *query_field_for_id(const query_t *query, postlicyd_token id)
 {
     switch (id) {
@@ -203,6 +279,18 @@ const static_str_t *query_field_for_id(const query_t *query, postlicyd_token id)
       CASE(ETRN_DOMAIN, etrn_domain)
       CASE(STRESS, stress)
 #undef CASE
+      case PTK_NORMALIZED_SENDER:
+        if (query->normalized_sender.len == 0) {
+            query_compute_normalized_sender((query_t*)query);
+        }
+        return &query->normalized_sender;
+
+      case PTK_NORMALIZED_CLIENT:
+        if (query->normalized_client.len == 0) {
+            query_compute_normalized_client((query_t*)query);
+        }
+        return &query->normalized_client;
+
       case PTK_PROTOCOL_NAME:
         return query->esmtp ? &static_ESMTP : &static_SMTP;
 
