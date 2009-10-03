@@ -47,6 +47,7 @@ static const static_str_t static_cleanup = { "@@cleanup@@", 11 };
 struct db_t {
     unsigned can_expire : 1;
 
+    char *ns;
     char *filename;
     TCBDB **db;
 
@@ -67,6 +68,7 @@ static db_t* db_new(void)
 static void db_delete(db_t **db)
 {
     if (*db) {
+        p_delete(&(*db)->ns);
         p_delete(&(*db)->filename);
         p_delete(db);
     }
@@ -99,10 +101,10 @@ static TCBDB** db_resource_acquire(const db_t* db)
     TCBDB *awl_db, *tmp_db;
     time_t now = time(NULL);
 
-    db_resource_t *res = resource_get("db", db->filename);
+    db_resource_t *res = resource_get(db->ns, db->filename);
     if (res == NULL) {
         res = p_new(db_resource_t, 1);
-        resource_set("db", db->filename, res, (resource_destructor_t)db_resource_wipe);
+        resource_set(db->ns, db->filename, res, (resource_destructor_t)db_resource_wipe);
     }
 
     /* Open the database and check if cleanup is needed
@@ -114,7 +116,7 @@ static TCBDB** db_resource_acquire(const db_t* db)
         if (!tcbdbopen(awl_db, db->filename, BDBOWRITER | BDBOCREAT)) {
             err("can not open database: %s", tcbdberrmsg(tcbdbecode(awl_db)));
             tcbdbdel(awl_db);
-            resource_release("db", db->filename);
+            resource_release(db->ns, db->filename);
             return NULL;
         }
     }
@@ -189,7 +191,7 @@ static TCBDB** db_resource_acquire(const db_t* db)
             unlink(db->filename);
             if (rename(tmppath, db->filename) != 0) {
                 UNIXERR("rename");
-                resource_release("db", db->filename);
+                resource_release(db->ns, db->filename);
                 return NULL;
             }
         } else {
@@ -206,7 +208,7 @@ static TCBDB** db_resource_acquire(const db_t* db)
     if (!tcbdbopen(awl_db, db->filename, BDBOWRITER | BDBOCREAT)) {
         err("can not open database: %s", tcbdberrmsg(tcbdbecode(awl_db)));
         tcbdbdel(awl_db);
-        resource_release("db", db->filename);
+        resource_release(db->ns, db->filename);
         return NULL;
     }
 
@@ -215,14 +217,15 @@ static TCBDB** db_resource_acquire(const db_t* db)
     return &res->db;
 }
 
-db_t* db_load(const char* path, bool can_expire, db_checker_t need_cleanup,
-              db_entry_checker_t entry_check, void *config)
+db_t* db_load(const char* ns, const char* path, bool can_expire,
+              db_checker_t need_cleanup, db_entry_checker_t entry_check, void *config)
 {
     db_t *db = db_new();
     db->can_expire = can_expire;
     db->need_cleanup = need_cleanup;
     db->entry_check = entry_check;
     db->config = config;
+    db->ns = m_strdup(ns);
     db->filename = m_strdup(path);
     db->db = db_resource_acquire(db);
     if (db->db == NULL) {
@@ -233,7 +236,7 @@ db_t* db_load(const char* path, bool can_expire, db_checker_t need_cleanup,
 
 bool db_release(db_t* db)
 {
-    resource_release("db", db->filename);
+    resource_release(db->ns, db->filename);
     db_delete(&db);
     return true;
 }

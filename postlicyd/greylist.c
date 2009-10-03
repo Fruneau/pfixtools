@@ -112,7 +112,7 @@ static bool greylist_initialize(greylist_config_t *config,
 
     if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        config->awl = db_load(path, config->max_age > 0, greylist_need_cleanup,
+        config->awl = db_load("greylist", path, config->max_age > 0, greylist_need_cleanup,
                               greylist_check_awlentry, config);
         if (config->awl == NULL) {
             return false;
@@ -120,7 +120,7 @@ static bool greylist_initialize(greylist_config_t *config,
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    config->obj = db_load(path, config->max_age > 0, greylist_need_cleanup,
+    config->obj = db_load("greylist", path, config->max_age > 0, greylist_need_cleanup,
                           greylist_check_objentry, config);
     if (config->obj == NULL) {
         if (config->awl) {
