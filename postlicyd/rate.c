@@ -33,27 +33,215 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2008 Florent Bruneau
+ * Copyright © 2009 Florent Bruneau
  */
 
-#include <tcbdb.h>
-
 #include "filter.h"
+#include "db.h"
+
+#define RATE_MAX_SLOTS 128
+
+typedef struct rate_config_t {
+    char *key_format;
+    int delay;
+    int soft_threshold;
+    int hard_threshold;
+
+    db_t *db;
+} rate_config_t;
+
+struct rate_entry_t {
+    time_t ts;
+    int delay;
+    uint16_t active_entries;
+    uint16_t entries[RATE_MAX_SLOTS];
+};
+
+static rate_config_t* rate_config_new(void)
+{
+    return p_new(rate_config_t, 1);
+}
+
+static void rate_config_wipe(rate_config_t *config)
+{
+    p_delete(&config->key_format);
+    db_release(config->db);
+    config->db = NULL;
+}
+
+static void rate_config_delete(rate_config_t **config)
+{
+    if (*config) {
+        rate_config_wipe(*config);
+        p_delete(config);
+    }
+}
+
+static bool rate_db_need_cleanup(time_t last_cleanup, time_t now, void *data)
+{
+    rate_config_t *config = data;
+    return (now - last_cleanup) >= config->delay;
+}
+
+static bool rate_db_check_entry(const void *entry, size_t entry_len, time_t now, void *data)
+{
+    rate_config_t *config = data;
+    const struct rate_entry_t *rate = entry;
+    static size_t len = (const char*)&rate->entries[0] - (const char*)rate;
+    if (entry_len < len) {
+        return false;
+    }
+    return rate->delay == config->delay
+        && rate->ts + rate->delay > now
+        && entry_len == len + 2 * rate->active_entries;
+}
+
+static bool rate_db_load(rate_config_t *config, const char *directory, const char *prefix)
+{
+    char path[PATH_MAX];
+
+    snprintf(path, sizeof(path), "%s/%srate.db", directory, prefix);
+    config->db = db_load("rate", path, true, rate_db_need_cleanup,
+                         rate_db_check_entry, config);
+    return config->db != NULL;
+}
 
 static bool rate_filter_constructor(filter_t *filter)
 {
+    const char *path = NULL;
+    const char *prefix = NULL;
+    rate_config_t *config = rate_config_new();
+
+#define PARSE_CHECK(Expr, Str, ...)                                            \
+    if (!(Expr)) {                                                             \
+        err(Str, ##__VA_ARGS__);                                               \
+        rate_config_delete(&config);                                           \
+        return false;                                                          \
+    }
+
+    config->hard_threshold = 1;
+    config->soft_threshold = 1;
+    foreach (filter_param_t *param, filter->params) {
+        switch (param->type) {
+          FILTER_PARAM_PARSE_STRING(PATH, path, false);
+          FILTER_PARAM_PARSE_STRING(PREFIX, prefix, false);
+          FILTER_PARAM_PARSE_STRING(KEY, config->key_format, true);
+          FILTER_PARAM_PARSE_INT(DELAY, config->delay);
+          FILTER_PARAM_PARSE_INT(SOFT_THRESHOLD, config->soft_threshold);
+          FILTER_PARAM_PARSE_INT(HARD_THRESHOLD, config->hard_threshold);
+
+          default: break;
+        }
+    }}
+
+    PARSE_CHECK(config->key_format != NULL && query_format_check(config->key_format),
+                "invalid key for rate filter");
+    PARSE_CHECK(rate_db_load(config, path, prefix == NULL ? "" : prefix),
+                "can not load rate database");
+    PARSE_CHECK(config->delay > 0, "invalid delay");
+
+    filter->data = config;
     return true;
 }
 
 static void rate_filter_destructor(filter_t *filter)
 {
+    rate_config_t *config = filter->data;
+    rate_config_delete(&config);
+    filter->data = NULL;
+}
+
+static inline int rate_slot_for_delay(int t, int delay)
+{
+    if (t >= delay || t < 0) {
+        return -1;
+    }
+    return (t * 128) / delay;
+}
+
+static inline int rate_delay_for_slot(int slot, int delay)
+{
+    if (slot >= RATE_MAX_SLOTS || slot < 0) {
+        return -1;
+    }
+    return (delay * slot) / RATE_MAX_SLOTS;
 }
 
 static filter_result_t rate_filter(const filter_t *filter,
-                                   const query_t *query,
+                                    const query_t *query,
                                    filter_context_t *context)
 {
-    return HTK_FAIL;
+    char key[BUFSIZ];
+    const rate_config_t *config = filter->data;
+    time_t now = time(NULL);
+    size_t key_len, entry_len;
+    struct rate_entry_t entry;
+    static size_t entry_header_len = (const char*)&entry.entries[0] - (const char*)&entry;
+    p_clear(&entry, 1);
+
+    key_len = query_format(key, sizeof(key), config->key_format, query);
+    if (key_len >= BUFSIZ) {
+        key_len = BUFSIZ - 1;
+    }
+    const void *data = db_get(config->db, key, key_len, &entry_len);
+    if (rate_db_check_entry(data, entry_len, now, (void*)config)) {
+        memcpy(&entry, data, entry_len);
+        debug("rate entry found for \"%s\"", key);
+    }
+    entry.delay = config->delay;
+
+    time_t old_end = entry.ts + config->delay;
+    time_t new_start = now - config->delay + 1;
+    int total = 1;
+    if (old_end <= new_start) {
+        entry.ts = now;
+        entry.active_entries = 1;
+        entry.entries[0] = 1;
+    } else {
+        int slot = rate_slot_for_delay(new_start - entry.ts, config->delay);
+        int first_active_slot = -1;
+        for (int i = slot ; i < entry.active_entries ; ++i) {
+            if (first_active_slot < 0 && entry.entries[i] != 0) {
+                first_active_slot = i;
+            }
+            total += entry.entries[i];
+        }
+        if (first_active_slot < 0) {
+            entry.ts = now;
+            entry.active_entries = 1;
+            entry.entries[0] = 1;
+        } else if (first_active_slot >= 0) {
+            if (first_active_slot > 0) {
+                entry.ts += rate_delay_for_slot(first_active_slot, config->delay);
+                memmove(entry.entries, &entry.entries[first_active_slot],
+                        2 * (entry.active_entries - first_active_slot));
+                entry.active_entries -= first_active_slot;
+            }
+            int current_slot = rate_slot_for_delay(now - entry.ts, entry.delay);
+            assert(current_slot < RATE_MAX_SLOTS);
+            if (current_slot >= entry.active_entries) {
+                memset(&entry.entries[entry.active_entries], 0, (current_slot - entry.active_entries) * 2);
+                entry.entries[current_slot] = 1;
+                entry.active_entries = current_slot + 1;
+            } else {
+                assert(current_slot == entry.active_entries - 1);
+                if (entry.entries[current_slot] < UINT16_MAX) {
+                    warn("rate storage capacity for a single slot reached");
+                } else {
+                    ++entry.entries[current_slot];
+                }
+            }
+        }
+    }
+    db_put(config->db, key, key_len, &entry, entry_header_len + 2 * entry.active_entries);
+
+    if (total >= config->hard_threshold) {
+        return HTK_HARD_MATCH;
+    } else if (total >= config->soft_threshold) {
+        return HTK_SOFT_MATCH;
+    } else {
+        return HTK_FAIL;
+    }
 }
 
 static int rate_init(void)
@@ -73,6 +261,8 @@ static int rate_init(void)
     /* Parameters
      */
     (void)filter_param_register(type, "key");
+    (void)filter_param_register(type, "path");
+    (void)filter_param_register(type, "prefix");
     (void)filter_param_register(type, "delay");
     (void)filter_param_register(type, "soft_threshold");
     (void)filter_param_register(type, "hard_threshold");

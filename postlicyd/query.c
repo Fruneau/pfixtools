@@ -177,10 +177,12 @@ bool query_parse(query_t *query, char *p)
 static void query_compute_normalized_client(query_t* query)
 {
     char ip2[4], ip3[4];
-    const char *dot, *p, *end;
+    const char *dot, *p;
 
-    end = query->client_address.str + query->client_address.len;
     query->normalized_client = query->client_address;
+    if (query->client_name.len == 0) {
+        return;
+    }
     if (!(dot = strchr(query->client_address.str, '.'))) {
         return;
     }
@@ -193,6 +195,7 @@ static void query_compute_normalized_client(query_t* query)
     }
     m_strncpy(ip2, sizeof(ip2), p, dot - p);
 
+    const char *end = query->client_address.str + query->client_address.len;
     p = dot + 1;
     if (strchr(dot + 1, '.') || end - p > 3) {
         return;

@@ -79,51 +79,55 @@ struct obj_entry {
     time_t last;
 };
 
-static bool greylist_check_objentry(const void* entry, size_t entry_len, time_t now, void* data)
+static inline bool greylist_check_objentry(const greylist_config_t *config,
+                                           const struct obj_entry* oent, time_t now)
 {
-    const greylist_config_t* config = data;
-    const struct obj_entry* oent = entry;
-    if (entry_len != sizeof(struct obj_entry)) {
-        return false;
-    }
     return !((config->max_age > 0 && now - oent->last > config->max_age)
              || (oent->last - oent->first < config->delay
                  && now - oent->last > config->retry_window));
 }
 
-static bool greylist_check_awlentry(const void* entry, size_t entry_len, time_t now, void* data)
+static bool greylist_db_check_objentry(const void *entry, size_t entry_len, time_t now, void *data)
 {
-    const greylist_config_t* config = data;
-    const struct awl_entry* aent = entry;
-    if (entry_len != sizeof(struct awl_entry)) {
-        return false;
-    }
+    return entry_len == sizeof(struct obj_entry)
+        && greylist_check_objentry(data, entry, now);
+}
+
+static inline bool greylist_check_awlentry(const greylist_config_t *config,
+                                           const struct awl_entry *aent, time_t now)
+{
     return !(config->max_age > 0 && now - aent->last > config->max_age);
 }
 
-static bool greylist_need_cleanup(time_t last_update, time_t now, void* data)
+static bool greylist_db_check_awlentry(const void* entry, size_t entry_len, time_t now, void* data)
+{
+    return entry_len == sizeof(struct awl_entry)
+        && greylist_check_awlentry(data, entry, now);
+}
+
+static bool greylist_db_need_cleanup(time_t last_update, time_t now, void* data)
 {
     const greylist_config_t* config = data;
     return now - last_update >= config->cleanup_period;
 }
 
-static bool greylist_initialize(greylist_config_t *config,
-                                const char *directory, const char *prefix)
+static bool greylist_db_load(greylist_config_t *config,
+                             const char *directory, const char *prefix)
 {
     char path[PATH_MAX];
 
     if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        config->awl = db_load("greylist", path, config->max_age > 0, greylist_need_cleanup,
-                              greylist_check_awlentry, config);
+        config->awl = db_load("greylist", path, config->max_age > 0, greylist_db_need_cleanup,
+                              greylist_db_check_awlentry, config);
         if (config->awl == NULL) {
             return false;
         }
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    config->obj = db_load("greylist", path, config->max_age > 0, greylist_need_cleanup,
-                          greylist_check_objentry, config);
+    config->obj = db_load("greylist", path, config->max_age > 0, greylist_db_need_cleanup,
+                          greylist_db_check_objentry, config);
     if (config->obj == NULL) {
         if (config->awl) {
             db_release(config->awl);
@@ -134,7 +138,7 @@ static bool greylist_initialize(greylist_config_t *config,
     return true;
 }
 
-static void greylist_shutdown(greylist_config_t *config)
+static void greylist_config_wipe(greylist_config_t *config)
 {
     if (config->awl) {
         db_release(config->awl);
@@ -172,7 +176,7 @@ static bool try_greylist(const greylist_config_t *config, const query_t* query)
                   (int)c_addr->len, c_addr->str, aent.count);
         }
 
-        if (!greylist_check_awlentry(&aent, sizeof(aent), now, (void*)config)) {
+        if (!greylist_check_awlentry(config, &aent, now)) {
             aent.count = 0;
             aent.last  = 0;
             debug("client %.*s whitelist entry too old",
@@ -214,7 +218,7 @@ static bool try_greylist(const greylist_config_t *config, const query_t* query)
     /* Discard stored first-seen if it is the first retrial and
      * it is beyong the retry window and too old entries.
      */
-    if (!greylist_check_objentry(&oent, sizeof(oent), now, (void*)config)) {
+    if (!greylist_check_objentry(config, &oent, now)) {
         oent.first = now;
         debug("invalid retry for %.*s: %s", (int)klen, key,
               (config->max_age > 0 && now - oent.last > config->max_age) ?
@@ -266,7 +270,7 @@ static greylist_config_t *greylist_config_new(void)
 static void greylist_config_delete(greylist_config_t **config)
 {
     if (*config) {
-        greylist_shutdown(*config);
+        greylist_config_wipe(*config);
         p_delete(config);
     }
 }
@@ -303,7 +307,7 @@ static bool greylist_filter_constructor(filter_t *filter)
     }}
 
     PARSE_CHECK(path, "path to greylist db not given");
-    PARSE_CHECK(greylist_initialize(config, path, prefix ? prefix : ""),
+    PARSE_CHECK(greylist_db_load(config, path, prefix ? prefix : ""),
                 "can not load greylist database");
 
     filter->data = config;
