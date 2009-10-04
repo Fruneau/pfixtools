@@ -46,9 +46,17 @@ typedef struct rate_config_t {
     int delay;
     int soft_threshold;
     int hard_threshold;
+    int cleanup_period;
 
     db_t *db;
 } rate_config_t;
+
+#define RATE_CONFIG_INIT { .key_format     = NULL,                             \
+                           .delay          = 0,                                \
+                           .soft_threshold = 1,                                \
+                           .hard_threshold = 1,                                \
+                           .cleanup_period = 86400,                            \
+                           .db             = NULL }
 
 struct rate_entry_t {
     time_t ts;
@@ -59,7 +67,10 @@ struct rate_entry_t {
 
 static rate_config_t* rate_config_new(void)
 {
-    return p_new(rate_config_t, 1);
+    const rate_config_t init = RATE_CONFIG_INIT;
+    rate_config_t *rc = p_new(rate_config_t, 1);
+    *rc = init;
+    return rc;
 }
 
 static void rate_config_wipe(rate_config_t *config)
@@ -80,7 +91,8 @@ static void rate_config_delete(rate_config_t **config)
 static bool rate_db_need_cleanup(time_t last_cleanup, time_t now, void *data)
 {
     rate_config_t *config = data;
-    return (now - last_cleanup) >= config->delay;
+    return (now - last_cleanup) >= config->delay
+        && (now - last_cleanup) >= config->cleanup_period;
 }
 
 static bool rate_db_check_entry(const void *entry, size_t entry_len, time_t now, void *data)
@@ -119,8 +131,6 @@ static bool rate_filter_constructor(filter_t *filter)
         return false;                                                          \
     }
 
-    config->hard_threshold = 1;
-    config->soft_threshold = 1;
     foreach (filter_param_t *param, filter->params) {
         switch (param->type) {
           FILTER_PARAM_PARSE_STRING(PATH, path, false);
@@ -129,6 +139,7 @@ static bool rate_filter_constructor(filter_t *filter)
           FILTER_PARAM_PARSE_INT(DELAY, config->delay);
           FILTER_PARAM_PARSE_INT(SOFT_THRESHOLD, config->soft_threshold);
           FILTER_PARAM_PARSE_INT(HARD_THRESHOLD, config->hard_threshold);
+          FILTER_PARAM_PARSE_INT(CLEANUP_PERIOD, config->cleanup_period);
 
           default: break;
         }
@@ -266,6 +277,7 @@ static int rate_init(void)
     (void)filter_param_register(type, "delay");
     (void)filter_param_register(type, "soft_threshold");
     (void)filter_param_register(type, "hard_threshold");
+    (void)filter_param_register(type, "cleanup_period");
     return 0;
 }
 module_init(rate_init);
