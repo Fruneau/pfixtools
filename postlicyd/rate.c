@@ -167,13 +167,19 @@ static inline int rate_slot_for_delay(int t, int delay)
     if (t >= delay || t < 0) {
         return -1;
     }
-    return (t * 128) / delay;
+    if (delay < RATE_MAX_SLOTS) {
+        return t;
+    }
+    return (t * RATE_MAX_SLOTS) / delay;
 }
 
 static inline int rate_delay_for_slot(int slot, int delay)
 {
     if (slot >= RATE_MAX_SLOTS || slot < 0) {
         return -1;
+    }
+    if (delay < RATE_MAX_SLOTS) {
+        return slot;
     }
     return (delay * slot) / RATE_MAX_SLOTS;
 }
