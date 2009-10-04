@@ -91,8 +91,7 @@ static void rate_config_delete(rate_config_t **config)
 static bool rate_db_need_cleanup(time_t last_cleanup, time_t now, void *data)
 {
     rate_config_t *config = data;
-    return (now - last_cleanup) >= config->delay
-        && (now - last_cleanup) >= config->cleanup_period;
+    return (now - last_cleanup) >= config->cleanup_period;
 }
 
 static bool rate_db_check_entry(const void *entry, size_t entry_len, time_t now, void *data)
