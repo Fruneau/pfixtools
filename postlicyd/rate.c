@@ -104,7 +104,7 @@ static bool rate_db_check_entry(const void *entry, size_t entry_len, time_t now,
         return false;
     }
     return rate->delay == config->delay
-        && rate->ts + rate->delay > now
+        && rate->ts + 2 * rate->delay > now
         && entry_len == len + 2 * rate->active_entries;
 }
 
@@ -179,7 +179,7 @@ static inline int rate_delay_for_slot(int slot, int delay)
 }
 
 static filter_result_t rate_filter(const filter_t *filter,
-                                    const query_t *query,
+                                   const query_t *query,
                                    filter_context_t *context)
 {
     char key[BUFSIZ];
@@ -205,18 +205,23 @@ static filter_result_t rate_filter(const filter_t *filter,
     time_t new_start = now - config->delay + 1;
     int total = 1;
     if (old_end <= new_start) {
+        debug("rate entry obsolete, initialize a new one");
         entry.ts = now;
         entry.active_entries = 1;
         entry.entries[0] = 1;
     } else {
         int slot = rate_slot_for_delay(new_start - entry.ts, config->delay);
         int first_active_slot = -1;
+        if (slot < 0) {
+            slot = 0;
+        }
         for (int i = slot ; i < entry.active_entries ; ++i) {
             if (first_active_slot < 0 && entry.entries[i] != 0) {
                 first_active_slot = i;
             }
             total += entry.entries[i];
         }
+        debug("analysis gives: active_entries=%d, first_active=%d, hits=%d", entry.active_entries, first_active_slot, total);
         if (first_active_slot < 0) {
             entry.ts = now;
             entry.active_entries = 1;
@@ -229,6 +234,7 @@ static filter_result_t rate_filter(const filter_t *filter,
                 entry.active_entries -= first_active_slot;
             }
             int current_slot = rate_slot_for_delay(now - entry.ts, entry.delay);
+            debug("rate current entry belongs to slot %d", current_slot);
             assert(current_slot < RATE_MAX_SLOTS);
             if (current_slot >= entry.active_entries) {
                 memset(&entry.entries[entry.active_entries], 0, (current_slot - entry.active_entries) * 2);
@@ -236,7 +242,7 @@ static filter_result_t rate_filter(const filter_t *filter,
                 entry.active_entries = current_slot + 1;
             } else {
                 assert(current_slot == entry.active_entries - 1);
-                if (entry.entries[current_slot] < UINT16_MAX) {
+                if (entry.entries[current_slot] == UINT16_MAX) {
                     warn("rate storage capacity for a single slot reached");
                 } else {
                     ++entry.entries[current_slot];
