@@ -230,7 +230,8 @@ static filter_result_t rate_filter(const filter_t *filter,
             }
             total += entry.entries[i];
         }
-        debug("analysis gives: active_entries=%d, first_active=%d, hits=%d", entry.active_entries, first_active_slot, total);
+        debug("analysis gives: active_entries=%d, first_active=%d, hits=%d",
+              entry.active_entries, first_active_slot, total);
         if (first_active_slot < 0) {
             entry.ts = now;
             entry.active_entries = 1;
@@ -246,7 +247,7 @@ static filter_result_t rate_filter(const filter_t *filter,
             debug("rate current entry belongs to slot %d", current_slot);
             assert(current_slot < RATE_MAX_SLOTS);
             if (current_slot >= entry.active_entries) {
-                memset(&entry.entries[entry.active_entries], 0, (current_slot - entry.active_entries) * 2);
+                p_clear(&entry.entries[entry.active_entries], current_slot - entry.active_entries);
                 entry.entries[current_slot] = 1;
                 entry.active_entries = current_slot + 1;
             } else {
