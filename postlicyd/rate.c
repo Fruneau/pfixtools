@@ -203,6 +203,10 @@ static filter_result_t rate_filter(const filter_t *filter,
     if (rate_db_check_entry(data, entry_len, now, (void*)config)) {
         memcpy(&entry, data, entry_len);
         debug("rate entry found for \"%s\"", key);
+        if (entry.active_entries == 0) {
+            entry.active_entries = 1;
+            entry.entries[0] = 1;
+        }
     }
     entry.delay = config->delay;
 
@@ -254,6 +258,9 @@ static filter_result_t rate_filter(const filter_t *filter,
                 }
             }
         }
+    }
+    if (entry.active_entries == 1 && entry.entries[0] == 1) {
+        entry.active_entries = 0;
     }
     db_put(config->db, key, key_len, &entry, entry_header_len + 2 * entry.active_entries);
 
