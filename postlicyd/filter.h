@@ -55,6 +55,8 @@ typedef struct filter_hook_t {
     filter_result_t type;
     char *value;
 
+    char* warn;
+
     int counter;
     int cost;
 
@@ -230,6 +232,7 @@ __attribute__((nonnull(1)))
 static inline void filter_hook_wipe(filter_hook_t *hook)
 {
     p_delete(&hook->value);
+    p_delete(&hook->warn);
 }
 
 __attribute__((nonnull(1)))

@@ -321,56 +321,65 @@ bool filter_add_param(filter_t *filter, const char *name, int name_len,
 bool filter_add_hook(filter_t *filter, const char *name, int name_len,
                      const char *value, int value_len)
 {
+#define PARSE_CHECK(Cond, Message, ...)                                        \
+    if (!(Cond)) {                                                             \
+        err("hook %s, " Message, htokens[hook.type], ##__VA_ARGS__);           \
+        filter_hook_wipe(&hook);                                               \
+        return false;                                                          \
+    }
     filter_hook_t hook;
     hook.filter_id = -1;
+    hook.value = NULL;
+    hook.warn  = NULL;
+    hook.counter = -1;
+    hook.cost    = 0;
     hook.type  = hook_tokenize(name, name_len);
     if (hook.type == HTK_UNKNOWN) {
         err("unknown hook type %.*s", name_len, name);
         return false;
     }
-    if (!hooks[filter->type][hook.type] || hook.type == HTK_ABORT) {
-        err("hook %s not is valid for filter %s",
-            htokens[hook.type], ftokens[filter->type]);
-        return false;
-    }
+    PARSE_CHECK(hooks[filter->type][hook.type] && hook.type != HTK_ABORT,
+                "not is valid for filter %s", ftokens[filter->type]);
     hook.async   = false;
 
     /* Value format is (counter:id:incr)?(postfix:reply|filter_name)
      */
-    hook.value = NULL;
-    if (strncmp(value, "counter:", 8) == 0) {
-        char *end = NULL;
-        value += 8;
-        hook.counter = strtol(value, &end, 10);
-        if (end == value || *end != ':') {
-              err("hook %s, cannot read counter id", htokens[hook.type]);
-              return false;
-        } else if (hook.counter < 0 || hook.counter >= MAX_COUNTERS) {
-            err("hook %s, invalid counter id %d", htokens[hook.type], hook.counter);
-            return false;
+    while (true) {
+        if (strncmp(value, "counter:", 8) == 0) {
+            PARSE_CHECK(hook.counter == -1, "cannot specify more than one counter");
+            char *end = NULL;
+            value += 8;
+            hook.counter = strtol(value, &end, 10);
+            PARSE_CHECK(end != value && *end == ':', "cannot read counter id");
+            PARSE_CHECK(hook.counter >= 0 && hook.counter < MAX_COUNTERS,
+                        "invalid counter id %d", hook.counter);
+            value = end + 1;
+            hook.cost = strtol(value, &end, 10);
+            PARSE_CHECK(end != value && *end == ':', "cannot read counter increment");
+            PARSE_CHECK(hook.cost >= 0, "invalid counter increment value %d", hook.cost);
+            value = end + 1;
+        } else if (strncmp(value, "warn:", 5) == 0) {
+            PARSE_CHECK(hook.warn == NULL, "cannot specify more than one warning message");
+            value += 5;
+            const char* end = strchr(value, ':');
+            PARSE_CHECK(end != NULL, "invalid unterminated warning message");
+            PARSE_CHECK(end != value, "empty warning message");
+            hook.warn = p_dupstr(value, end - value);
+            PARSE_CHECK(query_format_check(hook.warn), "invalid message format: \"%s\"", hook.warn);
+            value = end + 1;
+        } else {
+            break;
         }
-        value = end + 1;
-        hook.cost = strtol(value, &end, 10);
-        if (end == value || *end != ':') {
-            err("hook %s, cannot read counter increment", htokens[hook.type]);
-            return false;
-        } else if (hook.cost < 0) {
-            err("hook %s, invalid counter increment value %d", htokens[hook.type],
-                hook.cost);
-            return false;
-        }
-        value = end + 1;
-    } else {
-        hook.counter = -1;
-        hook.cost    = 0;
     }
     hook.postfix = (strncmp(value, "postfix:", 8) == 0);
-    if (hook.postfix && !query_format_check(value + 8)) {
-        err("invalid formatted text \"%s\"", value + 8);
-        return false;
+    if (hook.postfix) {
+        value += 8;
     }
-    hook.value = m_strdup(hook.postfix ? value + 8 : value);
+    PARSE_CHECK(!hook.postfix || query_format_check(value),
+                "invalid postfix reply format: \"%s\"", value);
+    hook.value = m_strdup(value);
     array_add(filter->hooks, hook);
+#undef PARSE_CHECK
     return true;
 }
 
