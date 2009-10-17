@@ -147,6 +147,11 @@ static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
                       hook->cost, hook->counter,
                       context->context.counters[hook->counter]);
         }
+        if (hook->warn != NULL) {
+            query_format(log_prefix, BUFSIZ, hook->warn, query);
+            warn("user warning for filter %s: %s", filter->name, log_prefix);
+            log_prefix[0] = '\0';
+        }
     }
     if (hook == NULL) {
         log_reply(WARNING, "aborted");
@@ -157,7 +162,7 @@ static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
         *ok = true;
         return NULL;
     } else if (hook->postfix) {
-        log_reply(INFO, "answer %s from filter %s: \"%s\"",
+        log_reply(NOTICE, "answer %s from filter %s: \"%s\"",
                   htokens[hook->type], filter->name, hook->value);
         policy_answer(pcy, hook->value);
         *ok = true;
