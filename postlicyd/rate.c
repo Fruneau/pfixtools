@@ -60,8 +60,9 @@ typedef struct rate_config_t {
 
 struct rate_entry_t {
     time_t ts;
-    int delay;
-    uint16_t active_entries;
+    uint32_t delay;
+    unsigned last_total         : 24;
+    unsigned active_entries     : 8;
     uint16_t entries[RATE_MAX_SLOTS];
 };
 
@@ -102,8 +103,8 @@ static bool rate_db_check_entry(const void *entry, size_t entry_len, time_t now,
     if (entry_len < len) {
         return false;
     }
-    return rate->delay == config->delay
-        && rate->ts + 2 * rate->delay > now
+    return (int)rate->delay == config->delay
+        && rate->ts + 2 * (int)rate->delay > now
         && entry_len == len + 2 * rate->active_entries;
 }
 
@@ -210,6 +211,7 @@ static filter_result_t rate_filter(const filter_t *filter,
     }
     entry.delay = config->delay;
 
+    uint32_t last_total = 0;
     time_t old_end = entry.ts + config->delay;
     time_t new_start = now - config->delay + 1;
     int total = 1;
@@ -221,6 +223,7 @@ static filter_result_t rate_filter(const filter_t *filter,
     } else {
         int slot = rate_slot_for_delay(new_start - entry.ts, config->delay);
         int first_active_slot = -1;
+        last_total = entry.last_total;
         if (slot < 0) {
             slot = 0;
         }
@@ -260,14 +263,21 @@ static filter_result_t rate_filter(const filter_t *filter,
             }
         }
     }
+    entry.last_total = total;
     if (entry.active_entries == 1 && entry.entries[0] == 1) {
         entry.active_entries = 0;
     }
     db_put(config->db, key, key_len, &entry, entry_header_len + 2 * entry.active_entries);
 
     if (total >= config->hard_threshold) {
+        if (last_total < (uint32_t)config->hard_threshold) {
+            return HTK_HARD_MATCH_START;
+        }
         return HTK_HARD_MATCH;
     } else if (total >= config->soft_threshold) {
+        if (last_total < (uint32_t)config->soft_threshold) {
+            return HTK_SOFT_MATCH_START;
+        }
         return HTK_SOFT_MATCH;
     } else {
         return HTK_FAIL;
@@ -284,8 +294,12 @@ static int rate_init(void)
      */
     (void)filter_hook_register(type, "fail");
     (void)filter_hook_register(type, "soft_match");
+    (void)filter_hook_register(type, "soft_match_start");
     (void)filter_hook_register(type, "hard_match");
+    (void)filter_hook_register(type, "hard_match_start");
 
+    filter_hook_forward_register(type, HTK_SOFT_MATCH_START, HTK_SOFT_MATCH);
+    filter_hook_forward_register(type, HTK_HARD_MATCH_START, HTK_HARD_MATCH);
     filter_hook_forward_register(type, HTK_SOFT_MATCH, HTK_HARD_MATCH);
 
     /* Parameters
