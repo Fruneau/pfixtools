@@ -191,6 +191,53 @@ static bool run_greylisttest(const config_t *config, const char *basepath)
     return ok;
 }
 
+static bool run_ratetest(const config_t *config, const char *basepath)
+{
+    char buff_q1[BUFSIZ];
+    query_t q1;
+    bool ok = true;
+
+    filter_t *rate1;
+
+#define QUERY(Q)                                                               \
+    if (read_query(basepath, "greylist_" STR(Q), buff_##Q, NULL, &Q) == NULL) {    \
+        return false;                                                          \
+    }
+    QUERY(q1);
+#undef QUERY
+
+#define FILTER(F)                                                              \
+    do {                                                                       \
+      int __p = filter_find_with_name(&config->filters, STR(F));               \
+      if (__p < 0) {                                                           \
+          return false;                                                        \
+      }                                                                        \
+      F = array_ptr(config->filters, __p);                                     \
+    } while (0)
+    FILTER(rate1);
+#undef FILTER
+
+    filter_context_t context;
+    filter_context_prepare(&context, NULL);
+
+    /* Test greylist */
+    TEST("no", filter_test(rate1, &q1, &context, HTK_FAIL));
+    TEST("soft_start", filter_test(rate1, &q1, &context, HTK_SOFT_MATCH_START));
+    sleep(1);
+    TEST("soft", filter_test(rate1, &q1, &context, HTK_SOFT_MATCH));
+    sleep(1);
+    TEST("hard_start", filter_test(rate1, &q1, &context, HTK_HARD_MATCH_START));
+    TEST("hard", filter_test(rate1, &q1, &context, HTK_HARD_MATCH));
+    sleep(4);
+    TEST("soft_down", filter_test(rate1, &q1, &context, HTK_SOFT_MATCH));
+    sleep(5);
+    TEST("no_down", filter_test(rate1, &q1, &context, HTK_FAIL));
+
+    filter_context_wipe(&context);
+    return ok;
+}
+
+
 int main(int argc, char *argv[])
 {
     char basepath[FILENAME_MAX];
@@ -215,6 +262,7 @@ int main(int argc, char *argv[])
       RM("test1_whitelist.db");
       RM("test2_greylist.db");
       RM("test2_whitelist.db");
+      RM("test1_rate.db");
 #undef RM
     }
 
@@ -247,6 +295,9 @@ int main(int argc, char *argv[])
 
     /* Test greylist */
     RUN("greylist", greylisttest);
+
+    /* Test rate control */
+    RUN("rate", ratetest);
 
 
 #undef RUN
