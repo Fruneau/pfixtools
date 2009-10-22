@@ -194,7 +194,6 @@ static srs_config_t config = {
     .domain = NULL,
     .domainlen = 0,
     .ignore_ext = false,
-    .reject_err = false,
     .separator = '\0'
 };
 
