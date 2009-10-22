@@ -58,7 +58,8 @@ typedef struct srs_config_t {
     srs_t* srs;
     const char* domain;
     int domainlen;
-    int ignore_ext;
+    unsigned ignore_ext : 1;
+    char separator;
 } srs_config_t;
 
 
@@ -159,7 +160,7 @@ int process_srs(client_t *srsd, void* vconfig)
             err = srs_forward(config->srs, buf, ssizeof(buf), p, config->domain);
         }
 
-        if (err == 0) {
+        if (err == SRS_SUCCESS) {
             buffer_addstr(obuf, "200 ");
             buffer_addstr(obuf, buf);
         } else {
@@ -191,7 +192,10 @@ int process_srs(client_t *srsd, void* vconfig)
 
 static srs_config_t config = {
     .srs = NULL,
-    .domain = NULL
+    .domain = NULL,
+    .domainlen = 0,
+    .ignore_ext = false,
+    .separator = '\0'
 };
 
 /** overload srs_free since the lib is not properly maintained.
@@ -274,6 +278,7 @@ void usage(void)
           "    -d <port>    port to listen to for decoding requests\n"
           "                 (default: "STR(DEFAULT_DECODER_PORT)")\n"
           "    -p <pidfile> file to write our pid to\n"
+          "    -s <sep>     define the character used as srs separator (+, - or =)\n"
           "    -u           unsafe mode: don't drop privilegies\n"
           "    -I           do not touch mails outside of \"domain\" in decoding mode\n"
           "    -f           stay in foreground\n"
@@ -291,7 +296,7 @@ int main(int argc, char *argv[])
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
 
-    for (int c = 0; (c = getopt(argc, argv, "hfuI" "e:d:p:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "hfuI" "e:d:p:s:")) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
@@ -310,6 +315,18 @@ int main(int argc, char *argv[])
             break;
           case 'I':
             config.ignore_ext = true;
+            break;
+          case 's':
+            if (m_strlen(optarg) != 1) {
+                usage();
+                return EXIT_FAILURE;
+            }
+            config.separator = *optarg;
+            if (config.separator != '+' && config.separator != '-'
+                && config.separator != '=') {
+                usage();
+                return EXIT_FAILURE;
+            }
             break;
           default:
             usage();
@@ -331,9 +348,15 @@ int main(int argc, char *argv[])
     config.domain = argv[optind];
     config.domainlen = strlen(config.domain);
     config.srs = srs_read_secrets(argv[optind + 1]);
-    if (!config.srs
-        || common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP,
-                        daemonize) != EXIT_SUCCESS
+    if (config.srs == NULL) {
+        return EXIT_FAILURE;
+    }
+    if (config.separator != '\0'
+        && srs_set_separator(config.srs, config.separator) == SRS_ESEPARATORINVALID) {
+        return EXIT_FAILURE;
+    }
+    if (common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP,
+                     daemonize) != EXIT_SUCCESS
         || (encoder_ptr = start_listener(port_enc)) == NULL
         || (decoder_ptr = start_listener(port_dec)) == NULL) {
         return EXIT_FAILURE;
