@@ -3,6 +3,11 @@ version 0.8
   * common:
     NEW: support for explanations in SPF                                   FRU
 
+  * pfix-srsd:
+    NEW: command line option to reject external domains in decoding        FRU
+    NEW: command line option to set the separator                          FRU
+    NOTE: changes based on a patch by Nicolas Grekas
+
   * postlicyd:
     NEW: filters can add an explanation in their answer                    FRU
     NEW: the sender normalization of the greylister can be disabled        FRU
