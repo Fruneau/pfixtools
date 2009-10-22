@@ -170,6 +170,9 @@ int process_srs(client_t *srsd, void* vconfig)
               case SRS_ERRTYPE_SYNTAX:
                 buffer_addstr(obuf, "500 ");
                 break;
+              case SRS_ERRTYPE_CONFIG:
+                buffer_addstr(obuf, "400 ");
+                break;
               default:
                 if (decoder && config->reject_err) {
                     buffer_addstr(obuf, "500 ");
