@@ -59,7 +59,6 @@ typedef struct srs_config_t {
     const char* domain;
     int domainlen;
     unsigned ignore_ext : 1;
-    unsigned reject_err : 1;
     char separator;
 } srs_config_t;
 
@@ -166,19 +165,11 @@ int process_srs(client_t *srsd, void* vconfig)
             buffer_addstr(obuf, buf);
         } else {
             switch (SRS_ERROR_TYPE(err)) {
-              case SRS_ERRTYPE_SRS:
-              case SRS_ERRTYPE_SYNTAX:
-                buffer_addstr(obuf, "500 ");
-                break;
               case SRS_ERRTYPE_CONFIG:
                 buffer_addstr(obuf, "400 ");
                 break;
               default:
-                if (decoder && config->reject_err) {
-                    buffer_addstr(obuf, "500 ");
-                } else {
-                    buffer_addstr(obuf, "400 ");
-                }
+                buffer_addstr(obuf, "500 ");
                 break;
             }
             buffer_addstr(obuf, srs_strerror(err));
@@ -290,7 +281,6 @@ void usage(void)
           "    -s <sep>     define the character used as srs separator (+, - or =)\n"
           "    -u           unsafe mode: don't drop privilegies\n"
           "    -I           do not touch mails outside of \"domain\" in decoding mode\n"
-          "    -R           produce of 500 error code for mails outside of \"domain\" in decoding mode\n"
           "    -f           stay in foreground\n"
          , stderr);
 }
@@ -306,7 +296,7 @@ int main(int argc, char *argv[])
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
 
-    for (int c = 0; (c = getopt(argc, argv, "hfuIR" "e:d:p:s:")) >= 0; ) {
+    for (int c = 0; (c = getopt(argc, argv, "hfuI" "e:d:p:s:")) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
@@ -325,9 +315,6 @@ int main(int argc, char *argv[])
             break;
           case 'I':
             config.ignore_ext = true;
-            break;
-          case 'R':
-            config.reject_err = true;
             break;
           case 's':
             if (m_strlen(optarg) != 1) {
