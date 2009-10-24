@@ -47,9 +47,10 @@
 #include "array.h"
 
 
-typedef filter_token filter_type_t;
 typedef hook_token   filter_result_t;
 typedef param_token  filter_param_id_t;
+typedef struct filter_description_t filter_description_t;
+typedef const filter_description_t* filter_type_t;
 
 typedef struct filter_hook_t {
     filter_result_t type;
@@ -117,7 +118,7 @@ typedef struct filter_context_t {
 } filter_context_t;
 
 
-#define FILTER_INIT { NULL, FTK_UNKNOWN, ARRAY_INIT, NULL, ARRAY_INIT, -1 }
+#define FILTER_INIT { NULL, NULL, ARRAY_INIT, NULL, ARRAY_INIT, -1 }
 #define CHECK_FILTER(Filter)                                                   \
     assert(Filter != FTK_UNKNOWN && Filter != FTK_count                        \
            && "Unknown filter type")
@@ -310,6 +311,9 @@ void filter_context_wipe(filter_context_t *context);
 
 __attribute__((nonnull))
 void filter_context_clean(filter_context_t *context);
+
+__attribute__((nonnull))
+void* filter_context(const filter_t * filter, filter_context_t* context);
 
 __attribute__((nonnull))
 void filter_post_async_result(filter_context_t *context, filter_result_t result);

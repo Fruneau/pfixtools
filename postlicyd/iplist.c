@@ -285,8 +285,6 @@ typedef struct iplist_async_data_t {
     bool error;
 } iplist_async_data_t;
 
-static filter_type_t filter_type = FTK_UNKNOWN;
-
 static iplist_filter_t *iplist_filter_new(void)
 {
     return p_new(iplist_filter_t, 1);
@@ -447,7 +445,7 @@ static void iplist_filter_async(dns_result_t *result, void *arg)
     filter_context_t   *context = arg;
     const filter_t      *filter = context->current_filter;
     const iplist_filter_t *data = filter->data;
-    iplist_async_data_t  *async = context->contexts[filter_type];
+    iplist_async_data_t  *async = filter_context(filter, context);
 
 
     if (*result != DNS_ERROR) {
@@ -518,7 +516,7 @@ static filter_result_t iplist_filter(const filter_t *filter, const query_t *quer
         error = false;
     }
     if (array_len(data->host_offsets) > 0) {
-        iplist_async_data_t* async = context->contexts[filter_type];
+        iplist_async_data_t* async = filter_context(filter, context);
         array_ensure_exact_capacity(async->results, array_len(data->host_offsets));
         async->sum = sum;
         async->awaited = 0;
@@ -561,10 +559,10 @@ static void iplist_context_destructor(void *data)
 
 static int iplist_init(void)
 {
-    filter_type =  filter_register("iplist", iplist_filter_constructor,
-                                   iplist_filter_destructor, iplist_filter,
-                                   iplist_context_constructor,
-                                   iplist_context_destructor);
+    filter_type_t filter_type =  filter_register("iplist", iplist_filter_constructor,
+                                                 iplist_filter_destructor, iplist_filter,
+                                                 iplist_context_constructor,
+                                                 iplist_context_destructor);
     /* Hooks.
      */
     (void)filter_hook_register(filter_type, "error");

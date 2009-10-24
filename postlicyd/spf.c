@@ -48,7 +48,6 @@ typedef struct spf_filter_t {
     unsigned use_explanation: 1;
 } spf_filter_t;
 
-static filter_type_t filter_type = FTK_UNKNOWN;
 static buffer_t domain = ARRAY_INIT;
 static buffer_t sender = ARRAY_INIT;
 static buffer_t ip     = ARRAY_INIT;
@@ -177,9 +176,9 @@ module_exit(spf_exit);
 
 static int spf_init(void)
 {
-    filter_type = filter_register("spf", spf_filter_constructor,
-                                  spf_filter_destructor, spf_filter,
-                                  NULL, NULL);
+    filter_type_t filter_type = filter_register("spf", spf_filter_constructor,
+                                                spf_filter_destructor, spf_filter,
+                                                NULL, NULL);
 
     /* Hooks.
      */

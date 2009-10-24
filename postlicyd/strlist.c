@@ -88,9 +88,6 @@ typedef struct strlist_async_data_t {
     bool error;
 } strlist_async_data_t;
 
-static filter_type_t filter_type = FTK_UNKNOWN;
-
-
 static void strlist_local_wipe(strlist_local_t *entry)
 {
     if (entry->filename != NULL) {
@@ -635,7 +632,7 @@ static void strlist_filter_async(dns_result_t *result, void *arg)
     filter_context_t   *context = arg;
     const filter_t      *filter = context->current_filter;
     const strlist_config_t *data = filter->data;
-    strlist_async_data_t  *async = context->contexts[filter_type];
+    strlist_async_data_t  *async = filter_context(filter, context);
 
     if (*result != DNS_ERROR) {
         async->error = false;
@@ -750,7 +747,7 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
                                       filter_context_t *context)
 {
     const strlist_config_t *config = filter->data;
-    strlist_async_data_t *async = context->contexts[filter_type];
+    strlist_async_data_t *async = filter_context(filter, context);
     int result_pos = 0;
     async->sum = 0;
     async->error = true;
@@ -828,10 +825,10 @@ static void strlist_context_destructor(void *data)
 
 static int strlist_init(void)
 {
-    filter_type =  filter_register("strlist", strlist_filter_constructor,
-                                   strlist_filter_destructor, strlist_filter,
-                                   strlist_context_constructor,
-                                   strlist_context_destructor);
+    filter_type_t filter_type =  filter_register("strlist", strlist_filter_constructor,
+                                                 strlist_filter_destructor, strlist_filter,
+                                                 strlist_context_constructor,
+                                                 strlist_context_destructor);
     /* Hooks.
      */
     (void)filter_hook_register(filter_type, "abort");

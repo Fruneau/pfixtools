@@ -46,8 +46,6 @@ typedef struct hang_filter_t {
     int timeout;
 } hang_filter_t;
 
-static filter_type_t filter_type = FTK_UNKNOWN;
-
 
 static hang_filter_t* hang_filter_new(void)
 {
@@ -112,9 +110,9 @@ static filter_result_t hang_filter(const filter_t* filter, const query_t* query,
 
 static int hang_init(void)
 {
-    filter_type = filter_register("hang", hang_filter_constructor,
-                                  hang_filter_destructor, hang_filter,
-                                  NULL, NULL);
+    filter_type_t filter_type = filter_register("hang", hang_filter_constructor,
+                                                hang_filter_destructor, hang_filter,
+                                                NULL, NULL);
 
     /* Hooks
      */
