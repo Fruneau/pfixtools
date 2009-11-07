@@ -290,12 +290,12 @@ void usage(void)
     fputs("usage: "DAEMON_NAME" [options] config\n"
           "\n"
           "Options:\n"
-          "    -l <port>    port to listen to\n"
-          "    -p <pidfile> file to write our pid to\n"
-          "    -f           stay in foreground\n"
-          "    -d           grow logging level\n"
-          "    -u           unsafe mode (don't drop privileges)\n"
-          "    -c           check-conf\n"
+          "    -l|--port <port>        port to listen to\n"
+          "    -p|--pid-file <pidfile> file to write our pid to\n"
+          "    -f|--foreground         stay in foreground\n"
+          "    -d|--debug              grow logging level\n"
+          "    -u|--unsafe             unsafe mode (don't drop privileges)\n"
+          "    -c|--check-conf         only check configuration\n"
          , stderr);
 }
 
@@ -310,7 +310,18 @@ int main(int argc, char *argv[])
     bool port_from_cli = false;
     bool check_conf = false;
 
-    for (int c = 0; (c = getopt(argc, argv, "hufdc" "l:p:")) >= 0; ) {
+    struct option longopts[] = {
+        { "help", no_argument, NULL, 'h' },
+        { "unsafe", no_argument, NULL, 'u' },
+        { "foreground", no_argument, NULL, 'f' },
+        { "debug", no_argument, NULL, 'd' },
+        { "check-conf", no_argument, NULL, 'c' },
+        { "port", required_argument, NULL, 'l' },
+        { "pid-file", required_argument, NULL, 'p' },
+        { NULL, 0, NULL, 0 }
+    };
+
+    for (int c = 0; (c = getopt_long(argc, argv, "hufdc" "l:p:", longopts, NULL)) >= 0; ) {
         switch (c) {
           case 'p':
             pidfile = optarg;

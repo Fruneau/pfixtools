@@ -37,6 +37,8 @@
  * Copyright © 2008 Florent Bruneau
  */
 
+#include <getopt.h>
+
 #include "common.h"
 
 #include <srs2.h>
@@ -272,15 +274,15 @@ void usage(void)
     fputs("usage: "DAEMON_NAME" [options] domain secrets\n"
           "\n"
           "Options:\n"
-          "    -e <port>    port to listen to for encoding requests\n"
-          "                 (default: "STR(DEFAULT_ENCODER_PORT)")\n"
-          "    -d <port>    port to listen to for decoding requests\n"
-          "                 (default: "STR(DEFAULT_DECODER_PORT)")\n"
-          "    -p <pidfile> file to write our pid to\n"
-          "    -s <sep>     define the character used as srs separator (+, - or =)\n"
-          "    -u           unsafe mode: don't drop privilegies\n"
-          "    -I           do not touch mails outside of \"domain\" in decoding mode\n"
-          "    -f           stay in foreground\n"
+          "    -e|--encoding <port>    port to listen to for encoding requests\n"
+          "                            (default: "STR(DEFAULT_ENCODER_PORT)")\n"
+          "    -d|--decoding <port>    port to listen to for decoding requests\n"
+          "                            (default: "STR(DEFAULT_DECODER_PORT)")\n"
+          "    -p|--pid-file <pidfile> file to write our pid to\n"
+          "    -s|--separator <sep>    define the character used as srs separator (+, - or =)\n"
+          "    -u|--unsafe             unsafe mode: don't drop privilegies\n"
+          "    -I|--ignore-outside     do not touch mails outside of \"domain\" in decoding mode\n"
+          "    -f|--foreground         stay in foreground\n"
          , stderr);
 }
 
@@ -295,7 +297,19 @@ int main(int argc, char *argv[])
     int port_dec = DEFAULT_DECODER_PORT;
     const char *pidfile = NULL;
 
-    for (int c = 0; (c = getopt(argc, argv, "hfuI" "e:d:p:s:")) >= 0; ) {
+    struct option longopts[] = {
+        { "help", no_argument, NULL, 'h' },
+        { "unsafe", no_argument, NULL, 'u' },
+        { "foreground", no_argument, NULL, 'f' },
+        { "ignore-outside", no_argument, NULL, 'I' },
+        { "pid-file", required_argument, NULL, 'p' },
+        { "encoding", required_argument, NULL, 'e' },
+        { "decoding", required_argument, NULL, 'd' },
+        { "separator", required_argument, NULL, 's' },
+        { NULL, 0, NULL, 0 }
+    };
+
+    for (int c = 0; (c = getopt_long(argc, argv, "hfuI" "e:d:p:s:", longopts, NULL)) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
