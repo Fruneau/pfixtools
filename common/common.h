@@ -123,6 +123,7 @@ void common_init(void);
 #define UNIXERR(fun)     err("%s:%d:%s %s: %s",                      \
                              __FILE__, __LINE__, __func__, fun, strerror(errno))
 
+extern bool         daemon_process;
 extern int          log_level;
 extern bool         log_syslog;
 extern const char  *log_state;

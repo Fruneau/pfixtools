@@ -385,6 +385,9 @@ static void server_shutdown(void)
     array_deep_wipe(listeners, listener_delete);
     array_deep_wipe(client_pool, client_delete);
     array_deep_wipe(timeout_pool, timeout_delete);
+    if (daemon_process) {
+        ev_default_destroy();
+    }
 }
 module_init(server_init);
 module_exit(server_shutdown);
