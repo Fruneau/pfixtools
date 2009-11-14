@@ -84,6 +84,9 @@ static void           *gl_config         = NULL;
 
 static inline void server_io_wipe(server_io_t *io)
 {
+    if (unlikely(gl_loop == NULL)) {
+        return;
+    }
     if (io->fd >= 0) {
         ev_io_stop(gl_loop, &io->io);
         close(io->fd);
@@ -146,11 +149,17 @@ void client_release(client_t *server)
 
 void client_io_none(client_t *server)
 {
+    if (unlikely(gl_loop == NULL)) {
+        return;
+    }
     ev_io_stop(gl_loop, &server->io.io);
 }
 
 void client_io_rw(client_t *server)
 {
+    if (unlikely(gl_loop == NULL)) {
+        return;
+    }
     ev_io_stop(gl_loop, &server->io.io);
     ev_io_set(&server->io.io, server->io.fd, EV_READ | EV_WRITE);
     ev_io_start(gl_loop, &server->io.io);
@@ -158,6 +167,9 @@ void client_io_rw(client_t *server)
 
 void client_io_ro(client_t *server)
 {
+    if (unlikely(gl_loop == NULL)) {
+        return;
+    }
     ev_io_stop(gl_loop, &server->io.io);
     ev_io_set(&server->io.io, server->io.fd, EV_READ);
     ev_io_start(gl_loop, &server->io.io);
@@ -387,6 +399,7 @@ static void server_shutdown(void)
     array_deep_wipe(timeout_pool, timeout_delete);
     if (daemon_process) {
         ev_default_destroy();
+        gl_loop = NULL;
     }
 }
 module_init(server_init);
