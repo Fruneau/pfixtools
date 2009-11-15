@@ -34,30 +34,8 @@
 
 include ../mk/tc.mk
 
-TESTS = tst-trie tst-regexp tst-spf tst-rbl tst-filters tst-greylist tst-qf
+TESTS = trie regexp spf rbl filters greylist qf
 TESTLIBS=$(TC_LIBS) -lunbound -lev -lpcre
-
-tst-trie_SOURCES = tst-trie.c ../common/lib.a
-tst-trie_LIBADD = $(TESTLIBS)
-
-tst-regexp_SOURCES = tst-regexp.c ../common/lib.a
-tst-regexp_LIBADD = $(TESTLIBS)
-
-tst-spf_SOURCES = tst-spf.c ../common/lib.a
-tst-spf_LIBADD = $(TESTLIBS)
-
-tst-rbl_SOURCES   = tst-rbl.c ../common/lib.a ../postlicyd/libpostlicyd.a
-tst-rbl_LIBADD    = $(TESTLIBS)
-
-tst-filters_SOURCES = tst-filters.c ../common/lib.a ../postlicyd/libpostlicyd.a
-tst-filters_LIBADD  = $(TESTLIBS)
-
-tst-greylist_SOURCES = tst-greylist.c ../common/lib.a ../postlicyd/libpostlicyd.a
-tst-greylist_LIBADD  = $(TESTLIBS)
-
-tst-qf_SOURCES = tst-qf.c ../common/lib.a ../postlicyd/libpostlicyd.a
-tst-qf_LIBADD = $(TESTLIBS)
-
 
 all:
 

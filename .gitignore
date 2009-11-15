@@ -3,6 +3,7 @@
 /pfix-srsd/pfix-srsd
 /postlicyd/postlicyd
 /tests/data/*.db
+/tests/tst-*
 
 *.xml
 *.html

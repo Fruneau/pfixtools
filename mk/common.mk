@@ -44,9 +44,11 @@ ASCIIDOC     = asciidoc -f $(__DIR__)/asciidoc.conf -d manpage \
 XMLTO        = xmlto -m $(__DIR__)/callouts.xsl
 MAN_SECTIONS = 1 2 3 4 5 6 7 8 9
 
+TESTPROGAMS = $(addprefix tst-,$(TESTS))
+
 INSTALL_PROGS = $(addprefix install-,$(PROGRAMS))
 
-all: $(GENERATED) $(LIBS) $(PROGRAMS) $(TESTS)
+all: $(GENERATED) $(LIBS) $(PROGRAMS) $(TESTPROGAMS)
 
 DOCS_SRC  = $(foreach s,$(MAN_SECTIONS),$(patsubst %.$(s),%.txt,$(filter %.$(s),$(DOCS))))
 DOCS_HTML = $(DOCS_SRC:.txt=.html)
@@ -114,7 +116,10 @@ $(LIBS:=.a): $$(patsubst %.c,.%.o,$$($$(patsubst %.a,%,$$@)_SOURCES)) Makefile
 	$(RM) $@
 	$(AR) rcs $@ $(filter %.o,$^)
 
-$(PROGRAMS) $(TESTS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
+$(TESTPROGAMS): %: .$$(subst tst-,,%).o ../common/lib.a ../postlicyd/libpostlicyd.a Makefile
+	$(CC) -o $@ $(filter %.o,$^) $(LDFLAGS) $(TESTLIBS) $(filter %.a,$^)
+
+$(PROGRAMS): $$(patsubst %.c,.%.o,$$($$@_SOURCES)) Makefile
 	$(CC) -o $@ $(filter %.o,$^) $(LDFLAGS) $($@_LIBADD) $(filter %.a,$^)
 
 $(DOCS):
