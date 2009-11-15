@@ -97,6 +97,18 @@ static const filter_hook_t async_hook = {
 static bool init_done  = false;
 uint32_t filter_running = 0;
 
+#define filter_declare(filter)                                                 \
+    filter_constructor_prototype(filter);                                      \
+    module_init(filter ## _init_filter);
+filter_declare(iplist)
+filter_declare(greylist)
+filter_declare(strlist)
+filter_declare(match)
+filter_declare(counters)
+filter_declare(spf)
+filter_declare(hang)
+filter_declare(rate)
+
 static int filter_module_init(void)
 {
     if (init_done) {

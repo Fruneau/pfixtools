@@ -338,7 +338,7 @@ static filter_result_t greylist_filter(const filter_t *filter,
     return try_greylist(config, query) ? HTK_WHITELIST : HTK_GREYLIST;
 }
 
-static int greylist_init(void)
+filter_constructor(greylist)
 {
     filter_type_t type =  filter_register("greylist", greylist_filter_constructor,
                                           greylist_filter_destructor,
@@ -364,6 +364,5 @@ static int greylist_init(void)
     (void)filter_param_register(type, "prefix");
     return 0;
 }
-module_init(greylist_init)
 
 /* vim:set et sw=4 sts=4 sws=4: */

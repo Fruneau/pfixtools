@@ -557,7 +557,7 @@ static void iplist_context_destructor(void *data)
     p_delete(&ctx);
 }
 
-static int iplist_init(void)
+filter_constructor(iplist)
 {
     filter_type_t filter_type =  filter_register("iplist", iplist_filter_constructor,
                                                  iplist_filter_destructor, iplist_filter,
@@ -583,6 +583,5 @@ static int iplist_init(void)
     (void)filter_param_register(filter_type, "soft_threshold");
     return 0;
 }
-module_init(iplist_init);
 
 /* vim:set et sw=4 sts=4 sws=4: */

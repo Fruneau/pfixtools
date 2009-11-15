@@ -338,7 +338,7 @@ static filter_result_t match_filter(const filter_t *filter, const query_t *query
     }
 }
 
-static int match_init(void)
+filter_constructor(match)
 {
     filter_type_t type =  filter_register("match", match_filter_constructor,
                                           match_filter_destructor, match_filter,
@@ -354,7 +354,6 @@ static int match_init(void)
     (void)filter_param_register(type, "condition");
     return 0;
 }
-module_init(match_init);
 
 static void match_exit(void)
 {

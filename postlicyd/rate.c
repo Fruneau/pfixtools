@@ -284,7 +284,7 @@ static filter_result_t rate_filter(const filter_t *filter,
     }
 }
 
-static int rate_init(void)
+filter_constructor(rate)
 {
     filter_type_t type = filter_register("rate", rate_filter_constructor,
                                          rate_filter_destructor,
@@ -313,6 +313,5 @@ static int rate_init(void)
     (void)filter_param_register(type, "cleanup_period");
     return 0;
 }
-module_init(rate_init);
 
 /* vim:set et sw=4 sts=4 sws=4: */

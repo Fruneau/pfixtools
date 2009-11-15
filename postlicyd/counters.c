@@ -110,7 +110,7 @@ static filter_result_t counter_filter(const filter_t *filter, const query_t *que
     }
 }
 
-static int counter_init(void)
+filter_constructor(counters)
 {
     filter_type_t type =  filter_register("counter", counter_filter_constructor,
                                           counter_filter_destructor, counter_filter,
@@ -130,6 +130,5 @@ static int counter_init(void)
     (void)filter_param_register(type, "soft_threshold");
     return 0;
 }
-module_init(counter_init);
 
 /* vim:set et sw=4 sts=4 sws=4: */

@@ -823,7 +823,7 @@ static void strlist_context_destructor(void *data)
     p_delete(&ctx);
 }
 
-static int strlist_init(void)
+filter_constructor(strlist)
 {
     filter_type_t filter_type =  filter_register("strlist", strlist_filter_constructor,
                                                  strlist_filter_destructor, strlist_filter,
@@ -850,6 +850,5 @@ static int strlist_init(void)
     (void)filter_param_register(filter_type, "fields");
     return 0;
 }
-module_init(strlist_init);
 
 /* vim:set et sw=4 sts=4 sws=4: */

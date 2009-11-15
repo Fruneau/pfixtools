@@ -174,7 +174,7 @@ static void spf_exit(void)
 module_exit(spf_exit);
 
 
-static int spf_init(void)
+filter_constructor(spf)
 {
     filter_type_t filter_type = filter_register("spf", spf_filter_constructor,
                                                 spf_filter_destructor, spf_filter,
@@ -203,7 +203,5 @@ static int spf_init(void)
     (void)filter_param_register(filter_type, "check_helo");
     return 0;
 }
-module_init(spf_init);
-
 
 /* vim:set et sw=4 sts=4 sws=4: */

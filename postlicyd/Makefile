@@ -43,7 +43,7 @@ GENERATED = policy_tokens.h policy_tokens.c \
 
 LIBS = libpostlicyd
 
-FILTERS		= iplist.c greylist.c strlist.c match.c counters.c spf.c hang.c rate.c
+FILTERS		= $(shell grep '^filter_declare' filter.c | sed -e 's/filter_declare(\(.*\)).*/\1.c/')
 
 libpostlicyd_SOURCES = filter.c config.c query.c resources.c db.c $(FILTERS) $(GENERATED)
 

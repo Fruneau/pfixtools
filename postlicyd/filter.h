@@ -151,6 +151,14 @@ extern uint32_t filter_running;
 
 /* Registration.
  */
+#define filter_constructor_name(filter)  filter ## _init_filter
+#define filter_constructor_prototype(filter)                                   \
+    int filter_constructor_name(filter)(void)
+
+#define filter_constructor(filter)                                             \
+    __attribute__((used)) filter_constructor_prototype(filter);                \
+                                                                               \
+    filter_constructor_prototype(filter)
 
 __attribute__((nonnull(1,4)))
 filter_type_t filter_register(const char *type, filter_constructor_t constructor,

@@ -108,7 +108,7 @@ static filter_result_t hang_filter(const filter_t* filter, const query_t* query,
 }
 
 
-static int hang_init(void)
+filter_constructor(hang)
 {
     filter_type_t filter_type = filter_register("hang", hang_filter_constructor,
                                                 hang_filter_destructor, hang_filter,
@@ -124,7 +124,5 @@ static int hang_init(void)
     (void)filter_param_register(filter_type, "timeout_ms");
     return 0;
 }
-module_init(hang_init);
-
 
 /* vim:set et sw=4 sts=4 sws=4: */
