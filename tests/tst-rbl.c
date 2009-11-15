@@ -33,91 +33,30 @@
 /******************************************************************************/
 
 /*
- * Copyright © 2008 Florent Bruneau
+ * Copyright © 2007 Pierre Habouzit
  */
 
-#include "common.h"
-#include "file.h"
-#include "query.h"
+#define DEBUG(fmt, ...) \
+    fprintf(stderr, "%s:%d:%s: "fmt"\n", \
+            __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 
-static bool read_query(const char *base, const char *file, query_t *query,
-                       char *buff)
-{
-    char path[FILENAME_MAX];
-    snprintf(path, FILENAME_MAX, "%s%s", base, file);
-    {
-        file_map_t map;
-        if (!file_map_open(&map, path, false)) {
-            UNIXERR("open");
-            return false;
-        }
-        if (map.end - map.map >= BUFSIZ) {
-            err("File too large for a testcase: %s", path);
-            file_map_close(&map);
-            return false;
-        }
-        memcpy(buff, map.map, map.end - map.map);
-        buff[map.end - map.map] = '\0';
-        file_map_close(&map);
-    }
-
-    char *eoq = strstr(buff, "\n\n");
-    if (eoq == NULL) {
-        return false;
-    }
-    if (!query_parse(query, buff)) {
-        err("Cannot parse query from file %s", path);
-        return false;
-    }
-    return true;
-}
+#include <common/common.h>
+#include <postlicyd/iplist.h>
+#include <common/array.h>
 
 int main(int argc, char *argv[])
 {
-    char basepath[FILENAME_MAX];
-    char buff[BUFSIZ];
-    char *p;
+    if (argc > 1) {
+        rbldb_t *db = rbldb_create(argv[1], false);
+        printf("loaded: %s, %d ips, %d o\n", argv[1], rbldb_stats(db),
+               rbldb_stats(db) * 2 + 65536 * (int) sizeof(A(uint16_t)));
 
-    p = strrchr(argv[0], '/');
-    if (p == NULL) {
-        p = argv[0];
-    } else {
-        ++p;
-    }
-    snprintf(basepath, FILENAME_MAX, "%.*sdata/", (int) (p - argv[0]), argv[0]);
-
-    query_t q;
-    if (!read_query(basepath, "testcase_1", &q, buff)) {
-        return EXIT_FAILURE;
-    }
-
-    static const int iterations = 50000000;
-    {
-      static const char *format = "${sender} ${recipient} ${normalized_sender} ${normalized_client} and ${client_name}[${client_address}] at ${protocol_state}";
-      time_t now = time(0);
-      char str[BUFSIZ];
-      for (int i = 0 ; i < iterations ; ++i) {
-          query_format(str, BUFSIZ, format, &q);
-          if (i == 0) {
-              printf("%s\n", str);
-          }
-      }
-      time_t ellapsed = time(0) - now;
-      printf("Done %d iterations in %us (%d format per second)\n", iterations,
-             (uint32_t)ellapsed, (int)(iterations / ellapsed));
-    }
-
-    {
-      time_t now = time(0);
-      char str[BUFSIZ];
-      for (int i = 0 ; i < iterations ; ++i) {
-          snprintf(str, BUFSIZ, "%s %s and %s[%s] at %s",
-                   q.sender.str, q.recipient.str, q.client_name.str, q.client_address.str,
-                   smtp_state_names[q.state].str);
-      }
-      time_t ellapsed = time(0) - now;
-      printf("Done %d iterations in %us (%d format per second)\n", iterations,
-             (uint32_t)ellapsed, (int)(iterations / ellapsed));
+        time_t now = time(NULL);
+        for (uint32_t i = 0 ; i < 1000000000 ; ++i) {
+            rbldb_ipv4_lookup(db, (88 << 24) | (170 << 16) | (239 << 8) | (132));
+        }
+        printf("%ld request per second\n", 1000000000 / (time(NULL) - now));
+        rbldb_delete(&db);
     }
     return 0;
 }

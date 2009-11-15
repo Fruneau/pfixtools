@@ -40,25 +40,15 @@ GENERATED = policy_tokens.h policy_tokens.c \
 						filter_tokens.h filter_tokens.c \
 						hook_tokens.h hook_tokens.c \
 						param_tokens.h param_tokens.c
-TESTS     = tst-rbl tst-filters tst-greylist tst-qf
 
-UB_LIBS   = -lunbound
+LIBS = libpostlicyd
 
 FILTERS		= iplist.c greylist.c strlist.c match.c counters.c spf.c hang.c rate.c
 
-postlicyd_SOURCES = main-postlicyd.c ../common/lib.a filter.c config.c query.c resources.c db.c $(FILTERS) $(GENERATED)
-postlicyd_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev -lpcre
+libpostlicyd_SOURCES = filter.c config.c query.c resources.c db.c $(FILTERS) $(GENERATED)
 
-tst-rbl_SOURCES   = tst-rbl.c ../common/lib.a filter.c config.c query.c iplist.c resources.c $(GENERATED)
-tst-rbl_LIBADD    = $(UB_LIBS) -lev -lpcre
-
-tst-filters_SOURCES = tst-filters.c ../common/lib.a config.c filter.c query.c resources.c db.c $(FILTERS) $(GENERATED)
-tst-filters_LIBADD  = $(UB_LIBS) $(TC_LIBS) -lev -lpcre
-
-tst-greylist_SOURCES = tst-greylist.c resources.c db.c ../common/lib.a
-tst-greylist_LIBADD  = $(TC_LIBS)
-
-tst-qf_SOURCES = tst-qf.c query.c ../common/lib.a $(GENERATED)
+postlicyd_SOURCES = main-postlicyd.c ../common/lib.a libpostlicyd.a
+postlicyd_LIBADD  = $(TC_LIBS) -lev -lpcre -lunbound
 
 all:
 

@@ -32,37 +32,33 @@
 #   see AUTHORS and source files for details                                 #
 ##############################################################################
 
-PROGDIRS = postlicyd pfix-srsd
-LIBDIRS  = common
-TESTDIRS = tests
-SUBDIRS  = $(LIBDIRS) $(PROGDIRS) $(TESTDIRS)
+include ../mk/tc.mk
 
-DOCS     = pfixtools.7
+TESTS = tst-trie tst-regexp tst-spf tst-rbl tst-filters tst-greylist tst-qf
+TESTLIBS=$(TC_LIBS) -lunbound -lev -lpcre
 
-# RULES ###################################################################{{{
+tst-trie_SOURCES = tst-trie.c ../common/lib.a
+tst-trie_LIBADD = $(TESTLIBS)
 
-all clean distclean doc install: %: %-recurse
+tst-regexp_SOURCES = tst-regexp.c ../common/lib.a
+tst-regexp_LIBADD = $(TESTLIBS)
 
-%-recurse:
-	@set -e $(foreach dir,$(SUBDIRS),; $(MAKE) -C $(dir) $*)
+tst-spf_SOURCES = tst-spf.c ../common/lib.a
+tst-spf_LIBADD = $(TESTLIBS)
 
-install-recurse: install-dir
-install: install-postlicyd-tools install-postlicyd-conf
-install-dir:
-	install -d $(DESTDIR)$(prefix)/sbin
-	install -d $(DESTDIR)$(prefix)/bin
-	install -d $(DESTDIR)$(prefix)/share/doc/pfixtools
-	install -d $(DESTDIR)/etc/pfixtools
+tst-rbl_SOURCES   = tst-rbl.c ../common/lib.a ../postlicyd/libpostlicyd.a
+tst-rbl_LIBADD    = $(TESTLIBS)
 
-install-postlicyd-tools:
-	install tools/postlicyd-rsyncrbl $(DESTDIR)$(prefix)/bin/postlicyd-rsyncrbl
+tst-filters_SOURCES = tst-filters.c ../common/lib.a ../postlicyd/libpostlicyd.a
+tst-filters_LIBADD  = $(TESTLIBS)
 
-install-postlicyd-conf:
-	install -m 640 example/postlicyd.conf $(DESTDIR)/etc/pfixtools/postlicyd.example.conf
-	install -m 640 example/postlicyd-rsyncrbl.conf $(DESTDIR)/etc/pfixtools/postlicyd-rsyncrbl.example.conf
+tst-greylist_SOURCES = tst-greylist.c ../common/lib.a ../postlicyd/libpostlicyd.a
+tst-greylist_LIBADD  = $(TESTLIBS)
 
-.PHONY: clean distclean install install-% %-recurse tst-%
+tst-qf_SOURCES = tst-qf.c ../common/lib.a ../postlicyd/libpostlicyd.a
+tst-qf_LIBADD = $(TESTLIBS)
 
-###########################################################################}}}
 
-include mk/common.mk
+all:
+
+include ../mk/common.mk

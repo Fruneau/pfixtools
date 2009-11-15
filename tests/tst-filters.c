@@ -36,9 +36,9 @@
  * Copyright © 2008 Florent Bruneau
  */
 
-#include "str.h"
-#include "config.h"
-#include "file.h"
+#include <common/str.h>
+#include <postlicyd/config.h>
+#include <common/file.h>
 #include <dirent.h>
 
 static char *read_query(const char *basepath, const char *filename,
