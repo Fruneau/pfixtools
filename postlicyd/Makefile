@@ -47,7 +47,7 @@ FILTERS		= iplist.c greylist.c strlist.c match.c counters.c spf.c hang.c rate.c
 
 libpostlicyd_SOURCES = filter.c config.c query.c resources.c db.c $(FILTERS) $(GENERATED)
 
-postlicyd_SOURCES = main-postlicyd.c ../common/lib.a libpostlicyd.a
+postlicyd_SOURCES = main-postlicyd.c libpostlicyd.a ../common/lib.a
 postlicyd_LIBADD  = $(TC_LIBS) -lev -lpcre -lunbound
 
 all:
