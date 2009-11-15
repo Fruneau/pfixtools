@@ -1,15 +1,8 @@
 *_tokens.[hc]
 
-/common/tst-regexp
-/common/tst-trie
-/common/tst-spf
 /pfix-srsd/pfix-srsd
 /postlicyd/postlicyd
-/postlicyd/data/*.db
-/postlicyd/tst-filters
-/postlicyd/tst-greylist
-/postlicyd/tst-qf
-/postlicyd/tst-rbl
+/tests/data/*.db
 
 *.xml
 *.html
