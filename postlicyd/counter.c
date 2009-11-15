@@ -110,7 +110,7 @@ static filter_result_t counter_filter(const filter_t *filter, const query_t *que
     }
 }
 
-filter_constructor(counters)
+filter_constructor(counter)
 {
     filter_type_t type =  filter_register("counter", counter_filter_constructor,
                                           counter_filter_destructor, counter_filter,
