@@ -285,73 +285,46 @@ module_exit(postlicyd_shutdown);
 
 /* administrivia {{{ */
 
-void usage(void)
+static void usage(void)
 {
     fputs("usage: "DAEMON_NAME" [options] config\n"
           "\n"
           "Options:\n"
-          "    -l|--port <port>        port to listen to\n"
-          "    -p|--pid-file <pidfile> file to write our pid to\n"
-          "    -f|--foreground         stay in foreground\n"
-          "    -d|--debug              grow logging level\n"
-          "    -u|--unsafe             unsafe mode (don't drop privileges)\n"
-          "    -c|--check-conf         only check configuration\n"
-         , stderr);
+          "    -l|--port <port>              port to listen to\n"
+          "    -c|--check-conf               only check configuration\n"
+          COMMON_DAEMON_OPTION_HELP,
+          stderr);
 }
 
 /* }}} */
 
 int main(int argc, char *argv[])
 {
-    bool unsafe = false;
-    const char *pidfile = NULL;
-    bool daemonize = true;
+    COMMON_DAEMON_OPTION_PARAMS;
     int port = DEFAULT_PORT;
     bool port_from_cli = false;
     bool check_conf = false;
 
     struct option longopts[] = {
-        { "help", no_argument, NULL, 'h' },
-        { "unsafe", no_argument, NULL, 'u' },
-        { "foreground", no_argument, NULL, 'f' },
-        { "debug", no_argument, NULL, 'd' },
+        COMMON_DAEMON_OPTION_LIST,
         { "check-conf", no_argument, NULL, 'c' },
         { "port", required_argument, NULL, 'l' },
-        { "pid-file", required_argument, NULL, 'p' },
         { NULL, 0, NULL, 0 }
     };
 
     for (int c = 0; (c = getopt_long(argc, argv, "hufdc" "l:p:", longopts, NULL)) >= 0; ) {
         switch (c) {
-          case 'p':
-            pidfile = optarg;
-            break;
-          case 'u':
-            unsafe = true;
-            break;
           case 'l':
             port = atoi(optarg);
             port_from_cli = true;
-            break;
-          case 'f':
-            daemonize = false;
-            break;
-          case 'd':
-            ++log_level;
             break;
           case 'c':
             check_conf = true;
             daemonize  = false;
             unsafe     = true;
             break;
-          default:
-            usage();
-            return EXIT_FAILURE;
+          COMMON_DAEMON_OPTION_CASES
         }
-    }
-
-    if (!daemonize) {
-        log_syslog = false;
     }
 
     if (argc - optind != 1) {

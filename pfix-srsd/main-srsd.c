@@ -269,21 +269,19 @@ static srs_t *srs_read_secrets(const char *sfile)
 /* administrivia {{{1
  */
 
-void usage(void)
+static void usage(void)
 {
     fputs("usage: "DAEMON_NAME" [options] domain secrets\n"
           "\n"
           "Options:\n"
-          "    -e|--encoding <port>    port to listen to for encoding requests\n"
-          "                            (default: "STR(DEFAULT_ENCODER_PORT)")\n"
-          "    -d|--decoding <port>    port to listen to for decoding requests\n"
-          "                            (default: "STR(DEFAULT_DECODER_PORT)")\n"
-          "    -p|--pid-file <pidfile> file to write our pid to\n"
-          "    -s|--separator <sep>    define the character used as srs separator (+, - or =)\n"
-          "    -u|--unsafe             unsafe mode: don't drop privilegies\n"
-          "    -I|--ignore-outside     do not touch mails outside of \"domain\" in decoding mode\n"
-          "    -f|--foreground         stay in foreground\n"
-         , stderr);
+          "    -e|--encoding <port>          port to listen to for encoding requests\n"
+          "                                  (default: "STR(DEFAULT_ENCODER_PORT)")\n"
+          "    -d|--decoding <port>          port to listen to for decoding requests\n"
+          "                                  (default: "STR(DEFAULT_DECODER_PORT)")\n"
+          "    -s|--separator <sep>          define the character used as srs separator (+, - or =)\n"
+          "    -I|--ignore-outside           do not touch mails outside of \"domain\" in decoding mode\n"
+          COMMON_DAEMON_OPTION_HELP,
+          stderr);
 }
 
 /* }}}
@@ -291,18 +289,13 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
-    bool unsafe  = false;
-    bool daemonize = true;
+    COMMON_DAEMON_OPTION_PARAMS;
     int port_enc = DEFAULT_ENCODER_PORT;
     int port_dec = DEFAULT_DECODER_PORT;
-    const char *pidfile = NULL;
 
     struct option longopts[] = {
-        { "help", no_argument, NULL, 'h' },
-        { "unsafe", no_argument, NULL, 'u' },
-        { "foreground", no_argument, NULL, 'f' },
+        COMMON_DAEMON_OPTION_LIST,
         { "ignore-outside", no_argument, NULL, 'I' },
-        { "pid-file", required_argument, NULL, 'p' },
         { "encoding", required_argument, NULL, 'e' },
         { "decoding", required_argument, NULL, 'd' },
         { "separator", required_argument, NULL, 's' },
@@ -314,17 +307,8 @@ int main(int argc, char *argv[])
           case 'e':
             port_enc = atoi(optarg);
             break;
-          case 'f':
-            daemonize = false;
-            break;
           case 'd':
             port_dec = atoi(optarg);
-            break;
-          case 'p':
-            pidfile = optarg;
-            break;
-          case 'u':
-            unsafe = true;
             break;
           case 'I':
             config.ignore_ext = true;
@@ -341,14 +325,8 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
             break;
-          default:
-            usage();
-            return EXIT_FAILURE;
+          COMMON_DAEMON_OPTION_CASES
         }
-    }
-
-    if (!daemonize) {
-        log_syslog = false;
     }
 
     if (argc - optind != 2) {

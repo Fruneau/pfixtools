@@ -170,6 +170,51 @@ static inline void common_startup(void)
     module_init(main_initialize);                                 \
     module_exit(main_shutdown);
 
+#define COMMON_OPTION_LIST                                        \
+    { "help", no_argument, NULL, 'h' },                           \
+    { "verbose", no_argument, NULL, 'v' }
+
+#define COMMON_OPTION_CASES                                       \
+  case 'v':                                                       \
+    ++log_level;                                                  \
+    break;                                                        \
+  default:                                                        \
+    usage();                                                      \
+    return EXIT_FAILURE;
+
+#define COMMON_OPTION_HELP                                        \
+    "    -v|--verbose                  increase logging level\n"  \
+    "    -h|--help                     show this help message\n"
+
+#define COMMON_DAEMON_OPTION_LIST                                 \
+    COMMON_OPTION_LIST,                                           \
+    { "unsafe", no_argument, NULL, 'u' },                         \
+    { "foreground", no_argument, NULL, 'f' },                     \
+    { "pid-file", required_argument, NULL, 'p' }
+
+#define COMMON_DAEMON_OPTION_CASES                                \
+  case 'f':                                                       \
+    daemonize = false;                                            \
+    log_syslog = false;                                           \
+    break;                                                        \
+  case 'p':                                                       \
+    pidfile = optarg;                                             \
+    break;                                                        \
+  case 'u':                                                       \
+    unsafe = true;                                                \
+    break;                                                        \
+  COMMON_OPTION_CASES
+
+#define COMMON_DAEMON_OPTION_PARAMS                               \
+    bool unsafe = false;                                          \
+    const char *pidfile = NULL;                                   \
+    bool daemonize = true;
+
+#define COMMON_DAEMON_OPTION_HELP                                 \
+    "    -p|--pid-file <pidfile>       file to write our pid to\n"\
+    "    -u|--unsafe                   unsafe mode (don't drop privileges)\n"\
+    "    -f|--foreground               stay in foreground\n"      \
+    COMMON_OPTION_HELP
 #endif
 
 /* vim:set et sw=4 sts=4 sws=4: */
