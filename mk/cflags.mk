@@ -46,7 +46,8 @@ CFLAGSBASE += -pipe
 CFLAGSBASE += -O2
 # let the type char be unsigned by default
 CFLAGSBASE += -funsigned-char
-CFLAGSBASE += -fno-strict-aliasing
+CFLAGSBASE += -fstrict-aliasing
+CFLAGSBASE += -Wstrict-aliasing=2
 # turn on all common warnings
 CFLAGSBASE += -Wall
 # turn on extra warnings
@@ -78,7 +79,6 @@ CFLAGSBASE += $(if $(GCC4),-Winit-self)
 # warn about pointer arithmetic on void* and function pointers
 CFLAGSBASE += -Wpointer-arith
 # warn about multiple declarations
-# #disabled on Darwin because of warnings in ev.h
 CFLAGSBASE += -Wredundant-decls
 # warn if the format string is not a string literal
 CFLAGSBASE += -Wformat-nonliteral
@@ -88,6 +88,12 @@ CFLAGSBASE += -Wno-format-zero-length
 CFLAGSBASE += -Wno-format-y2k
 # warn about functions without format attribute that should have one
 CFLAGSBASE += -Wmissing-format-attribute
+# warn about sequence point error
+CFLAGSBASE += -Wsequence-point
+# warn about dangerous missing parentheses
+CFLAGSBASE += -Wparentheses
+# warn about missing declarations
+CFLAGSBASE += -Wmissing-declarations
 
 CFLAGS=$(CFLAGSBASE)
 LDFLAGS=$(LDFLAGSBASE)

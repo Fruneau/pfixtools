@@ -39,6 +39,6 @@ lib_SOURCES = str.c buffer.c common.c trie.c file.c dns.c utils.c spf.c server.c
 
 all:
 
-.server.o: CFLAGS=$(if $(DARWIN),$(filter-out -Wredundant-decls,$(filter-out -Wshadow,$(CFLAGSBASE))),$(CFLAGSBASE))
+.server.o: CFLAGS=$(if $(DARWIN),$(filter-out -Wredundant-decls,$(filter-out -Wshadow,$(CFLAGSBASE) -fno-strict-aliasing)),$(CFLAGSBASE) -fno-strict-aliasing)
 
 include ../mk/common.mk
