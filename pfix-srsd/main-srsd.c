@@ -80,7 +80,7 @@ static void *srsd_starter(listener_t *server)
 /* Processing {{{1
  */
 
-char *urldecode(char *s, char *end)
+static char *urldecode(char *s, char *end)
 {
     char *p = s;
 
@@ -101,7 +101,7 @@ char *urldecode(char *s, char *end)
     return s;
 }
 
-int process_srs(client_t *srsd, void* vconfig)
+static int process_srs(client_t *srsd, void* vconfig)
 {
     srs_config_t* config = vconfig;
     buffer_t *ibuf = client_input_buffer(srsd);
