@@ -279,6 +279,8 @@ static inline bool trie_compile_aux(trie_t *trie, uint32_t id,
                                     uint32_t first_key, uint32_t last_key,
                                     int offset, int initial_diff)
 {
+    /* The forks list will contain the list of row number where splits are found.
+     */
     uint32_t forks[256];
     uint32_t fork_pos = 0;
     char current = '\0';
@@ -287,6 +289,11 @@ static inline bool trie_compile_aux(trie_t *trie, uint32_t id,
     assert(strcmp(key(trie, first_key) + offset, str(trie, entry)) == 0);
 #endif
 
+    /* Walk through the entries, column per column, and the first column where for one or more
+     * row entries[row,column] is not the same as entries[row-1,column].
+     *
+     * The corresponding rows are stored in forks and a new node is created each time a fork is found.
+     */
     for (int off_diff = initial_diff ; fork_pos == 0 ; ++off_diff, ++offset) {
         current = key(trie, first_key)[offset];
         for (uint32_t i = first_key + 1 ; i < last_key ; ++i) {
@@ -294,14 +301,23 @@ static inline bool trie_compile_aux(trie_t *trie, uint32_t id,
             const int  reg   = rek(trie, i);
             const char c = *ckey;
             if (c != current) {
+                /* Split found, create a new node.
+                 */
                 array_ensure_capacity_delta(trie->entries, 2);
                 if (fork_pos == 0) {
+                    /* Mark the current column as the split point
+                     */
                     trie_entry_split(trie, id, off_diff);
                 }
+                /* Mark this row as a split point, create a node.
+                 */
                 trie_entry_insert_child(trie, id, trie_add_leaf(trie, ckey, reg));
                 forks[fork_pos++] = i;
                 current = c;
             } else if (current == '\0') {
+                /* Found a '\0', This should not happen since the rows are sorted, so, we are
+                 * sure this is a duplicated ==> check consistency and skip the first line.
+                 */
                 if (rek(trie, first_key) != reg) {
                     err("duplicate entry in the trie with different associated regexps: %s",
                         key(trie, i));
@@ -319,6 +335,8 @@ static inline bool trie_compile_aux(trie_t *trie, uint32_t id,
     }
     forks[fork_pos] = last_key;
 
+    /* Recursively call compile_aux to build the subtree for each fork.
+     */
     const uint8_t children_len = array_elt(trie->entries, id).children_len;
     for (uint16_t i = 0 ; i < children_len ; ++i) {
         int child = array_elt(trie->entries, id).children_offset + i;
@@ -336,6 +354,9 @@ bool trie_compile(trie_t *trie, bool memlock)
 {
     assert(trie->entries.len == 0 && "Trie already compiled");
     assert(trie->keys.len != 0 && "Trying to compile an empty trie");
+
+    /* First of all, sort all the entries
+     */
     {
 #       define QSORT_TYPE trie_key_t
 #       define QSORT_BASE trie->keys_offset.data
@@ -345,10 +366,16 @@ bool trie_compile(trie_t *trie, bool memlock)
     }
 
     array_ensure_capacity(trie->entries, trie->keys_offset.len);
+
+    /* Build the tree
+     */
     if (!trie_compile_aux(trie, trie_add_leaf(trie, key(trie, 0), rek(trie, 0)),
                           0, trie->keys_offset.len, 0, 0)) {
         return false;
     }
+
+    /* Cleanup structure and reduce memory consumption.
+     */
     trie_cleanup_build_data(trie);
     array_adjust(trie->entries);
     array_adjust(trie->c);
