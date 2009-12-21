@@ -275,9 +275,9 @@ bool trie_insert(trie_t *trie, const char *key)
     return trie_insert_regexp_str(trie, &skey, NULL);
 }
 
-static inline bool trie_compile_aux(trie_t *trie, uint32_t id,
-                                    uint32_t first_key, uint32_t last_key,
-                                    int offset, int initial_diff)
+static bool trie_compile_aux(trie_t *trie, uint32_t id,
+                             uint32_t first_key, uint32_t last_key,
+                             int offset, int initial_diff)
 {
     /* The forks list will contain the list of row number where splits are found.
      */
@@ -513,8 +513,8 @@ void trie_unlock(trie_t *trie)
 /* Debug {{{1
  */
 
-static inline void trie_entry_inspect(const trie_t *trie, bool show_content,
-                                      const trie_entry_t *entry, int level)
+static void trie_entry_inspect(const trie_t *trie, bool show_content,
+                               const trie_entry_t *entry, int level)
 {
     static int max_depth = 0;
     static int leaves    = 0;
