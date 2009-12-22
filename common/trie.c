@@ -136,10 +136,16 @@ static inline bool trie_entry_is_leaf(const trie_entry_t *entry)
     return entry->children_len == 0;
 }
 
+static inline bool trie_entry_is_fake(const trie_entry_t *entry)
+{
+    return trie_entry_is_leaf(entry) && entry->c_len == 0;
+}
+
 /** Lookup for a child of entry matching the given entry at the given pos.
  * Only the first character of the children is taken into account in the
  * lookup. The current entry is assumed to match the key.
  */
+#if 0
 static inline const trie_entry_t* trie_entry_child(const trie_t *trie,
                                                    const trie_entry_t* entry,
                                                    const char c)
@@ -163,6 +169,31 @@ static inline const trie_entry_t* trie_entry_child(const trie_t *trie,
     }
     return NULL;
 }
+#else
+static inline const trie_entry_t* trie_entry_child(const trie_t *trie,
+                                                   const trie_entry_t * restrict entry,
+                                                   const char c) {
+    int pos = 0;
+
+    while (pos < entry->children_len) {
+        const trie_entry_t* restrict child = array_ptr(trie->entries, entry->children_offset + pos);
+        if (unlikely(trie_entry_is_fake(child))) {
+            return NULL;
+        } else {
+            const char c2 = str(trie, child)[0];
+            if (c2 == c) {
+                return child;
+            } else if (c2 > c) {
+                pos = (pos << 1) + 1;
+            } else {
+                pos = ((pos + 1) << 1);
+            }
+        }
+    }
+    return NULL;
+}
+
+#endif
 
 static inline uint32_t trie_entry_new(trie_t *trie)
 {
@@ -275,6 +306,58 @@ bool trie_insert(trie_t *trie, const char *key)
     return trie_insert_regexp_str(trie, &skey, NULL);
 }
 
+static uint16_t trie_binary_length(const trie_t *trie, uint32_t id)
+{
+    trie_entry_t *entry = array_ptr(trie->entries, id);
+    assert(entry->children_len != 0);
+    int bits = 32 - __builtin_clz(entry->children_len);
+    return (1 << bits) - 1;
+}
+
+static uint16_t trie_binary_pad(trie_t *trie, uint32_t id)
+{
+    int len = array_len(trie->entries);
+    uint16_t padded = trie_binary_length(trie, id);
+    for (uint16_t i = array_ptr(trie->entries, id)->children_len ; i < padded ; ++i) {
+        trie_entry_new(trie);
+    }
+    assert((uint32_t)(len + padded - array_ptr(trie->entries, id)->children_len) == array_len(trie->entries));
+    return padded - array_ptr(trie->entries, id)->children_len;
+}
+
+static bool trie_binary_build_aux(int pos, trie_entry_t* dest, const trie_entry_t* src,
+                                  int min, int max)
+{
+    if (min > max) {
+        return true;
+    }
+    int dpos = (min + max + 1) >> 1;
+    trie_entry_t* restrict dest_pos = dest + pos;
+    const trie_entry_t* restrict src_pos = src + dpos;
+    *dest_pos = *src_pos;
+
+    return trie_binary_build_aux((pos << 1) + 1, dest, src, min, dpos - 1)
+        && trie_binary_build_aux((pos + 1) << 1, dest, src, dpos + 1, max);
+}
+
+static bool trie_binary_build(trie_t *trie, uint32_t id)
+{
+    trie_entry_t children[256];
+    trie_entry_t *entry = array_ptr(trie->entries, id);
+    uint16_t padded = trie_binary_length(trie, id);
+    children[0] = array_elt(trie->entries, entry->children_offset);
+    memcpy(children, array_ptr(trie->entries, entry->children_offset),
+           sizeof(trie_entry_t) * entry->children_len);
+    p_clear(array_ptr(trie->entries, entry->children_offset), entry->children_len);
+
+    if (!trie_binary_build_aux(0, array_ptr(trie->entries, entry->children_offset),
+                               children, 0, entry->children_len - 1)) {
+        return false;
+    }
+    entry->children_len = padded;
+    return true;
+}
+
 static bool trie_compile_aux(trie_t *trie, uint32_t id,
                              uint32_t first_key, uint32_t last_key,
                              int offset, int initial_diff)
@@ -335,6 +418,8 @@ static bool trie_compile_aux(trie_t *trie, uint32_t id,
     }
     forks[fork_pos] = last_key;
 
+    trie_binary_pad(trie, id);
+
     /* Recursively call compile_aux to build the subtree for each fork.
      */
     const uint8_t children_len = array_elt(trie->entries, id).children_len;
@@ -347,7 +432,8 @@ static bool trie_compile_aux(trie_t *trie, uint32_t id,
         }
         first_key = forks[i];
     }
-    return true;
+
+    return trie_binary_build(trie, id);
 }
 
 bool trie_compile(trie_t *trie, bool memlock)
