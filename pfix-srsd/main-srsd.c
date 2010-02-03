@@ -302,7 +302,7 @@ int main(int argc, char *argv[])
         { NULL, 0, NULL, 0 }
     };
 
-    for (int c = 0; (c = getopt_long(argc, argv, "hfuI" "e:d:p:s:", longopts, NULL)) >= 0; ) {
+    for (int c = 0; (c = getopt_long(argc, argv, COMMON_DAEMON_OPTION_SHORTLIST "Ie:d:s:", longopts, NULL)) >= 0; ) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);

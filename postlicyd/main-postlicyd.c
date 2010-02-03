@@ -312,7 +312,7 @@ int main(int argc, char *argv[])
         { NULL, 0, NULL, 0 }
     };
 
-    for (int c = 0; (c = getopt_long(argc, argv, "hufdc" "l:p:", longopts, NULL)) >= 0; ) {
+    for (int c = 0; (c = getopt_long(argc, argv, COMMON_DAEMON_OPTION_SHORTLIST "cl:", longopts, NULL)) >= 0; ) {
         switch (c) {
           case 'l':
             port = atoi(optarg);

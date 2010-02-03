@@ -174,6 +174,8 @@ static inline void common_startup(void)
     { "help", no_argument, NULL, 'h' },                           \
     { "verbose", no_argument, NULL, 'v' }
 
+#define COMMON_OPTION_SHORTLIST "hv"
+
 #define COMMON_OPTION_CASES                                       \
   case 'v':                                                       \
     ++log_level;                                                  \
@@ -191,6 +193,8 @@ static inline void common_startup(void)
     { "unsafe", no_argument, NULL, 'u' },                         \
     { "foreground", no_argument, NULL, 'f' },                     \
     { "pid-file", required_argument, NULL, 'p' }
+
+#define COMMON_DAEMON_OPTION_SHORTLIST COMMON_OPTION_SHORTLIST "ufp:"
 
 #define COMMON_DAEMON_OPTION_CASES                                \
   case 'f':                                                       \
