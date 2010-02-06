@@ -79,19 +79,19 @@ static inline static_str_t buffer_tostr(buffer_t *buf) {
 
 static inline void buffer_ensure(buffer_t *buf, int extra) {
     assert (extra >= 0);
-    if (buf->len + extra >= buf->size) {
-        buffer_resize(buf, buf->len + extra);
+    if (buf->len + (uint32_t)extra >= buf->size) {
+        buffer_resize(buf, buf->len + (uint32_t)extra);
     }
 }
 static inline void buffer_extend(buffer_t *buf, int extra) {
     buffer_ensure(buf, extra);
-    buf->len += extra;
+    buf->len += (uint32_t)extra;
     buf->data[buf->len] = '\0';
 }
 static inline void buffer_extendch(buffer_t *buf, int extra, int c) {
     buffer_ensure(buf, extra);
     xmemset(buf->data + buf->len, c, extra);
-    buf->len += extra;
+    buf->len += (uint32_t)extra;
     buf->data[buf->len] = '\0';
 }
 
@@ -99,14 +99,14 @@ static inline void buffer_extendch(buffer_t *buf, int extra, int c) {
 static inline void buffer_add(buffer_t *buf, const void *data, int len) {
     buffer_ensure(buf, len);
     xmemcpy(buf->data + buf->len, data, len);
-    buf->len += len;
+    buf->len += (uint32_t)len;
     buf->data[buf->len] = '\0';
 }
 static inline void buffer_addstr(buffer_t *buf, const char *s) {
-    buffer_add(buf, s, m_strlen(s));
+    buffer_add(buf, s, (int)m_strlen(s));
 }
 static inline void buffer_addbuf(buffer_t *buf, buffer_t *buf2) {
-    buffer_add(buf, buf2->data, (ssize_t)buf2->len);
+    buffer_add(buf, buf2->data, (int)buf2->len);
 }
 static inline void buffer_addch(buffer_t *buf, int c) {
     buffer_extendch(buf, 1, c);

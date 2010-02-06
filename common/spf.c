@@ -175,9 +175,10 @@ static int spf_module_init(void)
         return -1;
     }
     if (strchr(pos + 1, '.') != NULL) {
-        memmove(domainname, pos + 1, 127 - (pos - domainname));
+        assert(pos - domainname <= 127);
+        memmove(domainname, pos + 1, (size_t)(127 - (pos - domainname)));
     }
-    domainname_len = m_strlen(domainname);
+    domainname_len = (uint8_t)m_strlen(domainname);
     return 0;
 }
 module_init(spf_module_init);
@@ -308,7 +309,7 @@ static void spf_exit(spf_t* spf, spf_code_t code)
 static void spf_write_macro(buffer_t* restrict  buffer, static_str_t str, bool escape)
 {
     if (!escape) {
-        buffer_add(buffer, str.str, str.len);
+        buffer_add(buffer, str.str, (int)str.len);
     } else {
         for (int i = 0 ; i < str.len ; ++i) {
             const char c = str.str[i];
@@ -442,7 +443,7 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* restrict buffer,
         ++c;
     }
     if (parts > pos - sections + 1) {
-        parts = pos - sections + 1;
+        parts = (int)(pos - sections + 1);
     }
     int i = 0;
     for (i = 0 ; i < parts ; ++i) {
@@ -468,7 +469,7 @@ static spf_expansion_t spf_expand(spf_t* spf, const char* restrict macrostring)
     const char* const macrostart = macrostring;
     while (*macrostring != '\0') {
         const char* next_format = m_strchrnul(macrostring, '%');
-        buffer_add(&spf->domainspec, macrostring, next_format - macrostring);
+        buffer_add(&spf->domainspec, macrostring, (int)(next_format - macrostring));
         macrostring = next_format;
         if (*macrostring != '\0') {
             ++macrostring;
@@ -490,7 +491,7 @@ static spf_expansion_t spf_expand(spf_t* spf, const char* restrict macrostring)
                     return SPFEXP_SYNTAX;
                 }
                 char* end;
-                char entity = ascii_tolower(*macrostring);
+                char entity = (char)ascii_tolower(*macrostring);
                 bool escape = isupper(*macrostring);
                 int parts = 256;
                 bool reverse = false;
@@ -498,7 +499,7 @@ static spf_expansion_t spf_expand(spf_t* spf, const char* restrict macrostring)
                 int delimiters_count = 1;
                 ++macrostring;
                 if (isdigit(*macrostring)) {
-                    parts = strtol(macrostring, &end, 10);
+                    parts = (int)strtol(macrostring, &end, 10);
                     if (parts < 0) {
                         debug("spf (depth=%d): invalid number of parts (%d) in macro  \"%s\"", spf->recursions, parts, macrostring);
                         return SPFEXP_SYNTAX;
@@ -511,7 +512,7 @@ static spf_expansion_t spf_expand(spf_t* spf, const char* restrict macrostring)
                 }
                 if (macrostring < next_format) {
                     delimiters = macrostring;
-                    delimiters_count = next_format - delimiters;
+                    delimiters_count = (int)(next_format - delimiters);
                 }
                 switch (spf_expand_pattern(spf, &spf->domainspec, entity, parts, reverse, escape,
                                            delimiters, delimiters_count)) {
@@ -549,7 +550,7 @@ static bool spf_subquery(spf_t* restrict spf, const char* restrict domain, spf_r
             return false;
         }
         spf->subquery->mech_withdns = spf->mech_withdns;
-        spf->subquery->recursions = spf->recursions + 1;
+        spf->subquery->recursions = (int8_t)(spf->recursions + 1);
         return true;
     }
 }
@@ -986,7 +987,7 @@ static bool spf_run_ptr_resolution(spf_t* spf, const char* domainspec, bool in_m
                 spf_match(spf);
                 return true;
             }
-            buffer_add(&spf->domainspec, array_start(spf->domain), array_len(spf->domain));
+            buffer_add(&spf->domainspec, array_start(spf->domain), (int)array_len(spf->domain));
         }
         if (array_last(spf->domainspec) != '.') {
             buffer_addch(&spf->domainspec, '.');
@@ -1408,7 +1409,7 @@ static bool spf_parse(spf_t* spf)
                 if (spf->redirect_pos >= 0) {
                     return false;
                 }
-                spf->redirect_pos = array_len(spf->rules);
+                spf->redirect_pos = (int8_t)array_len(spf->rules);
                 if (!spf_check_domainspec(name_end, pos, false, false)) {
                     return false;
                 }
@@ -1418,7 +1419,7 @@ static bool spf_parse(spf_t* spf)
                 if (spf->explanation_pos >= 0) {
                     return false;
                 }
-                spf->explanation_pos = array_len(spf->rules);
+                spf->explanation_pos = (int8_t)array_len(spf->rules);
                 if (!spf_check_domainspec(name_end, pos, false, false)) {
                     return false;
                 }
@@ -1449,7 +1450,7 @@ static bool spf_parse(spf_t* spf)
             if (cidr_end > name_end && (*name_end == ':' || *name_end == '=')) {
                 ++name_end;
             }
-            buffer_add(&rule.content, name_end, cidr_end - name_end);
+            buffer_add(&rule.content, name_end, (int)(cidr_end - name_end));
         }
         array_add(spf->rules, rule);
     } while (true);
@@ -1509,7 +1510,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
          *     must  be discarded.
          */
         const char* str = array_start(spf->domainspec);
-        const int len   = array_len(spf->domainspec);
+        const int len   = (int)array_len(spf->domainspec);
         if (len < 6) {
             debug("spf (depth=%d): entry too short to be a spf record", spf->recursions);
         } else {
@@ -1623,7 +1624,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     buffer_addstr(&spf->helo, helo);
     if (array_len(spf->sender) == 0) {
         buffer_addstr(&spf->sender, "postmaster@");
-        buffer_add(&spf->sender, array_start(spf->helo), array_len(spf->helo));
+        buffer_add(&spf->sender, array_start(spf->helo), (int)array_len(spf->helo));
     }
     const char* sender_domain = strchr(array_start(spf->sender), '@');
     if (sender_domain == array_start(spf->sender)) {

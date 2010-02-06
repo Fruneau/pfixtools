@@ -134,7 +134,7 @@ static inline int base64val(int c) {
 __attribute__((nonnull(1)))
 static inline char *m_strtolower(char *p) {
     for (; *p; p++)
-        *p = tolower((unsigned char)*p);
+        *p = (char)tolower((unsigned char)*p);
     return p;
 }
 
@@ -173,7 +173,7 @@ static inline int ascii_tolower(int c) {
  * \return the string length (or 0 if \c s is \c NULL).
  */
 static inline ssize_t m_strlen(const char *s) {
-    return s ? strlen(s) : 0;
+    return s ? (ssize_t)strlen(s) : 0;
 }
 
 /** \brief \c NULL resistant strnlen.
@@ -263,7 +263,7 @@ static inline char *m_strreplace(char **p, const char *s) {
 __attribute__((nonnull(1)))
 static inline ssize_t m_strputc(char *dst, ssize_t n, int c) {
     if (n > 1) {
-        dst[0] = c;
+        dst[0] = (char)c;
         dst[1] = '\0';
     }
     return 1;

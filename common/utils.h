@@ -111,7 +111,7 @@ static inline bool ip_compare_4(ip4_t ip1, ip4_t ip2, cidrlen_t cidr_len)
 
 static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2, cidrlen_t cidr_len)
 {
-    int bytes = cidr_len >> 3;
+    size_t bytes = cidr_len >> 3;
     int bits  = cidr_len & 7;
     if (bytes > 0) {
         if (memcmp(ip1, ip2, bytes) != 0) {
@@ -125,10 +125,10 @@ static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2, cidrlen_t cidr
 }
 
 static inline ip4_t ip_read_4(const uint8_t* restrict data) {
-    return (data[0] << 24)
-        | ((data[1]) << 16)
-        | ((data[2]) << 8)
-        | data[3];
+    return (ip4_t)(data[0] << 24)
+        | (ip4_t)((data[1]) << 16)
+        | (ip4_t)((data[2]) << 8)
+        | (ip4_t)data[3];
 }
 
 #endif

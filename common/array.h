@@ -196,7 +196,7 @@
 
 #define array_unlock(array)                                                    \
     if ((array).locked) {                                                      \
-        (void)munlock((array).data, array_byte_len(array));                    \
+        (void)munlock((array).data, (size_t)array_byte_len(array));            \
         (array).locked = false;                                                \
     }
 
