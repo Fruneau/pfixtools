@@ -927,7 +927,7 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
 
         debug("spf (depth=%d): found %s, to be compared to %s", spf->recursions,
               array_start(dns_buffer), array_start(spf->domainspec));
-        ssize_t diff = array_len(dns_buffer) - array_len(spf->domainspec);
+        ssize_t diff = ((ssize_t)array_len(dns_buffer)) - ((ssize_t)array_len(spf->domainspec));
         bool match = false;
         if (diff == 0) {
             if (strcasecmp(array_start(spf->domainspec), array_start(dns_buffer)) == 0) {
