@@ -167,12 +167,16 @@ static spf_t* spf_acquire(void)
 static int spf_module_init(void)
 {
     if (gethostname(domainname, 128) < 0) {
-        return -1;
+        strcpy(domainname, "localhost");
+        domainname_len = 9;
+        return 0;
     }
 
     const char* pos = strchr(domainname, '.');
     if (pos == NULL) {
-        return -1;
+        strcpy(domainname, "localhost");
+        domainname_len = 9;
+        return 0;
     }
     if (strchr(pos + 1, '.') != NULL) {
         assert(pos - domainname <= 127);
