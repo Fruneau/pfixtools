@@ -495,6 +495,11 @@ static filter_result_t iplist_filter(const filter_t *filter, const query_t *quer
     const iplist_filter_t *data = filter->data;
     bool  error = true;
 
+    if (query->client_address.str == NULL) {
+        warn("client address is missing, cannot run iplist");
+        return HTK_ERROR;
+    }
+
     if (parse_ipv4(query->client_address.str, &end, &ip) != 0) {
         if (strchr(query->client_address.str, ':')) {
             /* iplist only works on IPv4 */
