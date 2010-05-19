@@ -78,6 +78,8 @@ int main(int argc, char *argv[])
     char buff[BUFSIZ];
     char *p;
 
+    log_level = LOG_DEBUG;
+    log_syslog = false;
     p = strrchr(argv[0], '/');
     if (p == NULL) {
         p = argv[0];
@@ -93,7 +95,7 @@ int main(int argc, char *argv[])
 
     static const int iterations = 50000000;
     {
-      static const char *format = "${sender} ${recipient} ${normalized_sender} ${normalized_client} and ${client_name}[${client_address}] at ${protocol_state}";
+      static const char *format = "${sender} ${recipient} ${normalized_sender} ${normalized_client} and ${client_name}[${client_address[0]}.${client_address[1]}.${client_address[3]}.${client_address[4]}.${client_address[5]}.${client_address[-1]}.${client_address[-2]}.${client_address[-4]}.${client_address[-5]}.${client_address[-6]}] at ${protocol_state}";
       time_t now = time(0);
       char str[BUFSIZ];
       for (int i = 0 ; i < iterations ; ++i) {
@@ -103,6 +105,7 @@ int main(int argc, char *argv[])
           }
       }
       time_t ellapsed = time(0) - now;
+      printf(" -> %s\n", str);
       printf("Done %d iterations in %us (%d format per second)\n", iterations,
              (uint32_t)ellapsed, (int)(iterations / ellapsed));
     }
@@ -116,6 +119,7 @@ int main(int argc, char *argv[])
                    smtp_state_names[q.state].str);
       }
       time_t ellapsed = time(0) - now;
+      printf(" -> %s\n", str);
       printf("Done %d iterations in %us (%d format per second)\n", iterations,
              (uint32_t)ellapsed, (int)(iterations / ellapsed));
     }
