@@ -339,6 +339,18 @@ static inline const char *m_strchrnul(const char *s, int c) {
 }
 
 __attribute__((nonnull(1)))
+static inline const char *m_memrchr(const char *s, int c, ssize_t len) {
+    const char *pos = s + len - 1;
+    while (pos > s) {
+        if (*pos == c) {
+            return pos;
+        }
+        --pos;
+    }
+    return NULL;
+}
+
+__attribute__((nonnull(1)))
 static inline const char *m_strnextsp(const char *s) {
     while (*s && !isspace((unsigned char)*s))
         s++;
