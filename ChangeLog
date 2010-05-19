@@ -1,3 +1,14 @@
+version 0.9
+
+  * all:
+    NEW: add support for long options                                      FRU
+    NEW: provide consistent command line arguments                         FRU
+
+  * postlicyd:
+    NEW: query format learns ${field[part]} pattern                        FRU
+    FIX: crash in the greylister when client_address is missing            FRU
+
+------------------------------------------------------------------------------
 version 0.8                                                       Oct 26, 2009
 
   * common:
