@@ -315,6 +315,63 @@ const static_str_t *query_field_for_name(const query_t *query, const char *name)
     return query_field_for_id(query, id);
 }
 
+static bool query_format_field_content(const char* field, ssize_t field_len,
+                                       int part, const query_t *query,
+                                       static_str_t *res)
+{
+    postlicyd_token tok = policy_tokenize(field, field_len);
+    if (tok == PTK_UNKNOWN) {
+        warn("unknown field name \"%.*s\"", (int)field_len, field);
+    }
+    const static_str_t* f = query_field_for_id(query, tok);
+    if (f == NULL) {
+        res->str = "(null)";
+        res->len = 6;
+    } else {
+        *res = *f;
+        if (part == 0 && res->len == 0) {
+            return true;
+        } else if (part >= 0) {
+            const char* start = res->str;
+            const char* end = memchr(start, '.', res->len);
+            for (int i = 0 ; i < part ; ++i) {
+                if (end == NULL) {
+                    res->str = "(none)";
+                    res->len = 6;
+                    return true;
+                }
+                start = end + 1;
+                end = memchr(start, '.', res->len - (start - res->str));
+            }
+            if (end == NULL) {
+                res->len = res->len - (start - res->str);
+            } else {
+                res->len = end - start;
+            }
+            res->str = start;
+        } else if (part < 0 && part != INT_MIN) {
+            const char* end = res->str + res->len;
+            const char* start = m_memrchr(res->str, '.', res->len);
+            for (int i = part ; i != -1 ; ++i) {
+                if (start == NULL) {
+                    res->str = "(none)";
+                    res->len = 6;
+                    return true;
+                }
+                end = start;
+                start = m_memrchr(res->str, '.', end - res->str - 1);
+            }
+            if (start == NULL) {
+                res->len = end - res->str;
+            } else {
+                res->str = start + 1;
+                res->len = end - start - 1;
+            }
+        }
+    }
+    return true;
+}
+
 ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *query)
 {
     size_t written = 0;
@@ -344,19 +401,35 @@ ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *que
             fmt += 2;
             next_format = strchr(fmt, '}');
             if (next_format == NULL) {
+                debug("query format: unmatched { in \"%s\"", fmt);
                 return -1;
             }
 
-            postlicyd_token tok = policy_tokenize(fmt, next_format - fmt);
-            if (tok == PTK_UNKNOWN) {
-                warn("unknown field name \"%.*s\"", (int)(next_format - fmt), fmt);
+            ssize_t fmt_len = next_format - fmt;
+            int part = INT_MIN;
+            if (fmt[fmt_len - 1] == ']') {
+                fmt_len -= 2;
+                while (fmt_len > 0 && fmt[fmt_len] != '[') {
+                    --fmt_len;
+                }
+                char* end = NULL;
+                part = strtol(fmt + fmt_len + 1, &end, 10);
+                if (end == NULL || *end != ']') {
+                    debug("query format: invalid part id in \"%.*s\"",
+                          (int)(next_format - fmt), fmt);
+                    return -1;
+                }
             }
-            const static_str_t *field = query == NULL ? NULL
-                                                      : query_field_for_id(query, tok);
-            if (field == NULL) {
+
+            if (query == NULL) {
                 WRITE("(null)", 6);
             } else {
-                WRITE(field->str, field->len);
+                static_str_t field;
+                if (query_format_field_content(fmt, fmt_len, part, query, &field)) {
+                    WRITE(field.str, field.len);
+                } else {
+                    WRITE("(none)", 6);
+                }
             }
             fmt = next_format + 1;
         }
