@@ -46,8 +46,8 @@ CFLAGSBASE += -pipe
 CFLAGSBASE += -O2
 # let the type char be unsigned by default
 CFLAGSBASE += -funsigned-char
-CFLAGSBASE += -fstrict-aliasing
-CFLAGSBASE += -Wstrict-aliasing=2
+CFLAGSBASE += -fno-strict-aliasing
+# CFLAGSBASE += -Wstrict-aliasing=2
 # turn on all common warnings
 CFLAGSBASE += -Wall
 # turn on extra warnings
