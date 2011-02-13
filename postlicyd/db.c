@@ -42,7 +42,7 @@
 #include "str.h"
 #include "resources.h"
 
-static const static_str_t static_cleanup = { "@@cleanup@@", 11 };
+static const clstr_t static_cleanup = { "@@cleanup@@", 11 };
 
 struct db_t {
     unsigned can_expire : 1;

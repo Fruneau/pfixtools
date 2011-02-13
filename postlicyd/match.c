@@ -60,7 +60,7 @@ typedef struct match_condition_t {
     enum condition_t condition;
 
     union {
-      static_str_t value;
+      clstr_t value;
       regexp_t     regexp;
     } data;
 } match_condition_t;
@@ -68,8 +68,8 @@ ARRAY(match_condition_t)
 #define CONDITION_INIT { PTK_UNKNOWN, false, MATCH_UNKNOWN, { .value = { NULL, 0 } } }
 
 struct match_operator_t {
-    const static_str_t short_name;
-    const static_str_t long_name;
+    const clstr_t short_name;
+    const clstr_t long_name;
     enum condition_t condition;
     bool             cs;
 };
@@ -104,7 +104,7 @@ static const char *condition_names[] = {
 typedef struct match_config_t {
     A(match_condition_t) conditions;
     bool match_all;
-} match_config_t;
+}match_config_t; 
 
 static buffer_t match_buffer = BUFFER_INIT;
 
@@ -205,7 +205,7 @@ static bool match_filter_constructor(filter_t *filter)
               case MATCH_DONTMATCH: {
                 PARSE_CHECK(*p, "no value defined to check the condition");
                 const char * const end = param->value + param->value_len;
-                static_str_t reg = { p, end - p };
+                clstr_t reg = { p, end - p };
                 buffer_addstr(&regexp, "");
                 PARSE_CHECK(regexp_parse_str(&reg, NULL, &regexp, NULL, &condition.case_sensitive),
                             "invalid regexp");
@@ -246,7 +246,7 @@ static void match_filter_destructor(filter_t *filter)
 
 static inline bool match_condition(const match_condition_t *cond, const query_t *query)
 {
-    const static_str_t *field = query_field_for_id(query, cond->field);
+    const clstr_t *field = query_field_for_id(query, cond->field);
     if (cond->condition != MATCH_EMPTY && cond->condition != MATCH_MATCH
         && cond->condition != MATCH_DONTMATCH) {
         buffer_reset(&match_buffer);

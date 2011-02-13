@@ -58,7 +58,7 @@ typedef struct query_context_t {
     query_t query;
     filter_context_t context;
     client_t *client;
-} query_context_t;
+}query_context_t; 
 
 static config_t *config  = NULL;
 static bool refresh      = false;
@@ -110,7 +110,7 @@ static void policy_answer(client_t *pcy, const char *message)
         buffer_addstr(buf, message);
     }
     if (config->include_explanation) {
-        const static_str_t* exp = &context->context.explanation;
+        const clstr_t* exp = &context->context.explanation;
         if (exp->len > 0) {
             buffer_addstr(buf, ": ");
             buffer_add(buf, exp->str, exp->len);

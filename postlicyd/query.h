@@ -59,46 +59,46 @@ enum smtp_state {
     SMTP_UNKNOWN,
 };
 
-extern const static_str_t smtp_state_names[SMTP_count];
+extern const clstr_t smtp_state_names[SMTP_count];
 
 /* \see http://www.postfix.org/SMTPD_POLICY_README.html */
 typedef struct query_t {
     unsigned state : 4;
     unsigned esmtp : 1;
 
-    static_str_t helo_name;
-    static_str_t queue_id;
-    static_str_t sender;
-    static_str_t recipient;
-    static_str_t recipient_count;
-    static_str_t client_address;
-    static_str_t client_name;
-    static_str_t reverse_client_name;
-    static_str_t instance;
+    clstr_t helo_name;
+    clstr_t queue_id;
+    clstr_t sender;
+    clstr_t recipient;
+    clstr_t recipient_count;
+    clstr_t client_address;
+    clstr_t client_name;
+    clstr_t reverse_client_name;
+    clstr_t instance;
 
     /* useful data extracted from previous ones */
-    static_str_t sender_domain;
-    static_str_t recipient_domain;
-    static_str_t normalized_sender;
-    static_str_t normalized_client;
+    clstr_t sender_domain;
+    clstr_t recipient_domain;
+    clstr_t normalized_sender;
+    clstr_t normalized_client;
 
     /* postfix 2.2+ */
-    static_str_t sasl_method;
-    static_str_t sasl_username;
-    static_str_t sasl_sender;
-    static_str_t size;
-    static_str_t ccert_subject;
-    static_str_t ccert_issuer;
-    static_str_t ccert_fingerprint;
+    clstr_t sasl_method;
+    clstr_t sasl_username;
+    clstr_t sasl_sender;
+    clstr_t size;
+    clstr_t ccert_subject;
+    clstr_t ccert_issuer;
+    clstr_t ccert_fingerprint;
 
     /* postfix 2.3+ */
-    static_str_t encryption_protocol;
-    static_str_t encryption_cipher;
-    static_str_t encryption_keysize;
-    static_str_t etrn_domain;
+    clstr_t encryption_protocol;
+    clstr_t encryption_cipher;
+    clstr_t encryption_keysize;
+    clstr_t etrn_domain;
 
     /* postfix 2.5+ */
-    static_str_t stress;
+    clstr_t stress;
 
     const char *eoq;
 
@@ -117,12 +117,12 @@ bool query_parse(query_t *query, char *p);
 /** Return the value of the field with the given name.
  */
 __attribute__((nonnull(1,2)))
-const static_str_t *query_field_for_name(const query_t *query, const char *name);
+const clstr_t *query_field_for_name(const query_t *query, const char *name);
 
 /** Returns the value of the field with the given id.
  */
 __attribute__((nonnull))
-const static_str_t *query_field_for_id(const query_t *query, postlicyd_token id);
+const clstr_t *query_field_for_id(const query_t *query, postlicyd_token id);
 
 /** Formats the given string by replacing ${field_name} with the content
  * of the query.

@@ -41,7 +41,7 @@
 #include "policy_tokens.h"
 #include "str.h"
 
-const static_str_t smtp_state_names[SMTP_count] = {
+const clstr_t smtp_state_names[SMTP_count] = {
   { "CONNECT", 7 },
   { "HELO", 4 },
   { "MAIL", 4 },
@@ -52,8 +52,8 @@ const static_str_t smtp_state_names[SMTP_count] = {
   { "ETRN", 4 },
 };
 
-static const static_str_t static_ESMTP = { "ESMTP", 5 };
-static const static_str_t static_SMTP  = { "SMTP",  4 };
+static const clstr_t static_ESMTP = { "ESMTP", 5 };
+static const clstr_t static_SMTP  = { "SMTP",  4 };
 
 bool query_parse(query_t *query, char *p)
 {
@@ -254,7 +254,7 @@ static void query_compute_normalized_sender(query_t* query)
     query->normalized_sender.len = m_strlen(query->n_sender);
 }
 
-const static_str_t *query_field_for_id(const query_t *query, postlicyd_token id)
+const clstr_t *query_field_for_id(const query_t *query, postlicyd_token id)
 {
     switch (id) {
 #define CASE(Up, Low)                                                          \
@@ -305,7 +305,7 @@ const static_str_t *query_field_for_id(const query_t *query, postlicyd_token id)
     }
 }
 
-const static_str_t *query_field_for_name(const query_t *query, const char *name)
+const clstr_t *query_field_for_name(const query_t *query, const char *name)
 {
     postlicyd_token id = policy_tokenize(name, strlen(name));
     if (id == PTK_UNKNOWN) {
@@ -317,13 +317,13 @@ const static_str_t *query_field_for_name(const query_t *query, const char *name)
 
 static bool query_format_field_content(const char* field, ssize_t field_len,
                                        int part, const query_t *query,
-                                       static_str_t *res)
+                                       clstr_t *res)
 {
     postlicyd_token tok = policy_tokenize(field, field_len);
     if (tok == PTK_UNKNOWN) {
         warn("unknown field name \"%.*s\"", (int)field_len, field);
     }
-    const static_str_t* f = query_field_for_id(query, tok);
+    const clstr_t* f = query_field_for_id(query, tok);
     if (f == NULL) {
         res->str = "(null)";
         res->len = 6;
@@ -424,7 +424,7 @@ ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *que
             if (query == NULL) {
                 WRITE("(null)", 6);
             } else {
-                static_str_t field;
+                clstr_t field;
                 if (query_format_field_content(fmt, fmt_len, part, query, &field)) {
                     WRITE(field.str, field.len);
                 } else {

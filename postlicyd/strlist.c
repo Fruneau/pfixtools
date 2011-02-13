@@ -79,14 +79,14 @@ typedef struct strlist_config_t {
     unsigned match_helo       :1;
     unsigned match_client     :1;
     unsigned match_reverse    :1;
-} strlist_config_t;
+}strlist_config_t; 
 
 typedef struct strlist_async_data_t {
     A(dns_result_t) results;
     int awaited;
     uint32_t sum;
     bool error;
-} strlist_async_data_t;
+}strlist_async_data_t; 
 
 static void strlist_local_wipe(strlist_local_t *entry)
 {
@@ -217,7 +217,7 @@ static bool strlist_create(strlist_local_t *local,
                 --eos;
             }
             if (p < eos) {
-                static_str_t substr = { p, eos - p };
+                clstr_t substr = { p, eos - p };
                 if (allowregexp && *p == '/') {
                     CHECK_DATA(regexp_parse_str(&substr, reverse ? NULL : &anchor,
                                                 &regexp, reverse ? &anchor : NULL, NULL),
@@ -227,7 +227,7 @@ static bool strlist_create(strlist_local_t *local,
                                reverse ? "suffix" : "prefix", (int)substr.len, substr.str);
                     substr.str = line;
                     substr.len = anchor.len;
-                    static_str_t restr = buffer_tostr(&regexp);
+                    clstr_t restr = buffer_tostr(&regexp);
                     CHECK_DATA(trie_insert_regexp_str(res->trie1, &substr, &restr),
                                "connot insert regexp %.*s in the trie", (int)(eos - p), p);
                 } else {
@@ -687,7 +687,7 @@ static void strlist_filter_async(dns_result_t *result, void *arg)
 
 static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_context_t *context,
                                        strlist_async_data_t *async, int *result_pos,
-                                       const static_str_t *str, const char *fieldname) {
+                                       const clstr_t *str, const char *fieldname) {
     char reverse[BUFSIZ];
     char normal[BUFSIZ];
 
@@ -707,7 +707,7 @@ static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_co
         if (matched && match.regexp == NULL) {
             async->sum += entry->weight;
         } else if (match.regexp != NULL) {
-            static_str_t substr;
+            clstr_t substr;
             substr.str = entry->reverse ? normal : normal + match.match_len;
             substr.len = len - match.match_len;
             if (regexp_match_str(match.regexp, &substr)) {
@@ -724,7 +724,7 @@ static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_co
 
 static inline bool strlist_rhbl_lookup(const strlist_config_t *config, filter_context_t *context,
                                        strlist_async_data_t *async, int *result_pos,
-                                       const static_str_t *str, const char* fieldname) {
+                                       const clstr_t *str, const char* fieldname) {
     char normal[BUFSIZ];
 
     const int len = str->len;

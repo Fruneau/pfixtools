@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
             double diff;
 
             gettimeofday(&start, NULL);
-            static_str_t str = { argv[2], strlen(argv[2]) };
+            clstr_t str = { argv[2], strlen(argv[2]) };
             for (uint32_t i = 0 ; i < how_many ; ++i) {
                 regexp_match_str(re, &str);
             }

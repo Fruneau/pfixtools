@@ -77,7 +77,7 @@ bool regexp_compile(regexp_t *re, const char *str, bool cs)
     return true;
 }
 
-bool regexp_compile_str(regexp_t* re, const static_str_t *str, bool cs)
+bool regexp_compile_str(regexp_t* re, const clstr_t *str, bool cs)
 {
     if (str->str[str->len] == '\0') {
         return regexp_compile(re, str->str, cs);
@@ -90,14 +90,14 @@ bool regexp_compile_str(regexp_t* re, const static_str_t *str, bool cs)
     }
 }
 
-bool regexp_match_str(const regexp_t *re, const static_str_t *str)
+bool regexp_match_str(const regexp_t *re, const clstr_t *str)
 {
     return 0 == pcre_exec(re->re, re->extra, str->str, str->len, 0, 0, NULL, 0);
 }
 
 bool regexp_match(const regexp_t *re, const char *str)
 {
-    static_str_t s = { str, m_strlen(str) };
+    clstr_t s = { str, m_strlen(str) };
     return regexp_match_str(re, &s);
 }
 
@@ -131,7 +131,7 @@ static inline bool is_valid_delimiter(const char c) {
     return !isspace(c) && !isalnum(c) && isascii(c) && !is_wildcard(c);
 }
 
-bool regexp_parse_str(const static_str_t *str, buffer_t *prefix,
+bool regexp_parse_str(const clstr_t *str, buffer_t *prefix,
                       buffer_t *re, buffer_t *suffix, bool *cs) {
     if (str == NULL || re == NULL || str->len < 2) {
         err("Invalid argument");
@@ -279,7 +279,7 @@ bool regexp_parse_str(const static_str_t *str, buffer_t *prefix,
 }
 
 bool regexp_parse(const char *str, buffer_t *prefix, buffer_t *re, buffer_t *suffix, bool *cs) {
-    static_str_t s = { str, m_strlen(str) };
+    clstr_t s = { str, m_strlen(str) };
     return regexp_parse_str(&s, prefix, re, suffix, cs);
 }
 

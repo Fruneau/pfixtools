@@ -65,7 +65,7 @@ bool trie_insert(trie_t *trie, const char *key);
 /** Insert a string in the trie.
  */
 __attribute__((nonnull(1,2)))
-bool trie_insert_str(trie_t *trie, const static_str_t *key);
+bool trie_insert_str(trie_t *trie, const clstr_t *key);
 
 /** Add a string followed with a regexp in the trie.
  *
@@ -78,7 +78,7 @@ bool trie_insert_regexp(trie_t *trie, const char *key, const char *regexp);
 /** Insert a string followed by a regexp in the trie.
  */
 __attribute__((nonnull(1,2)))
-bool trie_insert_regexp_str(trie_t *trie, const static_str_t *key, const static_str_t *regexp);
+bool trie_insert_regexp_str(trie_t *trie, const clstr_t *key, const clstr_t *regexp);
 
 /** Compile the trie.
  * A trie must be compiled before lookup is possible. Compiling the trie

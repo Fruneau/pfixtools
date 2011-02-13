@@ -398,10 +398,10 @@ m_stristr(const char *haystack, const char *needle) {
  * This intends to store pointers to a part of a longer string and to avoid
  * useless strlen.
  */
-typedef struct static_str_t {
+typedef struct clstr_t {
     const char *str;
     ssize_t    len;
-} static_str_t;
+} clstr_t;
 
 /*@}*/
 #endif /* PFIXTOOLS_STR_H */

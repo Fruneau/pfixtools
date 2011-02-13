@@ -164,7 +164,7 @@ static bool try_greylist(const greylist_config_t *config, const query_t* query)
     time_t now = time(NULL);
     struct obj_entry oent = { now, now };
     struct awl_entry aent = { 0, 0 };
-    const static_str_t* c_addr = &query->client_address;
+    const clstr_t* c_addr = &query->client_address;
 
     size_t klen;
 
@@ -199,9 +199,9 @@ static bool try_greylist(const greylist_config_t *config, const query_t* query)
 
     /* Lookup.
      */
-    const static_str_t* cnet = query_field_for_id(query, config->lookup_by_host ? PTK_CLIENT_ADDRESS
+    const clstr_t* cnet = query_field_for_id(query, config->lookup_by_host ? PTK_CLIENT_ADDRESS
                                                                                 : PTK_NORMALIZED_CLIENT);
-    const static_str_t* sender = NULL;
+    const clstr_t* sender = NULL;
     if (!config->no_sender) {
         sender = query_field_for_id(query, config->normalize_sender ? PTK_NORMALIZED_SENDER
                                                                     : PTK_SENDER);

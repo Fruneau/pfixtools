@@ -89,7 +89,7 @@ typedef struct filter_t {
     /* Loop checking flags.
      */
     int last_seen;
-} filter_t;
+}filter_t; 
 ARRAY(filter_t)
 
 #define MAX_COUNTERS (64)
@@ -110,7 +110,7 @@ typedef struct filter_context_t {
 
     /* filter explanation
      */
-    static_str_t explanation;
+    clstr_t explanation;
 
     /* connection context
      */

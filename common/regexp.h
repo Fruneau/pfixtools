@@ -59,7 +59,7 @@ void regexp_delete(regexp_t **re);
 /** Compile a regexp and fill the @c re structure.
  */
 __attribute__((nonnull))
-bool regexp_compile_str(regexp_t *re, const static_str_t *str, bool cs);
+bool regexp_compile_str(regexp_t *re, const clstr_t *str, bool cs);
 
 /** Compile a regexp and fill the @c re structure.
  */
@@ -69,7 +69,7 @@ bool regexp_compile(regexp_t *re, const char *str, bool cs);
 /** Match the given string against the regexp.
  */
 __attribute__((nonnull))
-bool regexp_match_str(const regexp_t *re, const static_str_t *str);
+bool regexp_match_str(const regexp_t *re, const clstr_t *str);
 
 /** Match the given string against the regexp.
  */
@@ -86,7 +86,7 @@ bool regexp_match(const regexp_t *re, const char *str);
  *    with no wildcard (e.g /(.*)mysuffix$/)
  */
 __attribute__((nonnull(1,3)))
-bool regexp_parse_str(const static_str_t *str, buffer_t *prefix, buffer_t *re,
+bool regexp_parse_str(const clstr_t *str, buffer_t *prefix, buffer_t *re,
                       buffer_t *suffix, bool *cs);
 
 
