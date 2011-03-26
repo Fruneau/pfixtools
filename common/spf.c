@@ -310,7 +310,7 @@ static void spf_exit(spf_t* spf, spf_code_t code)
     spf_cancel(spf);
 }
 
-static void spf_write_macro(buffer_t* restrict  buffer, static_str_t str, bool escape)
+static void spf_write_macro(buffer_t* restrict  buffer, clstr_t str, bool escape)
 {
     if (!escape) {
         buffer_add(buffer, str.str, (int)str.len);
@@ -356,8 +356,8 @@ typedef enum {
 static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* restrict buffer, char identifier, int parts,
                                           bool reverse, bool escape, const char* restrict delimiters,
                                           int delimiters_count) {
-    static_str_t sections[256] = { { .str = 0, .len = 0}, };
-    static_str_t* pos = sections;
+    clstr_t sections[256] = { { .str = 0, .len = 0}, };
+    clstr_t* pos = sections;
     switch (identifier) {
       case 's':
         pos->str = array_start(spf->sender);
