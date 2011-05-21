@@ -70,32 +70,38 @@ struct filter_description_t {
     bool params[ATK_count];
 };
 
-static filter_description_t filter_descriptions[FTK_count];
+static struct {
+    filter_description_t filter_descriptions[FTK_count];
+    filter_async_handler_t async_handler;
 
-static filter_async_handler_t async_handler = NULL;
+    const filter_hook_t default_hook;
+    const filter_hook_t async_hook;
 
-static const filter_hook_t default_hook = {
-    .type      = 0,
-    .value     = (char*)"DUNNO",
-    .counter   = -1,
-    .cost      = 0,
-    .postfix   = true,
-    .async     = false,
-    .filter_id = 0
+    bool init_done;
+} filter_internal_g = {
+#define _G  filter_internal_g
+    .default_hook = {
+        .type      = 0,
+        .value     = (char*)"DUNNO",
+        .counter   = -1,
+        .cost      = 0,
+        .postfix   = true,
+        .async     = false,
+        .filter_id = 0
+    },
+
+    .async_hook = {
+        .type      = 0,
+        .value     = NULL,
+        .counter   = -1,
+        .cost      = 0,
+        .postfix   = false,
+        .async     = true,
+        .filter_id = 0
+    }
 };
 
-static const filter_hook_t async_hook = {
-    .type      = 0,
-    .value     = NULL,
-    .counter   = -1,
-    .cost      = 0,
-    .postfix   = false,
-    .async     = true,
-    .filter_id = 0
-};
-
-static bool init_done  = false;
-uint32_t filter_running = 0;
+uint32_t filter_running_g = 0;
 
 #define filter_declare(filter)                                                 \
     filter_constructor_prototype(filter);                                      \
@@ -111,15 +117,15 @@ filter_declare(rate)
 
 static int filter_module_init(void)
 {
-    if (init_done) {
+    if (_G.init_done) {
         return 0;
     }
-    init_done = true;
+    _G.init_done = true;
     for (int i = 0 ; i < FTK_count ; ++i) {
-        filter_descriptions[i].id = (filter_token)i;
-        filter_descriptions[i].name = ftokens[i];
+        _G.filter_descriptions[i].id = (filter_token)i;
+        _G.filter_descriptions[i].name = ftokens[i];
         for (int j = 0 ; j < HTK_count ; ++j) {
-            filter_descriptions[i].forward[j] = HTK_UNKNOWN;
+            _G.filter_descriptions[i].forward[j] = HTK_UNKNOWN;
         }
     }
     return 0;
@@ -134,7 +140,7 @@ filter_type_t filter_register(const char *type, filter_constructor_t constructor
     filter_token tok = filter_tokenize(type, m_strlen(type));
     CHECK_FILTER(tok);
 
-    filter_description_t *description = &filter_descriptions[tok];
+    filter_description_t *description = &_G.filter_descriptions[tok];
     description->runner = runner;
     description->constructor = constructor;
     description->destructor = destructor;
@@ -181,7 +187,7 @@ filter_param_id_t filter_param_register(filter_type_t filter,
 
 void filter_async_handler_register(filter_async_handler_t handler)
 {
-    async_handler = handler;
+    _G.async_handler = handler;
 }
 
 bool filter_build(filter_t *filter)
@@ -272,7 +278,7 @@ static inline const filter_hook_t *filter_hook_for_result(const filter_t *filter
         return NULL;
     }
     if (res == HTK_ASYNC) {
-        return &async_hook;
+        return &_G.async_hook;
     }
 
     while (start < end) {
@@ -294,7 +300,7 @@ static inline const filter_hook_t *filter_hook_for_result(const filter_t *filter
         return filter_hook_for_result(filter,  filter->type->forward[res]);
     } else {
         warn("missing hook %s for filter %s", htokens[res], filter->name);
-        return &default_hook;
+        return &_G.default_hook;
     }
 }
 
@@ -302,13 +308,13 @@ const filter_hook_t *filter_run(const filter_t *filter, const query_t *query,
                                 filter_context_t *context)
 {
     debug("running filter %s (%s)", filter->name, filter->type->name);
-    ++filter_running;
+    filter_running_g++;
     filter_result_t res = filter->type->runner(filter, query, context);
 
     if (res == HTK_ASYNC) {
         context->current_filter = filter;
     } else {
-        --filter_running;
+        filter_running_g--;
         context->current_filter = NULL;
     }
 
@@ -335,7 +341,7 @@ bool filter_set_type(filter_t *filter, const char *type, int len)
     if (tok == FTK_UNKNOWN) {
         return false;
     }
-    filter->type = &filter_descriptions[tok];
+    filter->type = &_G.filter_descriptions[tok];
     return true;
 }
 
@@ -427,8 +433,8 @@ bool filter_add_hook(filter_t *filter, const char *name, int name_len,
 void filter_context_prepare(filter_context_t *context, void *qctx)
 {
     for (int i = 0 ; i < FTK_count ; ++i) {
-        if (filter_descriptions[i].ctx_constructor != NULL) {
-            context->contexts[i] = filter_descriptions[i].ctx_constructor();
+        if (_G.filter_descriptions[i].ctx_constructor != NULL) {
+            context->contexts[i] = _G.filter_descriptions[i].ctx_constructor();
         }
     }
     context->current_filter = NULL;
@@ -440,8 +446,8 @@ void filter_context_prepare(filter_context_t *context, void *qctx)
 void filter_context_wipe(filter_context_t *context)
 {
     for (int i = 0 ; i < FTK_count ; ++i) {
-        if (filter_descriptions[i].ctx_destructor != NULL) {
-            filter_descriptions[i].ctx_destructor(context->contexts[i]);
+        if (_G.filter_descriptions[i].ctx_destructor != NULL) {
+            _G.filter_descriptions[i].ctx_destructor(context->contexts[i]);
         }
     }
 }
@@ -464,9 +470,9 @@ void filter_post_async_result(filter_context_t *context, filter_result_t result)
     if (result == HTK_ASYNC) {
         return;
     }
-    --filter_running;
+    filter_running_g--;
     hook = filter_hook_for_result(filter, result);
-    async_handler(context, hook);
+    _G.async_handler(context, hook);
 }
 
 void filter_set_explanation(filter_context_t *context, const char* str, ssize_t len)

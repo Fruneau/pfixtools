@@ -48,9 +48,12 @@ typedef struct resource_t {
 } resource_t;
 ARRAY(resource_t);
 
-#define RESOURCE_INIT { NULL, NULL, 0, NULL }
+#define RESOURCE_INIT { .key = NULL }
 
-static A(resource_t) resources = ARRAY_INIT;
+static struct {
+    A(resource_t) resources;
+} resources_g;
+#define _G  resources_g
 
 #define RESOURCE_KEY                                                           \
     char rskey[BUFSIZ];                                                        \
@@ -70,7 +73,7 @@ static inline void resource_wipe(resource_t *res)
 
 static inline resource_t *resource_find(const char *key, bool create)
 {
-    foreach (res, resources) {
+    foreach (res, _G.resources) {
         if (strcmp(res->key, key) == 0) {
             return res;
         }
@@ -78,8 +81,8 @@ static inline resource_t *resource_find(const char *key, bool create)
     if (create) {
         resource_t res = RESOURCE_INIT;
         res.key = m_strdup(key);
-        array_add(resources, res);
-        return &array_last(resources);
+        array_add(_G.resources, res);
+        return &array_last(_G.resources);
     }
     return NULL;
 }
@@ -124,8 +127,8 @@ void resource_release(const char *ns, const char *key)
 void resource_garbage_collect(void)
 {
     uint32_t used = 0;
-    foreach (res, resources) {
-        uint32_t pos = res - resources.data;
+    foreach (res, _G.resources) {
+        uint32_t pos = res - _G.resources.data;
         if (res->key != NULL && res->refcount == 0) {
             debug("resource gc: %s not referenced anymore", res->key);
             resource_wipe(res);
@@ -133,19 +136,19 @@ void resource_garbage_collect(void)
             debug("resource gc: keeping %s, still %d references",
                   res->key, res->refcount);
             if (used < pos) {
-                array_elt(resources, used) = *res;
+                array_elt(_G.resources, used) = *res;
             }
             ++used;
         }
     }
     debug("resource gc: before %d resources, after %d",
-          array_len(resources), used);
-    array_len(resources) = used;
+          array_len(_G.resources), used);
+    array_len(_G.resources) = used;
 }
 
 static void resources_exit(void)
 {
-    array_deep_wipe(resources, resource_wipe);
+    array_deep_wipe(_G.resources, resource_wipe);
 }
 module_exit(resources_exit);
 

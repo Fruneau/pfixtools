@@ -74,39 +74,52 @@ struct match_operator_t {
     bool             cs;
 };
 
-static const struct match_operator_t operators[] = {
-    { {"=i", 2}, {"EQUALS_i", 8},    MATCH_EQUAL,     false },
-    { {"==", 2}, {"EQUALS", 6},      MATCH_EQUAL,     true },
-    { {"!i", 2}, {"DIFFERS_i", 9},   MATCH_DIFFER,    false },
-    { {"!=", 2}, {"DIFFERS", 7},     MATCH_DIFFER,    true },
-    { {">i", 2}, {"CONTAINS_i", 10},  MATCH_CONTAINS,  false },
-    { {">=", 2}, {"CONTAINS", 8},    MATCH_CONTAINS,  true },
-    { {"<i", 2}, {"CONTAINED_i", 11}, MATCH_CONTAINED, false },
-    { {"<=", 2}, {"CONTAINED", 9},   MATCH_CONTAINED, true },
-    { {"#=", 2}, {"EMPTY", 5},       MATCH_EMPTY,     true },
-    { {"#i", 2}, {"NOTEMPTY", 8},    MATCH_EMPTY,     false },
-    { {"=~", 2}, {"MATCH", 5},       MATCH_MATCH,     false },
-    { {"!~", 2}, {"DONTMATCH", 9},   MATCH_DONTMATCH, false },
-    { {NULL, 0}, {NULL, 0}, MATCH_UNKNOWN, false }
-};
+static struct {
+    buffer_t match_buffer;
 
-static const char *condition_names[] = {
-    "unknown",
-    "equals to",
-    "differs from",
-    "contains",
-    "is contained",
-    "is empty",
-    "matches",
-    "does not match"
+    const char * const condition_names[MATCH_NUMBER];
+    const struct match_operator_t operators[];
+} match_g = {
+#define _G  match_g
+    .condition_names = {
+        [MATCH_UNKNOWN]   = "unknown",
+        [MATCH_EQUAL]     = "equals to",
+        [MATCH_DIFFER]    = "differs from",
+        [MATCH_CONTAINS]  = "contains",
+        [MATCH_CONTAINED] = "is contained",
+        [MATCH_EMPTY]     = "is empty",
+        [MATCH_MATCH]     = "matches",
+        [MATCH_DONTMATCH] = "does not match",
+    },
+
+    .operators = {
+#define DEFINE_OP(Short, Long, Cond, Cs)                                     \
+        { .short_name = CLSTR_IMMED(Short),                                      \
+          .long_name  = CLSTR_IMMED(Long),                                       \
+          .condition  = MATCH_##Cond,                                            \
+          .cs         = Cs,                                                      \
+        }
+        DEFINE_OP("=i", "EQUALS_i", EQUAL, false),
+        DEFINE_OP("==", "EQUALS", EQUAL, true),
+        DEFINE_OP("!i", "DIFFERS_i", DIFFER, false),
+        DEFINE_OP("!=", "DIFFERS", DIFFER, true),
+        DEFINE_OP(">i", "CONTAINS_i", CONTAINS, false),
+        DEFINE_OP(">=", "CONTAINS", CONTAINS, true),
+        DEFINE_OP("<i", "CONTAINED_i", CONTAINED, false),
+        DEFINE_OP("<=", "CONTAINED", CONTAINED, true),
+        DEFINE_OP("#=", "EMPTY", EMPTY, true),
+        DEFINE_OP("#i", "NOTEMPTY", EMPTY, false),
+        DEFINE_OP("=~", "MATCH", MATCH, false),
+        DEFINE_OP("!~", "DONTMATCH", DONTMATCH, false),
+#undef DEFINE_OP
+        { .condition = MATCH_UNKNOWN },
+    }
 };
 
 typedef struct match_config_t {
     A(match_condition_t) conditions;
     bool match_all;
-}match_config_t; 
-
-static buffer_t match_buffer = BUFFER_INIT;
+} match_config_t;
 
 static match_config_t *match_config_new(void)
 {
@@ -179,7 +192,7 @@ static bool match_filter_constructor(filter_t *filter)
             p = skipspaces(n);
 
             condition.condition = MATCH_UNKNOWN;
-            const struct match_operator_t *op = operators;
+            const struct match_operator_t *op = _G.operators;
             while (condition.condition == MATCH_UNKNOWN && op->condition != MATCH_UNKNOWN) {
                 if (strncmp(p, op->short_name.str, op->short_name.len) == 0) {
                     condition.condition = op->condition;
@@ -249,14 +262,14 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
     const clstr_t *field = query_field_for_id(query, cond->field);
     if (cond->condition != MATCH_EMPTY && cond->condition != MATCH_MATCH
         && cond->condition != MATCH_DONTMATCH) {
-        buffer_reset(&match_buffer);
-        query_format_buffer(&match_buffer, cond->data.value.str, query);
+        buffer_reset(&_G.match_buffer);
+        query_format_buffer(&_G.match_buffer, cond->data.value.str, query);
     }
     debug("running condition: \"%s\" %s %s\"%s\"",
-          field->str, condition_names[cond->condition],
+          field->str, _G.condition_names[cond->condition],
           cond->case_sensitive ? "" : "(alternative) ",
           cond->condition != MATCH_MATCH && cond->condition != MATCH_DONTMATCH 
-              && cond->data.value.str ? match_buffer.data : "(none)");
+              && cond->data.value.str ? _G.match_buffer.data : "(none)");
     switch (cond->condition) {
       case MATCH_EQUAL:
       case MATCH_DIFFER:
@@ -264,10 +277,10 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return cond->condition != MATCH_DIFFER;
         }
         if (cond->case_sensitive) {
-            return !!((strcmp(field->str, match_buffer.data) == 0)
+            return !!((strcmp(field->str, _G.match_buffer.data) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         } else {
-            return !!((ascii_strcasecmp(field->str, match_buffer.data) == 0)
+            return !!((ascii_strcasecmp(field->str, _G.match_buffer.data) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         }
         break;
@@ -277,9 +290,9 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return false;
         }
         if (cond->case_sensitive) {
-            return strstr(field->str, match_buffer.data);
+            return strstr(field->str, _G.match_buffer.data);
         } else {
-            return m_stristrn(field->str, match_buffer.data, match_buffer.len);
+            return m_stristrn(field->str, _G.match_buffer.data, _G.match_buffer.len);
         }
         break;
 
@@ -288,9 +301,9 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return false;
         }
         if (cond->case_sensitive) {
-            return strstr(match_buffer.data, field->str);
+            return strstr(_G.match_buffer.data, field->str);
         } else {
-            return m_stristr(match_buffer.data, field->str);
+            return m_stristr(_G.match_buffer.data, field->str);
         }
         break;
 
@@ -357,7 +370,7 @@ filter_constructor(match)
 
 static void match_exit(void)
 {
-    buffer_wipe(&match_buffer);
+    buffer_wipe(&_G.match_buffer);
 }
 module_exit(match_exit);
 

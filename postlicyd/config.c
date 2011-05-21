@@ -104,12 +104,15 @@ config_param_register("include_explanation");
 config_param_register("use_resolv_conf");
 
 
-static config_t *global_config = NULL;
+static struct {
+    config_t *config;
+} config_g;
+#define _G  config_g
 
 static inline config_t *config_new(void)
 {
     config_t *config = p_new(config_t, 1);
-    global_config = config;
+    _G.config = config;
     return config;
 }
 
@@ -129,14 +132,14 @@ void config_delete(config_t **config)
     if (*config) {
         config_close(*config);
         p_delete(config);
-        global_config = NULL;
+        _G.config = NULL;
     }
 }
 
 static void config_exit()
 {
-    if (global_config) {
-        config_delete(&global_config);
+    if (_G.config) {
+        config_delete(&_G.config);
     }
 }
 module_exit(config_exit);

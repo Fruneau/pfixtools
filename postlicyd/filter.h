@@ -147,7 +147,7 @@ typedef void (*filter_async_handler_t)(filter_context_t *context,
 
 /** Number of filter currently running.
  */
-extern uint32_t filter_running;
+extern uint32_t filter_running_g;
 
 /* Registration.
  */

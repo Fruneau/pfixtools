@@ -42,7 +42,12 @@
 #include "str.h"
 #include "resources.h"
 
-static const clstr_t static_cleanup = { "@@cleanup@@", 11 };
+static struct {
+    const clstr_t static_cleanup;
+} db_g = {
+#define _G  db_g
+    .static_cleanup = CLSTR_IMMED("@@cleanup@@")
+};
 
 struct db_t {
     unsigned can_expire : 1;
@@ -87,7 +92,7 @@ static bool db_need_cleanup(const db_t *db, TCBDB* tcdb)
 {
     int len = 0;
     time_t now = time(NULL);
-    const time_t *last_cleanup = tcbdbget3(tcdb, static_cleanup.str, static_cleanup.len, &len);
+    const time_t *last_cleanup = tcbdbget3(tcdb, _G.static_cleanup.str, _G.static_cleanup.len, &len);
     if (last_cleanup == NULL) {
         debug("No last cleanup time");
     }
@@ -162,7 +167,7 @@ static TCBDB** db_resource_acquire(const db_t *db)
                         }
                         ++old_count;
                     } while (tcbdbcurnext(cur));
-                    tcbdbput(tmp_db, static_cleanup.str, static_cleanup.len, &now, sizeof(now));
+                    tcbdbput(tmp_db, _G.static_cleanup.str, _G.static_cleanup.len, &now, sizeof(now));
                 }
                 tcxstrdel(key);
                 tcxstrdel(value);

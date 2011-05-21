@@ -58,11 +58,14 @@ typedef struct query_context_t {
     query_t query;
     filter_context_t context;
     client_t *client;
-}query_context_t; 
+} query_context_t;
 
-static config_t *config  = NULL;
-static bool refresh      = false;
-static PA(client_t) busy = ARRAY_INIT;
+static struct {
+    config_t *config;
+    bool      refresh;
+    PA(client_t) busy;
+} postlicyd_g;
+#define _G  postlicyd_g
 
 static void *query_starter(listener_t *server)
 {
@@ -82,19 +85,19 @@ static void query_stopper(void *data)
 
 static bool config_refresh(void *mconfig)
 {
-    refresh = true;
-    if (filter_running > 0) {
+    _G.refresh = true;
+    if (filter_running_g > 0) {
         return true;
     }
     log_state = "refreshing ";
     notice("reloading configuration");
     bool ret = config_reload(mconfig);
     log_state = "";
-    foreach (server, busy) {
+    foreach (server, _G.busy) {
         client_io_ro(*server);
     }
-    array_len(busy) = 0;
-    refresh = false;
+    array_len(_G.busy) = 0;
+    _G.refresh = false;
     return ret;
 }
 
@@ -109,7 +112,7 @@ static void policy_answer(client_t *pcy, const char *message)
     if (!query_format_buffer(buf, message, query)) {
         buffer_addstr(buf, message);
     }
-    if (config->include_explanation) {
+    if (_G.config->include_explanation) {
         const clstr_t *exp = &context->context.explanation;
         if (exp->len > 0) {
             buffer_addstr(buf, ": ");
@@ -133,8 +136,8 @@ static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
     if (log_level >= LOG_ ## Level) {                                          \
         if (log_prefix[0] == '\0') {                                           \
             query_format(log_prefix, BUFSIZ,                                   \
-                         config->log_format && config->log_format[0] ?         \
-                            config->log_format : DEFAULT_LOG_FORMAT, query);   \
+                         _G.config->log_format && _G.config->log_format[0] ?   \
+                            _G.config->log_format : DEFAULT_LOG_FORMAT, query);\
         }                                                                      \
         __log(LOG_ ## Level, "%s: " Msg, log_prefix, ##__VA_ARGS__);           \
     }
@@ -170,8 +173,8 @@ static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
     } else {
         log_reply(DEBUG, "answer %s from filter %s: next filter %s",
                   htokens[hook->type], filter->name,
-                  (array_ptr(config->filters, hook->filter_id))->name);
-        return array_ptr(config->filters, hook->filter_id);
+                  (array_ptr(_G.config->filters, hook->filter_id))->name);
+        return array_ptr(_G.config->filters, hook->filter_id);
     }
 #undef log_reply
 }
@@ -182,7 +185,7 @@ static bool policy_process(client_t *pcy, const config_t *mconfig)
     const query_t *query = &context->query;
     const filter_t *filter;
     if (mconfig->entry_points[query->state] == -1) {
-        warn("no filter defined for current protocol_state (%s)", smtp_state_names[query->state].str);
+        warn("no filter defined for current protocol_state (%s)", smtp_state_names_g[query->state].str);
         return false;
     }
     if (context->context.current_filter != NULL) {
@@ -204,8 +207,8 @@ static bool policy_process(client_t *pcy, const config_t *mconfig)
 static int policy_run(client_t *pcy, void* vconfig)
 {
     const config_t *mconfig = vconfig;
-    if (refresh) {
-        array_add(busy, pcy);
+    if (_G.refresh) {
+        array_add(_G.busy, pcy);
         return 0;
     }
 
@@ -260,13 +263,13 @@ static void policy_async_handler(filter_context_t *context,
 
     context->current_filter = next_filter(server, filter, query, hook, &ok);
     if (context->current_filter != NULL) {
-        ok = policy_process(server, config);
+        ok = policy_process(server, _G.config);
     }
     if (!ok) {
         client_release(server);
     }
-    if (refresh && filter_running == 0) {
-        config_refresh(config);
+    if (_G.refresh && filter_running_g == 0) {
+        config_refresh(_G.config);
     }
 }
 
@@ -278,7 +281,7 @@ static int postlicyd_init(void)
 
 static void postlicyd_shutdown(void)
 {
-    array_deep_wipe(busy, client_delete);
+    array_deep_wipe(_G.busy, client_delete);
 }
 module_init(postlicyd_init);
 module_exit(postlicyd_shutdown);
@@ -312,7 +315,7 @@ int main(int argc, char *argv[])
         { NULL, 0, NULL, 0 }
     };
 
-    for (int c = 0; (c = getopt_long(argc, argv, COMMON_DAEMON_OPTION_SHORTLIST "cl:", longopts, NULL)) >= 0; ) {
+    for (int c = 0; (c = getopt_long(argc, argv, COMMON_DAEMON_OPTION_SHORTLIST "cl:", longopts, NULL)) >= 0;) {
         switch (c) {
           case 'l':
             port = atoi(optarg);
@@ -349,12 +352,12 @@ int main(int argc, char *argv[])
         }
     }
 
-    config = config_read(argv[optind]);
-    if (config == NULL) {
+    _G.config = config_read(argv[optind]);
+    if (_G.config == NULL) {
         return EXIT_FAILURE;
     }
-    if (port_from_cli || config->port == 0) {
-        config->port = port;
+    if (port_from_cli || _G.config->port == 0) {
+        _G.config->port = port;
     }
 
     if (daemonize && daemon_detach() < 0) {
@@ -364,11 +367,11 @@ int main(int argc, char *argv[])
 
     pidfile_refresh();
 
-    if (start_listener(config->port) == NULL) {
+    if (start_listener(_G.config->port) == NULL) {
         return EXIT_FAILURE;
     } else {
         return server_loop(query_starter, query_stopper,
-                           policy_run, config_refresh, config);
+                           policy_run, config_refresh, _G.config);
     }
 }
 

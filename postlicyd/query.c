@@ -41,19 +41,25 @@
 #include "policy_tokens.h"
 #include "str.h"
 
-const clstr_t smtp_state_names[SMTP_count] = {
-  { "CONNECT", 7 },
-  { "HELO", 4 },
-  { "MAIL", 4 },
-  { "RCPT", 4 },
-  { "DATA", 4 },
-  { "END-OF-MESSAGE", 14 },
-  { "VRFY", 4 },
-  { "ETRN", 4 },
+const clstr_t smtp_state_names_g[] = {
+    [SMTP_CONNECT]        = CLSTR_IMMED("CONNECT"),
+    [SMTP_HELO]           = CLSTR_IMMED("HELO"),
+    [SMTP_MAIL]           = CLSTR_IMMED("MAIL"),
+    [SMTP_RCPT]           = CLSTR_IMMED("RCPT"),
+    [SMTP_DATA]           = CLSTR_IMMED("DATA"),
+    [SMTP_END_OF_MESSAGE] = CLSTR_IMMED("END-OF-MESSAGE"),
+    [SMTP_VRFY]           = CLSTR_IMMED("VRFY"),
+    [SMTP_ETRN]           = CLSTR_IMMED("ETRN"),
 };
 
-static const clstr_t static_ESMTP = { "ESMTP", 5 };
-static const clstr_t static_SMTP  = { "SMTP",  4 };
+static struct {
+    const clstr_t static_ESMTP;
+    const clstr_t static_SMTP;
+} query_g = {
+#define _G  query_g
+    .static_SMTP  = CLSTR_IMMED("SMTP"),
+    .static_ESMTP = CLSTR_IMMED("ESMTP"),
+};
 
 bool query_parse(query_t *query, char *p)
 {
@@ -296,10 +302,10 @@ const clstr_t *query_field_for_id(const query_t *query, postlicyd_token id)
         return &query->normalized_client;
 
       case PTK_PROTOCOL_NAME:
-        return query->esmtp ? &static_ESMTP : &static_SMTP;
+        return query->esmtp ? &_G.static_ESMTP : &_G.static_SMTP;
 
       case PTK_PROTOCOL_STATE:
-        return &smtp_state_names[query->state];
+        return &smtp_state_names_g[query->state];
 
       default: return NULL;
     }

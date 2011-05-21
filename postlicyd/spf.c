@@ -48,9 +48,12 @@ typedef struct spf_filter_t {
     unsigned use_explanation: 1;
 } spf_filter_t;
 
-static buffer_t domain = ARRAY_INIT;
-static buffer_t sender = ARRAY_INIT;
-static buffer_t ip     = ARRAY_INIT;
+static struct {
+    buffer_t domain;
+    buffer_t sender;
+    buffer_t ip;
+} spf_g;
+#define _G  spf_g
 
 static spf_filter_t *spf_filter_new(void)
 {
@@ -143,22 +146,24 @@ static filter_result_t spf_filter(const filter_t *filter, const query_t *query,
                                   filter_context_t *context)
 {
     const spf_filter_t *data = filter->data;
-    array_len(domain) = 0;
-    array_len(sender) = 0;
-    array_len(ip)     = 0;
-    buffer_add(&ip, query->client_address.str, query->client_address.len);
+    array_len(_G.domain) = 0;
+    array_len(_G.sender) = 0;
+    array_len(_G.ip)     = 0;
+    buffer_add(&_G.ip, query->client_address.str, query->client_address.len);
     if (data->check_helo || query->sender_domain.len == 0) {
-        buffer_add(&domain, query->helo_name.str, query->helo_name.len);
-        buffer_addstr(&sender, "postmaster@");
-        buffer_add(&sender, array_start(domain), array_len(domain));
+        buffer_add(&_G.domain, query->helo_name.str, query->helo_name.len);
+        buffer_addstr(&_G.sender, "postmaster@");
+        buffer_add(&_G.sender, array_start(_G.domain), array_len(_G.domain));
     } else {
-        buffer_add(&domain, query->sender_domain.str, query->sender_domain.len);
-        buffer_add(&sender, query->sender.str, query->sender.len);
+        buffer_add(&_G.domain, query->sender_domain.str, query->sender_domain.len);
+        buffer_add(&_G.sender, query->sender.str, query->sender.len);
     }
 
     spf_code_t res;
-    if (spf_check(array_start(ip), array_start(domain), array_start(sender), query->helo_name.str,
-                  spf_filter_async, !data->use_spf_record, !data->use_explanation, context, &res) == NULL) {
+    if (spf_check(array_start(_G.ip), array_start(_G.domain),
+                  array_start(_G.sender), query->helo_name.str,
+                  spf_filter_async, !data->use_spf_record,
+                  !data->use_explanation, context, &res) == NULL) {
         err("filter %s: error while trying to run spf check", filter->name);
         return spf_code_to_result(res);
     }
@@ -168,8 +173,8 @@ static filter_result_t spf_filter(const filter_t *filter, const query_t *query,
 
 static void spf_exit(void)
 {
-    array_wipe(domain);
-    array_wipe(sender);
+    array_wipe(_G.domain);
+    array_wipe(_G.sender);
 }
 module_exit(spf_exit);
 
