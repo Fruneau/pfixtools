@@ -68,8 +68,14 @@ typedef struct srs_config_t {
 /* Server {{{1
  */
 
-static listener_t *decoder_ptr = NULL;
-static listener_t *encoder_ptr = NULL;
+static struct {
+    listener_t *decoder_ptr;
+    listener_t *encoder_ptr;
+
+    srs_config_t config;
+} pfixsrsd_g;
+#define _G  pfixsrsd_g
+
 
 static void *srsd_starter(listener_t *server)
 {
@@ -106,7 +112,7 @@ static int process_srs(client_t *srsd, void* vconfig)
     srs_config_t *config = vconfig;
     buffer_t *ibuf = client_input_buffer(srsd);
     buffer_t *obuf = client_output_buffer(srsd);
-    bool decoder = (client_data(srsd) == decoder_ptr);
+    bool decoder = (client_data(srsd) == _G.decoder_ptr);
     int res = client_read(srsd);
 
     if ((res < 0 && errno != EINTR && errno != EAGAIN) || res == 0)
@@ -191,13 +197,6 @@ static int process_srs(client_t *srsd, void* vconfig)
 /* config {{{1
  */
 
-static srs_config_t config = {
-    .srs = NULL,
-    .domain = NULL,
-    .domainlen = 0,
-    .ignore_ext = false,
-    .separator = '\0'
-};
 
 /** overload srs_free since the lib is not properly maintained.
  */
@@ -217,9 +216,9 @@ inline void srs_free(srs_t *srs)
 
 static void config_shutdown(void)
 {
-    if (config.srs) {
-        srs_free(config.srs);
-        config.srs = NULL;
+    if (_G.config.srs) {
+        srs_free(_G.config.srs);
+        _G.config.srs = NULL;
     }
 }
 
@@ -302,7 +301,7 @@ int main(int argc, char *argv[])
         { NULL, 0, NULL, 0 }
     };
 
-    for (int c = 0; (c = getopt_long(argc, argv, COMMON_DAEMON_OPTION_SHORTLIST "Ie:d:s:", longopts, NULL)) >= 0; ) {
+    for (int c = 0; (c = getopt_long(argc, argv, COMMON_DAEMON_OPTION_SHORTLIST "Ie:d:s:", longopts, NULL)) >= 0;) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
@@ -311,16 +310,16 @@ int main(int argc, char *argv[])
             port_dec = atoi(optarg);
             break;
           case 'I':
-            config.ignore_ext = true;
+            _G.config.ignore_ext = true;
             break;
           case 's':
             if (m_strlen(optarg) != 1) {
                 usage();
                 return EXIT_FAILURE;
             }
-            config.separator = *optarg;
-            if (config.separator != '+' && config.separator != '-'
-                && config.separator != '=') {
+            _G.config.separator = *optarg;
+            if (_G.config.separator != '+' && _G.config.separator != '-'
+                && _G.config.separator != '=') {
                 usage();
                 return EXIT_FAILURE;
             }
@@ -336,23 +335,23 @@ int main(int argc, char *argv[])
 
     notice("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
-    config.domain = argv[optind];
-    config.domainlen = strlen(config.domain);
-    config.srs = srs_read_secrets(argv[optind + 1]);
-    if (config.srs == NULL) {
+    _G.config.domain = argv[optind];
+    _G.config.domainlen = strlen(_G.config.domain);
+    _G.config.srs = srs_read_secrets(argv[optind + 1]);
+    if (_G.config.srs == NULL) {
         return EXIT_FAILURE;
     }
-    if (config.separator != '\0'
-        && srs_set_separator(config.srs, config.separator) == SRS_ESEPARATORINVALID) {
+    if (_G.config.separator != '\0'
+        && srs_set_separator(_G.config.srs, _G.config.separator) == SRS_ESEPARATORINVALID) {
         return EXIT_FAILURE;
     }
     if (common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP,
                      daemonize) != EXIT_SUCCESS
-        || (encoder_ptr = start_listener(port_enc)) == NULL
-        || (decoder_ptr = start_listener(port_dec)) == NULL) {
+        || (_G.encoder_ptr = start_listener(port_enc)) == NULL
+        || (_G.decoder_ptr = start_listener(port_dec)) == NULL) {
         return EXIT_FAILURE;
     }
-    return server_loop(srsd_starter, NULL, process_srs, NULL, &config);
+    return server_loop(srsd_starter, NULL, process_srs, NULL, &_G.config);
 }
 
 /* vim:set et sw=4 sts=4 sws=4: */
