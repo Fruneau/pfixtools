@@ -114,6 +114,7 @@ filter_declare(counter)
 filter_declare(spf)
 filter_declare(hang)
 filter_declare(rate)
+filter_declare(srs)
 
 static int filter_module_init(void)
 {

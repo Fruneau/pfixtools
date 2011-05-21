@@ -48,7 +48,7 @@ FILTERS		= $(shell grep '^filter_declare' filter.c | sed -e 's/filter_declare(\(
 libpostlicyd_SOURCES = filter.c config.c query.c resources.c db.c $(FILTERS) $(GENERATED)
 
 postlicyd_SOURCES = main-postlicyd.c libpostlicyd.a ../common/lib.a
-postlicyd_LIBADD  = $(TC_LIBS) -lev -lpcre -lunbound
+postlicyd_LIBADD  = $(TC_LIBS) -lev -lpcre -lunbound -lsrs2
 
 all:
 
