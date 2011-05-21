@@ -6,6 +6,7 @@ version 0.9
 
   * postlicyd:
     NEW: query format learns ${field[part]} pattern                        FRU
+    NEW: new srs filter                                                    FRU
     FIX: crash in the greylister when client_address is missing            FRU
 
 ------------------------------------------------------------------------------
