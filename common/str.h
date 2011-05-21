@@ -39,6 +39,7 @@
 #ifndef PFIXTOOLS_STR_H
 #define PFIXTOOLS_STR_H
 
+#include <stdbool.h>
 #include "mem.h"
 
 /** \defgroup mutt_strings Madmutt string API
@@ -404,6 +405,11 @@ typedef struct clstr_t {
 } clstr_t;
 #define CLSTR_IMMED(Str)  { .str = (Str), .len = sizeof(Str) - 1 }
 #define CLSTR_NULL        { .str = NULL, .len = 0 }
+
+static inline bool clstr_equals(clstr_t a, clstr_t b)
+{
+    return a.len == b.len && (a.len == 0 || memcmp(a.str, b.str, a.len) == 0);
+}
 
 /*@}*/
 #endif /* PFIXTOOLS_STR_H */
