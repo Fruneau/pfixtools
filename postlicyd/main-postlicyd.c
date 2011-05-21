@@ -342,9 +342,11 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
-        crit("unable to drop privileges");
-        return EXIT_FAILURE;
+    if (!unsafe) {
+        if (drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
+            crit("unable to drop privileges");
+            return EXIT_FAILURE;
+        }
     }
 
     config = config_read(argv[optind]);
