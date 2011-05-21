@@ -70,7 +70,7 @@ static bool hang_filter_constructor(filter_t *filter)
         return false;                                                          \
     }
 
-    foreach (filter_param_t* param, filter->params) {
+    foreach (param, filter->params) {
         switch (param->type) {
           /* timeout_ms is an integer
            *  number of milliseconds to hang.
@@ -79,7 +79,7 @@ static bool hang_filter_constructor(filter_t *filter)
 
           default: break;
         }
-    }}
+    }
 
     PARSE_CHECK(data->timeout > 0, "invalid timeout given: %d, must be a strictly positive integer", data->timeout);
     filter->data = data;

@@ -75,7 +75,7 @@ static bool spf_filter_constructor(filter_t *filter)
         return false;                                                          \
     }
 
-    foreach (filter_param_t* param, filter->params) {
+    foreach (param, filter->params) {
         switch (param->type) {
           /* use_spf_record parameter is a boolean.
            *  If use_spf_record is true, SPF records are looked for in both
@@ -99,7 +99,7 @@ static bool spf_filter_constructor(filter_t *filter)
 
           default: break;
         }
-    }}
+    }
 
     filter->data = data;
     return true;

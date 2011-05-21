@@ -316,7 +316,7 @@ static bool iplist_filter_constructor(filter_t *filter)
 
     data->hard_threshold = 1;
     data->soft_threshold = 1;
-    foreach (filter_param_t *param, filter->params) {
+    foreach (param, filter->params) {
         switch (param->type) {
           /* file parameter is:
            *  [no]lock:weight:filename
@@ -425,7 +425,7 @@ static bool iplist_filter_constructor(filter_t *filter)
 
           default: break;
         }
-    }}
+    }
 
     PARSE_CHECK(data->rbls.len || data->host_offsets.len,
                 "no file parameter in the filter %s", filter->name);

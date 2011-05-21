@@ -131,7 +131,7 @@ static bool rate_filter_constructor(filter_t *filter)
         return false;                                                          \
     }
 
-    foreach (filter_param_t *param, filter->params) {
+    foreach (param, filter->params) {
         switch (param->type) {
           FILTER_PARAM_PARSE_STRING(PATH, path, false);
           FILTER_PARAM_PARSE_STRING(PREFIX, prefix, false);
@@ -143,7 +143,7 @@ static bool rate_filter_constructor(filter_t *filter)
 
           default: break;
         }
-    }}
+    }
 
     PARSE_CHECK(config->key_format != NULL && query_format_check(config->key_format),
                 "invalid key for rate filter");

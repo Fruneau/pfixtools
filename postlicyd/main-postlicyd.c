@@ -90,9 +90,9 @@ static bool config_refresh(void *mconfig)
     notice("reloading configuration");
     bool ret = config_reload(mconfig);
     log_state = "";
-    foreach (client_t **server, busy) {
+    foreach (server, busy) {
         client_io_ro(*server);
-    }}
+    }
     array_len(busy) = 0;
     refresh = false;
     return ret;

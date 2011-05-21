@@ -249,22 +249,14 @@
  * <code>
  * A(MyType) array;
  * ...
- * foreach (MyType* element, array) {
+ * foreach (element, array) {
  *    do_something(element);
- * }}
+ * }
  * </code>
- *
- * Warnings:
- *  * remember the loop must be ended with }} (the foreach macro contains 
- *    a not-matched opening brace).
- *  * the macro uses a counter name __Ai, so you cannot build imbricated
- *    array enumerations. You SHOULD NOT use this counter in your code since
- *    it is part of the internal API and may change in the future.
  */
 
 #define foreach(var, array)                                                    \
-    for (uint32_t __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                    \
-        var = array_ptr(array, __Ai);
+    for (typeof(*(array).data) *var = (array).data; var < array_end(array); var++)
 
 /** Execute @c action for each element of the array.
  *

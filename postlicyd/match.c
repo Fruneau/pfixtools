@@ -146,7 +146,7 @@ static bool match_filter_constructor(filter_t *filter)
         return false;                                                          \
     }
 
-    foreach (filter_param_t *param, filter->params) {
+    foreach (param, filter->params) {
         switch (param->type) {
           FILTER_PARAM_PARSE_BOOLEAN(MATCH_ALL, config->match_all);
 
@@ -228,7 +228,7 @@ static bool match_filter_constructor(filter_t *filter)
 
           default: break;
         }
-    }}
+    }
 
     PARSE_CHECK(config->conditions.len > 0,
                 "no condition defined");
@@ -319,7 +319,7 @@ static filter_result_t match_filter(const filter_t *filter, const query_t *query
                                     filter_context_t *context)
 {
     const match_config_t *config = filter->data;
-    foreach (const match_condition_t *condition, config->conditions) {
+    foreach (condition, config->conditions) {
         bool r = match_condition(condition, query);
         if (!r && config->match_all) {
             debug("condition failed, match_all failed");
@@ -328,7 +328,7 @@ static filter_result_t match_filter(const filter_t *filter, const query_t *query
             debug("condition succeed, not-match_all succeed");
             return HTK_MATCH;
         }
-    }}
+    }
     if (config->match_all) {
         debug("all conditions matched, match_all succeed");
         return HTK_MATCH;

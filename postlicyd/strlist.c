@@ -387,7 +387,7 @@ static bool strlist_filter_constructor(filter_t *filter)
 
     config->hard_threshold = 1;
     config->soft_threshold = 1;
-    foreach (filter_param_t *param, filter->params) {
+    foreach (param, filter->params) {
         switch (param->type) {
           /* file parameter is:
            *  [no]lock:(partial-)(prefix|suffix):weight:filename
@@ -610,7 +610,7 @@ static bool strlist_filter_constructor(filter_t *filter)
 
           default: break;
         }
-    }}
+    }
 
     PARSE_CHECK(config->is_email != config->is_hostname,
                 "matched field MUST be emails XOR hostnames");
@@ -695,7 +695,7 @@ static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_co
     trie_match_t match;
     strlist_copy(normal, str->str, len, false);
     strlist_copy(reverse, str->str, len, true);
-    foreach (strlist_local_t *entry, config->locals) {
+    foreach (entry, config->locals) {
         bool matched = false;
         if (!entry->partial) {
             matched = trie_lookup_match(*(entry->db),
@@ -718,7 +718,7 @@ static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_co
             return true;
         }
         async->error = false;
-    }}
+    }
     return false;
 }
 

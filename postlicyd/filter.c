@@ -206,7 +206,7 @@ bool filter_build(filter_t *filter)
 
 bool filter_update_references(filter_t *filter, A(filter_t) *filter_list)
 {
-    foreach (filter_hook_t *hook, filter->hooks) {
+    foreach (hook, filter->hooks) {
         if (!hook->postfix) {
             hook->filter_id = filter_find_with_name(filter_list, hook->value);
             if (hook->filter_id == -1) {
@@ -216,7 +216,7 @@ bool filter_update_references(filter_t *filter, A(filter_t) *filter_list)
             }
             p_delete(&hook->value);
         }
-    }}
+    }
     return true;
 }
 
@@ -226,7 +226,7 @@ static inline bool filter_check_loop(filter_t *filter, A(filter_t) *array, int l
         return true;
     }
     filter->last_seen = level;
-    foreach (filter_hook_t *hook, filter->hooks) {
+    foreach (hook, filter->hooks) {
         if (hook->postfix) {
             continue;
         }
@@ -236,18 +236,19 @@ static inline bool filter_check_loop(filter_t *filter, A(filter_t) *array, int l
         if (!filter_check_loop(array_ptr(*array, hook->filter_id), array, level)) {
             return false;
         }
-    }}
+    }
     return true;
 }
 
 bool filter_check_safety(A(filter_t) *array)
 {
-    foreach (filter_t *filter, *array) {
-        if (!filter_check_loop(filter, array, __Ai)) {
+    foreach (filter, *array) {
+        int pos = filter - array->data;
+        if (!filter_check_loop(filter, array, pos)) {
             err("the filter tree contains a loop");
             return false;
         }
-    }}
+    }
     return true;
 }
 

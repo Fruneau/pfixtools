@@ -383,12 +383,12 @@ static bool config_build_structure(config_t *config)
 #       include "qsort.c"
     }
 
-    foreach (filter_t *filter, config->filters) {
+    foreach (filter, config->filters) {
         if (!filter_update_references(filter, &config->filters)) {
             ok = false;
             break;
         }
-    }}
+    }
     if (!ok) {
         return false;
     }
@@ -402,7 +402,7 @@ static bool config_build_structure(config_t *config)
         err(Fmt, ##__VA_ARGS__);                                               \
         return false;                                                          \
     }
-    foreach (filter_param_t *param, config->params) {
+    foreach (param, config->params) {
         switch (param->type) {
 #define   CASE(Param, State)                                                   \
             case ATK_ ## Param ## _FILTER:                                     \
@@ -428,7 +428,7 @@ static bool config_build_structure(config_t *config)
           FILTER_PARAM_PARSE_BOOLEAN(INCLUDE_EXPLANATION, config->include_explanation);
           default: break;
         }
-    }}
+    }
     array_deep_wipe(config->params, filter_params_wipe);
 
     if (config->log_format && !query_format_check(config->log_format)) {
@@ -444,11 +444,11 @@ static bool config_build_structure(config_t *config)
 
 static bool config_build_filters(config_t *config)
 {
-    foreach (filter_t *filter, config->filters) {
+    foreach (filter, config->filters) {
         if (!filter_build(filter)) {
             return false;
         }
-    }}
+    }
 
     return true;
 }

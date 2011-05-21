@@ -73,14 +73,14 @@ static bool counter_filter_constructor(filter_t *filter)
 
     config->hard_threshold = 1;
     config->soft_threshold = 1;
-    foreach (filter_param_t *param, filter->params) {
+    foreach (param, filter->params) {
         switch (param->type) {
           FILTER_PARAM_PARSE_INT(COUNTER, config->counter);
           FILTER_PARAM_PARSE_INT(HARD_THRESHOLD, config->hard_threshold);
           FILTER_PARAM_PARSE_INT(SOFT_THRESHOLD, config->soft_threshold);
           default: break;
         }
-    }}
+    }
 
     PARSE_CHECK(config->counter >= 0 && config->counter < MAX_COUNTERS,
                 "invalid counter number: %d", config->counter);

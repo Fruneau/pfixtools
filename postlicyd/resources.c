@@ -70,11 +70,11 @@ static inline void resource_wipe(resource_t *res)
 
 static inline resource_t *resource_find(const char *key, bool create)
 {
-    foreach (resource_t* res, resources) {
+    foreach (res, resources) {
         if (strcmp(res->key, key) == 0) {
             return res;
         }
-    }}
+    }
     if (create) {
         resource_t res = RESOURCE_INIT;
         res.key = m_strdup(key);
@@ -124,19 +124,20 @@ void resource_release(const char *ns, const char *key)
 void resource_garbage_collect(void)
 {
     uint32_t used = 0;
-    foreach (resource_t *res, resources) {
+    foreach (res, resources) {
+        uint32_t pos = res - resources.data;
         if (res->key != NULL && res->refcount == 0) {
             debug("resource gc: %s not referenced anymore", res->key);
             resource_wipe(res);
         } else if (res->key != NULL) {
             debug("resource gc: keeping %s, still %d references",
                   res->key, res->refcount);
-            if (used < __Ai) {
+            if (used < pos) {
                 array_elt(resources, used) = *res;
             }
             ++used;
         }
-    }}
+    }
     debug("resource gc: before %d resources, after %d",
           array_len(resources), used);
     array_len(resources) = used;
