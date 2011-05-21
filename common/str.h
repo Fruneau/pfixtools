@@ -402,6 +402,8 @@ typedef struct clstr_t {
     const char *str;
     ssize_t    len;
 } clstr_t;
+#define CLSTR_IMMED(Str)  { .str = (Str), .len = sizeof(Str) - 1 }
+#define CLSTR_NULL        { .str = NULL, .len = 0 }
 
 /*@}*/
 #endif /* PFIXTOOLS_STR_H */
