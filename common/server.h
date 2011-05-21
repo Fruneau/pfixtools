@@ -72,7 +72,7 @@ buffer_t *client_output_buffer(client_t *client);
 void *client_data(client_t *client);
 
 timeout_t *start_timer(int milliseconds, run_timeout_t runner, void *data);
-void timer_cancel(timeout_t* timer);
+void timer_cancel(timeout_t *timer);
 
 
 int server_loop(start_client_t starter, delete_client_t deleter,

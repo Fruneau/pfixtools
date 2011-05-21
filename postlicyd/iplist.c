@@ -521,7 +521,7 @@ static filter_result_t iplist_filter(const filter_t *filter, const query_t *quer
         error = false;
     }
     if (array_len(data->host_offsets) > 0) {
-        iplist_async_data_t* async = filter_context(filter, context);
+        iplist_async_data_t *async = filter_context(filter, context);
         array_ensure_exact_capacity(async->results, array_len(data->host_offsets));
         async->sum = sum;
         async->awaited = 0;

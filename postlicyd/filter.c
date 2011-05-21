@@ -134,7 +134,7 @@ filter_type_t filter_register(const char *type, filter_constructor_t constructor
     filter_token tok = filter_tokenize(type, m_strlen(type));
     CHECK_FILTER(tok);
 
-    filter_description_t* description = &filter_descriptions[tok];
+    filter_description_t *description = &filter_descriptions[tok];
     description->runner = runner;
     description->constructor = constructor;
     description->destructor = destructor;
@@ -446,7 +446,7 @@ void filter_context_wipe(filter_context_t *context)
     }
 }
 
-void* filter_context(const filter_t* filter, filter_context_t* context) {
+void* filter_context(const filter_t *filter, filter_context_t *context) {
     return context->contexts[filter->type->id];
 }
 

@@ -174,7 +174,7 @@ bool query_parse(query_t *query, char *p)
 #undef PARSE_CHECK
 }
 
-static void query_compute_normalized_client(query_t* query)
+static void query_compute_normalized_client(query_t *query)
 {
     char ip2[4], ip3[4];
     const char *dot, *p;
@@ -213,7 +213,7 @@ static void query_compute_normalized_client(query_t* query)
     query->normalized_client.len = m_strlen(query->n_client);
 }
 
-static void query_compute_normalized_sender(query_t* query)
+static void query_compute_normalized_sender(query_t *query)
 {
     const char *at = strchr(query->sender.str, '@');
     int rpos = 0, wpos = 0, userlen;
@@ -323,7 +323,7 @@ static bool query_format_field_content(const char* field, ssize_t field_len,
     if (tok == PTK_UNKNOWN) {
         warn("unknown field name \"%.*s\"", (int)field_len, field);
     }
-    const clstr_t* f = query_field_for_id(query, tok);
+    const clstr_t *f = query_field_for_id(query, tok);
     if (f == NULL) {
         res->str = "(null)";
         res->len = 6;

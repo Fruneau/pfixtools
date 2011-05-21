@@ -47,12 +47,12 @@ typedef struct hang_filter_t {
 } hang_filter_t;
 
 
-static hang_filter_t* hang_filter_new(void)
+static hang_filter_t *hang_filter_new(void)
 {
     return p_new(hang_filter_t, 1);
 }
 
-static void hang_filter_delete(hang_filter_t** filter)
+static void hang_filter_delete(hang_filter_t **filter)
 {
     if (*filter) {
         p_delete(filter);
@@ -61,7 +61,7 @@ static void hang_filter_delete(hang_filter_t** filter)
 
 static bool hang_filter_constructor(filter_t *filter)
 {
-    hang_filter_t* data = hang_filter_new();
+    hang_filter_t *data = hang_filter_new();
 
 #define PARSE_CHECK(Expr, Str, ...)                                            \
     if (!(Expr)) {                                                             \
@@ -88,21 +88,21 @@ static bool hang_filter_constructor(filter_t *filter)
 
 static void hang_filter_destructor(filter_t *filter)
 {
-    hang_filter_t* data = filter->data;
+    hang_filter_t *data = filter->data;
     hang_filter_delete(&data);
     filter->data = data;
 }
 
 static void hang_filter_async(void* arg)
 {
-    filter_context_t* context = arg;
+    filter_context_t *context = arg;
     filter_post_async_result(context, HTK_TIMEOUT);
 }
 
-static filter_result_t hang_filter(const filter_t* filter, const query_t* query,
-                                   filter_context_t* context)
+static filter_result_t hang_filter(const filter_t *filter, const query_t *query,
+                                   filter_context_t *context)
 {
-    const hang_filter_t* data = filter->data;
+    const hang_filter_t *data = filter->data;
     start_timer(data->timeout, hang_filter_async, context);
     return HTK_ASYNC;
 }

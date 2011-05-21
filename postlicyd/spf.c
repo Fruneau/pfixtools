@@ -52,12 +52,12 @@ static buffer_t domain = ARRAY_INIT;
 static buffer_t sender = ARRAY_INIT;
 static buffer_t ip     = ARRAY_INIT;
 
-static spf_filter_t* spf_filter_new(void)
+static spf_filter_t *spf_filter_new(void)
 {
     return p_new(spf_filter_t, 1);
 }
 
-static void spf_filter_delete(spf_filter_t** spf)
+static void spf_filter_delete(spf_filter_t **spf)
 {
     if (*spf) {
         p_delete(spf);
@@ -66,7 +66,7 @@ static void spf_filter_delete(spf_filter_t** spf)
 
 static bool spf_filter_constructor(filter_t *filter)
 {
-    spf_filter_t* data = spf_filter_new();
+    spf_filter_t *data = spf_filter_new();
 
 #define PARSE_CHECK(Expr, Str, ...)                                            \
     if (!(Expr)) {                                                             \
@@ -107,7 +107,7 @@ static bool spf_filter_constructor(filter_t *filter)
 
 static void spf_filter_destructor(filter_t *filter)
 {
-    spf_filter_t* data = filter->data;
+    spf_filter_t *data = filter->data;
     spf_filter_delete(&data);
     filter->data = data;
 }
@@ -134,7 +134,7 @@ static filter_result_t spf_code_to_result(spf_code_t code) {
 
 static void spf_filter_async(spf_code_t result, const char* exp, void *arg)
 {
-    filter_context_t* context = arg;
+    filter_context_t *context = arg;
     filter_post_async_result_with_explanation(context, spf_code_to_result(result), exp, -1);
 }
 
@@ -142,7 +142,7 @@ static void spf_filter_async(spf_code_t result, const char* exp, void *arg)
 static filter_result_t spf_filter(const filter_t *filter, const query_t *query,
                                   filter_context_t *context)
 {
-    const spf_filter_t* data = filter->data;
+    const spf_filter_t *data = filter->data;
     array_len(domain) = 0;
     array_len(sender) = 0;
     array_len(ip)     = 0;

@@ -57,7 +57,7 @@
 DECLARE_MAIN
 
 typedef struct srs_config_t {
-    srs_t* srs;
+    srs_t *srs;
     const char* domain;
     int domainlen;
     unsigned ignore_ext : 1;
@@ -103,7 +103,7 @@ static char *urldecode(char *s, char *end)
 
 static int process_srs(client_t *srsd, void* vconfig)
 {
-    srs_config_t* config = vconfig;
+    srs_config_t *config = vconfig;
     buffer_t *ibuf = client_input_buffer(srsd);
     buffer_t *obuf = client_output_buffer(srsd);
     bool decoder = (client_data(srsd) == decoder_ptr);
@@ -201,7 +201,7 @@ static srs_config_t config = {
 
 /** overload srs_free since the lib is not properly maintained.
  */
-inline void srs_free(srs_t* srs)
+inline void srs_free(srs_t *srs)
 {
     int  i;
     for (i = 0; i < srs->numsecrets; i++) {

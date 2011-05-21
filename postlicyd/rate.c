@@ -66,7 +66,7 @@ struct rate_entry_t {
     uint16_t entries[RATE_MAX_SLOTS];
 };
 
-static rate_config_t* rate_config_new(void)
+static rate_config_t *rate_config_new(void)
 {
     const rate_config_t init = RATE_CONFIG_INIT;
     rate_config_t *rc = p_new(rate_config_t, 1);

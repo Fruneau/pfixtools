@@ -266,11 +266,11 @@ static int tested = 0;
 static int passed = 0;
 static const char* to_run = NULL;
 
-static void spf_test_next(spf_test_t* current);
+static void spf_test_next(spf_test_t *current);
 
 static void spf_test_done(spf_code_t code, const char* explanation, void* data)
 {
-    spf_test_t* current = data;
+    spf_test_t *current = data;
     ++tested;
 
     if (((int)code == current->result1 || (int)code == current->result2) && ascii_strcasecmp(explanation, current->explanation) == 0) {
@@ -287,7 +287,7 @@ static void exit_cb(void* arg)
     exit(0);
 }
 
-static void spf_test_next(spf_test_t* current)
+static void spf_test_next(spf_test_t *current)
 {
     do {
         if (current == NULL) {

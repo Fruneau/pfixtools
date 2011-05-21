@@ -100,9 +100,9 @@ static inline void server_io_wipe(server_io_t *io)
 
 /* 1 - managing clients */
 
-static client_t* client_new(void)
+static client_t *client_new(void)
 {
-    client_t* server = p_new(client_t, 1);
+    client_t *server = p_new(client_t, 1);
     server->io.fd  = -1;
     return server;
 }
@@ -130,7 +130,7 @@ void client_delete(client_t **server)
     }
 }
 
-static client_t* client_acquire(void)
+static client_t *client_acquire(void)
 {
     if (client_pool.len != 0) {
         return array_pop_last(client_pool);
@@ -323,7 +323,7 @@ listener_t *start_listener(int port)
 /* Timers
  */
 
-static timeout_t* timeout_new(void)
+static timeout_t *timeout_new(void)
 {
     return p_new(timeout_t, 1);
 }
@@ -333,7 +333,7 @@ static void timeout_wipe(timeout_t *timer)
     ev_timer_stop(gl_loop, &timer->timer);
 }
 
-static void timeout_delete(timeout_t** timer)
+static void timeout_delete(timeout_t **timer)
 {
     if (*timer) {
         timeout_wipe(*timer);
@@ -341,7 +341,7 @@ static void timeout_delete(timeout_t** timer)
     }
 }
 
-static void timeout_release(timeout_t* timer)
+static void timeout_release(timeout_t *timer)
 {
     timeout_wipe(timer);
     array_add(timeout_pool, timer);
@@ -359,9 +359,9 @@ static void timeout_cb(EV_P_ struct ev_timer *w, int revents)
     }
 }
 
-timeout_t* start_timer(int milliseconds, run_timeout_t runner, void *data)
+timeout_t *start_timer(int milliseconds, run_timeout_t runner, void *data)
 {
-    timeout_t* timer = NULL;
+    timeout_t *timer = NULL;
     float timeout = ((float)milliseconds) / 1000.;
     if (array_len(timeout_pool) > 0) {
         timer = array_pop_last(timeout_pool);
@@ -376,7 +376,7 @@ timeout_t* start_timer(int milliseconds, run_timeout_t runner, void *data)
     return timer;
 }
 
-void timer_cancel(timeout_t* timer)
+void timer_cancel(timeout_t *timer)
 {
     timeout_release(timer);
 }

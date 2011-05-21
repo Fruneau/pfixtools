@@ -53,8 +53,8 @@ typedef struct greylist_config_t {
     int max_age;
     int cleanup_period;
 
-    db_t* awl;
-    db_t* obj;
+    db_t *awl;
+    db_t *obj;
 } greylist_config_t;
 
 #define GREYLIST_INIT { .lookup_by_host = false,       \
@@ -107,7 +107,7 @@ static bool greylist_db_check_awlentry(const void* entry, size_t entry_len, time
 
 static bool greylist_db_need_cleanup(time_t last_update, time_t now, void* data)
 {
-    const greylist_config_t* config = data;
+    const greylist_config_t *config = data;
     return now - last_update >= config->cleanup_period;
 }
 
@@ -150,7 +150,7 @@ static void greylist_config_wipe(greylist_config_t *config)
     }
 }
 
-static bool try_greylist(const greylist_config_t *config, const query_t* query)
+static bool try_greylist(const greylist_config_t *config, const query_t *query)
 {
 #define INCR_AWL                                              \
     aent.count++;                                             \
@@ -164,7 +164,7 @@ static bool try_greylist(const greylist_config_t *config, const query_t* query)
     time_t now = time(NULL);
     struct obj_entry oent = { now, now };
     struct awl_entry aent = { 0, 0 };
-    const clstr_t* c_addr = &query->client_address;
+    const clstr_t *c_addr = &query->client_address;
 
     size_t klen;
 
@@ -199,9 +199,9 @@ static bool try_greylist(const greylist_config_t *config, const query_t* query)
 
     /* Lookup.
      */
-    const clstr_t* cnet = query_field_for_id(query, config->lookup_by_host ? PTK_CLIENT_ADDRESS
+    const clstr_t *cnet = query_field_for_id(query, config->lookup_by_host ? PTK_CLIENT_ADDRESS
                                                                                 : PTK_NORMALIZED_CLIENT);
-    const clstr_t* sender = NULL;
+    const clstr_t *sender = NULL;
     if (!config->no_sender) {
         sender = query_field_for_id(query, config->normalize_sender ? PTK_NORMALIZED_SENDER
                                                                     : PTK_SENDER);

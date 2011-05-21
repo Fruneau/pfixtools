@@ -64,7 +64,7 @@ static config_t *config  = NULL;
 static bool refresh      = false;
 static PA(client_t) busy = ARRAY_INIT;
 
-static void *query_starter(listener_t* server)
+static void *query_starter(listener_t *server)
 {
     query_context_t *context = p_new(query_context_t, 1);
     filter_context_prepare(&context->context, context);
@@ -101,7 +101,7 @@ static bool config_refresh(void *mconfig)
 static void policy_answer(client_t *pcy, const char *message)
 {
     query_context_t *context = client_data(pcy);
-    const query_t* query = &context->query;
+    const query_t *query = &context->query;
     buffer_t *buf = client_output_buffer(pcy);
 
     /* Write reply "action=ACTION [text]" */
@@ -110,7 +110,7 @@ static void policy_answer(client_t *pcy, const char *message)
         buffer_addstr(buf, message);
     }
     if (config->include_explanation) {
-        const clstr_t* exp = &context->context.explanation;
+        const clstr_t *exp = &context->context.explanation;
         if (exp->len > 0) {
             buffer_addstr(buf, ": ");
             buffer_add(buf, exp->str, exp->len);
@@ -179,7 +179,7 @@ static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
 static bool policy_process(client_t *pcy, const config_t *mconfig)
 {
     query_context_t *context = client_data(pcy);
-    const query_t* query = &context->query;
+    const query_t *query = &context->query;
     const filter_t *filter;
     if (mconfig->entry_points[query->state] == -1) {
         warn("no filter defined for current protocol_state (%s)", smtp_state_names[query->state].str);

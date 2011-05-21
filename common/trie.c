@@ -140,8 +140,8 @@ static inline bool trie_entry_is_leaf(const trie_entry_t *entry)
  * Only the first character of the children is taken into account in the
  * lookup. The current entry is assumed to match the key.
  */
-static inline const trie_entry_t* trie_entry_child(const trie_t *trie,
-                                                   const trie_entry_t* entry,
+static inline const trie_entry_t *trie_entry_child(const trie_t *trie,
+                                                   const trie_entry_t *entry,
                                                    const char c)
 {
     uint32_t start = entry->children_offset;
@@ -149,7 +149,7 @@ static inline const trie_entry_t* trie_entry_child(const trie_t *trie,
 
     while (start < end) {
         uint32_t mid = (start + end) >> 1;
-        const trie_entry_t* child = array_ptr(trie->entries, mid);
+        const trie_entry_t *child = array_ptr(trie->entries, mid);
         const char c2 = str(trie, child)[0];
 
         if (c2 == c) {
@@ -419,7 +419,7 @@ bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
                 }
             } else if (trie_entry_c_match(trie, current, key)) {
                 key += current->c_len;
-                const trie_entry_t* nexte = trie_entry_child(trie, current, key[0]);
+                const trie_entry_t *nexte = trie_entry_child(trie, current, key[0]);
                 if (nexte == NULL) {
                     if (match) {
                       nexte = trie_entry_child(trie, current, '\0');
@@ -462,7 +462,7 @@ bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match)
                 }
             } else if (trie_entry_c_match(trie, current, key)) {
                 key += current->c_len;
-                const trie_entry_t* nexte = trie_entry_child(trie, current, key[0]);
+                const trie_entry_t *nexte = trie_entry_child(trie, current, key[0]);
                 if (nexte == NULL) {
                     nexte = trie_entry_child(trie, current, '\0');
                     if (nexte != NULL) {

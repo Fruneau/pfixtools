@@ -41,7 +41,7 @@
 #include "utils.h"
 #include "str.h"
 
-bool ip_parse_4(ip4_t* restrict ip, const char* restrict txt, ssize_t len)
+bool ip_parse_4(ip4_t *restrict ip, const char* restrict txt, ssize_t len)
 {
     char str[BUFSIZ];
     if (len < 0) {
@@ -72,7 +72,7 @@ bool ip_parse_6(ip6_t ip, const char* restrict txt, ssize_t len)
     return true;
 }
 
-bool ip_print_4(buffer_t* buffer, ip4_t ip, bool display, bool reverse)
+bool ip_print_4(buffer_t *buffer, ip4_t ip, bool display, bool reverse)
 {
     unused(display);
     if (!reverse) {
@@ -87,7 +87,7 @@ bool ip_print_4(buffer_t* buffer, ip4_t ip, bool display, bool reverse)
     return true;
 }
 
-bool ip_print_6(buffer_t* buffer, const ip6_t ip, bool display, bool reverse)
+bool ip_print_6(buffer_t *buffer, const ip6_t ip, bool display, bool reverse)
 {
     unused(display);
     if (!reverse) {

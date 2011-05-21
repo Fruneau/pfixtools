@@ -60,7 +60,7 @@ typedef struct db_resource_t {
     TCBDB *db;
 } db_resource_t;
 
-static db_t* db_new(void)
+static db_t *db_new(void)
 {
     return p_new(db_t, 1);
 }
@@ -83,7 +83,7 @@ static void db_resource_wipe(db_resource_t *res)
     p_delete(&res);
 }
 
-static bool db_need_cleanup(const db_t* db, TCBDB* tcdb)
+static bool db_need_cleanup(const db_t *db, TCBDB* tcdb)
 {
     int len = 0;
     time_t now = time(NULL);
@@ -96,7 +96,7 @@ static bool db_need_cleanup(const db_t* db, TCBDB* tcdb)
         || db->need_cleanup(*last_cleanup, now, db->config);
 }
 
-static TCBDB** db_resource_acquire(const db_t* db)
+static TCBDB** db_resource_acquire(const db_t *db)
 {
     TCBDB *awl_db, *tmp_db;
     time_t now = time(NULL);
@@ -217,7 +217,7 @@ static TCBDB** db_resource_acquire(const db_t* db)
     return &res->db;
 }
 
-db_t* db_load(const char* ns, const char* path, bool can_expire,
+db_t *db_load(const char* ns, const char* path, bool can_expire,
               db_checker_t need_cleanup, db_entry_checker_t entry_check, void *config)
 {
     db_t *db = db_new();
@@ -234,14 +234,14 @@ db_t* db_load(const char* ns, const char* path, bool can_expire,
     return db;
 }
 
-bool db_release(db_t* db)
+bool db_release(db_t *db)
 {
     resource_release(db->ns, db->filename);
     db_delete(&db);
     return true;
 }
 
-const void* db_get(const db_t* db, const void* key, size_t key_len, size_t* entry_len)
+const void* db_get(const db_t *db, const void* key, size_t key_len, size_t *entry_len)
 {
     int len = 0;
     const void* data = tcbdbget3(*db->db, key, key_len, &len);
@@ -249,7 +249,7 @@ const void* db_get(const db_t* db, const void* key, size_t key_len, size_t* entr
     return data;
 }
 
-bool db_get_len(const db_t* db, const void* key, size_t key_len, void* entry, size_t entry_len)
+bool db_get_len(const db_t *db, const void* key, size_t key_len, void* entry, size_t entry_len)
 {
     int len = 0;
     const void* data = tcbdbget3(*db->db, key, key_len, &len);
@@ -261,7 +261,7 @@ bool db_get_len(const db_t* db, const void* key, size_t key_len, void* entry, si
     }
 }
 
-bool db_put(const db_t* db, const void* key, size_t key_len, const void* entry, size_t entry_len)
+bool db_put(const db_t *db, const void* key, size_t key_len, const void* entry, size_t entry_len)
 {
     tcbdbput(*db->db, key, key_len, entry, entry_len);
     return true;
