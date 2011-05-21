@@ -261,9 +261,8 @@ static bool try_greylist(const greylist_config_t *config, const query_t *query)
 
 static greylist_config_t *greylist_config_new(void)
 {
-    const greylist_config_t g = GREYLIST_INIT;
     greylist_config_t *config = p_new(greylist_config_t, 1);
-    *config = g;
+    *config = (greylist_config_t)GREYLIST_INIT;;
     return config;
 }
 
