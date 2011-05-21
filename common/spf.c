@@ -91,7 +91,7 @@ struct spf_t {
     buffer_t domainspec;
 
     int8_t recursions;
-    struct spf_t* subquery;
+    struct spf_t *subquery;
 
     uint8_t a_resolutions;
     uint8_t mech_withdns;
@@ -103,33 +103,42 @@ struct spf_t {
 
 #define current_rule(spf) array_elt((spf)->rules, (spf)->current_rule)
 
-static PA(spf_t) spf_pool = ARRAY_INIT;
-static A(spf_rule_t) spf_rule_pool = ARRAY_INIT;
+static struct {
+    PA(spf_t) spf_pool;
+    A(spf_rule_t) spf_rule_pool;
 
-static char domainname[128];
-static uint8_t domainname_len;
-static buffer_t query_buffer = ARRAY_INIT;
-static buffer_t dns_buffer = ARRAY_INIT;
+    char domainname[128];
+    uint8_t domainname_len;
+    buffer_t query_buffer;
+    buffer_t dns_buffer;
 
-static int created = 0;
-static int acquired = 0;
-static int deleted = 0;
-static int released = 0;
+    int created;
+    int acquired;
+    int deleted;
+    int released;
+} spf_g = {
+#define _G  spf_g
+    .spf_pool      = ARRAY_INIT,
+    .spf_rule_pool = ARRAY_INIT,
 
-static spf_t* spf_new(void)
+    .query_buffer  = ARRAY_INIT,
+    .dns_buffer    = ARRAY_INIT,
+};
+
+static spf_t *spf_new(void)
 {
-    ++created;
+    _G.created++;
     return p_new(spf_t, 1);
 }
 
-static void spf_rule_wipe(spf_rule_t* rule)
+static void spf_rule_wipe(spf_rule_t *rule)
 {
     array_wipe(rule->content);
 }
 
-static void spf_wipe(spf_t* spf)
+static void spf_wipe(spf_t *spf)
 {
-    array_append(spf_rule_pool, array_start(spf->rules), array_len(spf->rules));
+    array_append(_G.spf_rule_pool, array_start(spf->rules), array_len(spf->rules));
     array_wipe(spf->rules);
     array_wipe(spf->domain);
     array_wipe(spf->ip);
@@ -145,67 +154,69 @@ static void spf_wipe(spf_t* spf)
 static void spf_delete(spf_t **spf)
 {
     if (*spf) {
-        ++deleted;
+        _G.deleted++;
         spf_wipe(*spf);
         p_delete(spf);
     }
 }
 
-static spf_t* spf_acquire(void)
+static spf_t *spf_acquire(void)
 {
-    ++acquired;
-    spf_t* spf = NULL;
-    if (array_len(spf_pool)) {
-        spf = array_pop_last(spf_pool);
+    _G.acquired++;
+    spf_t *spf = NULL;
+    if (array_len(_G.spf_pool)) {
+        spf = array_pop_last(_G.spf_pool);
     } else {
         spf = spf_new();
     }
-    debug("spf pool: acquiring %p - pool length: %d (created %d)", spf, array_len(spf_pool), created);
+    debug("spf pool: acquiring %p - pool length: %d (created %d)", spf,
+          array_len(_G.spf_pool), _G.created);
     return spf;
 }
 
 static int spf_module_init(void)
 {
-    if (gethostname(domainname, 128) < 0) {
-        strcpy(domainname, "localhost");
-        domainname_len = 9;
+    if (gethostname(_G.domainname, 128) < 0) {
+        strcpy(_G.domainname, "localhost");
+        _G.domainname_len = 9;
         return 0;
     }
 
-    const char* pos = strchr(domainname, '.');
+    const char* pos = strchr(_G.domainname, '.');
     if (pos == NULL) {
-        strcpy(domainname, "localhost");
-        domainname_len = 9;
+        strcpy(_G.domainname, "localhost");
+        _G.domainname_len = 9;
         return 0;
     }
     if (strchr(pos + 1, '.') != NULL) {
-        assert(pos - domainname <= 127);
-        memmove(domainname, pos + 1, (size_t)(127 - (pos - domainname)));
+        assert(pos - _G.domainname <= 127);
+        memmove(_G.domainname, pos + 1, (size_t)(127 - (pos - _G.domainname)));
     }
-    domainname_len = (uint8_t)m_strlen(domainname);
+    _G.domainname_len = (uint8_t)m_strlen(_G.domainname);
     return 0;
 }
 module_init(spf_module_init);
 
 static void spf_module_exit(void)
 {
-    array_deep_wipe(spf_pool, spf_delete);
-    array_deep_wipe(spf_rule_pool, spf_rule_wipe);
-    buffer_wipe(&query_buffer);
-    buffer_wipe(&dns_buffer);
-    debug("spf: Created: %d, Deleted: %d, Acquired: %d, Release: %d", created, deleted, acquired, released);
+    array_deep_wipe(_G.spf_pool, spf_delete);
+    array_deep_wipe(_G.spf_rule_pool, spf_rule_wipe);
+    buffer_wipe(&_G.query_buffer);
+    buffer_wipe(&_G.dns_buffer);
+    debug("spf: Created: %d, Deleted: %d, Acquired: %d, Release: %d",
+          _G.created, _G.deleted, _G.acquired, _G.released);
 }
 module_exit(spf_module_exit);
 
-static bool spf_release(spf_t* spf, bool decrement)
+static bool spf_release(spf_t *spf, bool decrement)
 {
     if (decrement) {
         --spf->queries;
     }
     if (spf->canceled && spf->queries == 0) {
-        ++released;
-        debug("spf pool: releasing %p - pool length: %d (created: %d)", spf, array_len(spf_pool) + 1, created);
-        array_append(spf_rule_pool, array_start(spf->rules), array_len(spf->rules));
+        _G.released++;
+        debug("spf pool: releasing %p - pool length: %d (created: %d)", spf, array_len(_G.spf_pool) + 1, _G.created);
+        array_append(_G.spf_rule_pool, array_start(spf->rules), array_len(spf->rules));
         array_len(spf->rules) = 0;
         buffer_reset(&spf->domain);
         buffer_reset(&spf->ip);
@@ -226,7 +237,7 @@ static bool spf_release(spf_t* spf, bool decrement)
         spf->validated = bak.validated;
         spf->domainspec = bak.domainspec;
         spf->explanation = bak.explanation;
-        array_add(spf_pool, spf);
+        array_add(_G.spf_pool, spf);
         return true;
     }
     return false;
@@ -261,15 +272,15 @@ static bool spf_validate_domain(const char* restrict domain) {
     return label_count > 1;
 }
 
-static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_callback_t cb)
+static bool spf_query(spf_t *spf, const char* query, dns_rrtype_t rtype, ub_callback_t cb)
 {
-    buffer_reset(&query_buffer);
-    buffer_addstr(&query_buffer, query);
-    if (array_last(query_buffer) != '.') {
-        buffer_addch(&query_buffer, '.');
+    buffer_reset(&_G.query_buffer);
+    buffer_addstr(&_G.query_buffer, query);
+    if (array_last(_G.query_buffer) != '.') {
+        buffer_addch(&_G.query_buffer, '.');
     }
     debug("spf (depth=%d): performing query of type %d for %s", spf->recursions, rtype, query);
-    if (dns_resolve(array_start(query_buffer), rtype, cb, spf)) {
+    if (dns_resolve(array_start(_G.query_buffer), rtype, cb, spf)) {
         if (rtype == DNS_RRT_A || rtype == DNS_RRT_AAAA) {
             ++spf->a_resolutions;
         }
@@ -279,9 +290,9 @@ static bool spf_query(spf_t* spf, const char* query, dns_rrtype_t rtype, ub_call
     return false;
 }
 
-static void spf_next(spf_t* spf, bool start);
+static void spf_next(spf_t *spf, bool start);
 
-static void spf_exit(spf_t* spf, spf_code_t code)
+static void spf_exit(spf_t *spf, spf_code_t code)
 {
     if (spf->in_macro) {
         spf_next(spf, false);
@@ -310,7 +321,7 @@ static void spf_exit(spf_t* spf, spf_code_t code)
     spf_cancel(spf);
 }
 
-static void spf_write_macro(buffer_t* restrict  buffer, clstr_t str, bool escape)
+static void spf_write_macro(buffer_t *restrict  buffer, clstr_t str, bool escape)
 {
     if (!escape) {
         buffer_add(buffer, str.str, (int)str.len);
@@ -339,7 +350,7 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result);
 static void spf_mx_receive(void* arg, int err, struct ub_result* result);
 static void spf_exists_receive(void* arg, int err, struct ub_result* result);
 static void spf_exp_receive(void* arg, int err, struct ub_result* result);
-static bool spf_run_ptr_resolution(spf_t* spf, const char* domainspec, bool in_macro);
+static bool spf_run_ptr_resolution(spf_t *spf, const char* domainspec, bool in_macro);
 
 static bool spf_dns_in_error(int err, struct ub_result* result)
 {
@@ -353,11 +364,11 @@ typedef enum {
     SPFEXP_DNS
 } spf_expansion_t;
 
-static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* restrict buffer, char identifier, int parts,
+static spf_expansion_t spf_expand_pattern(spf_t *spf, buffer_t *restrict buffer, char identifier, int parts,
                                           bool reverse, bool escape, const char* restrict delimiters,
                                           int delimiters_count) {
     clstr_t sections[256] = { { .str = 0, .len = 0}, };
-    clstr_t* pos = sections;
+    clstr_t *pos = sections;
     switch (identifier) {
       case 's':
         pos->str = array_start(spf->sender);
@@ -376,14 +387,14 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* restrict buffer,
         pos->len = array_len(spf->domain);
         break;
       case 'i': {
-        buffer_reset(&dns_buffer);
+        buffer_reset(&_G.dns_buffer);
         if (!spf->is_ip6) {
-            ip_print_4(&dns_buffer, spf->ip4, false, false);
+            ip_print_4(&_G.dns_buffer, spf->ip4, false, false);
         } else {
-            ip_print_6(&dns_buffer, spf->ip6, false, false);
+            ip_print_6(&_G.dns_buffer, spf->ip6, false, false);
         }
-        pos->str = array_start(dns_buffer);
-        pos->len = array_len(dns_buffer);
+        pos->str = array_start(_G.dns_buffer);
+        pos->len = array_len(_G.dns_buffer);
       } break;
       case 'p':
         if (array_len(spf->validated) > 0) {
@@ -412,14 +423,14 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* restrict buffer,
         pos->len = array_len(spf->ip);
         break;
       case 'r':
-        pos->str = domainname;
-        pos->len = domainname_len;
+        pos->str = _G.domainname;
+        pos->len = _G.domainname_len;
         break;
       case 't': {
-        buffer_reset(&dns_buffer);
-        buffer_addf(&dns_buffer, "%lu", (long int)time(0));
-        pos->str = array_start(dns_buffer);
-        pos->len = array_len(dns_buffer);
+        buffer_reset(&_G.dns_buffer);
+        buffer_addf(&_G.dns_buffer, "%lu", (long int)time(0));
+        pos->str = array_start(_G.dns_buffer);
+        pos->len = array_len(_G.dns_buffer);
       } break;
       default:
         return SPFEXP_SYNTAX;
@@ -463,7 +474,7 @@ static spf_expansion_t spf_expand_pattern(spf_t* spf, buffer_t* restrict buffer,
     return SPFEXP_VALID;
 }
 
-static spf_expansion_t spf_expand(spf_t* spf, const char* restrict macrostring)
+static spf_expansion_t spf_expand(spf_t *spf, const char* restrict macrostring)
 {
     buffer_reset(&spf->domainspec);
     if (m_strlen(macrostring) == 0) {
@@ -541,7 +552,7 @@ static spf_expansion_t spf_expand(spf_t* spf, const char* restrict macrostring)
     }
 }
 
-static bool spf_subquery(spf_t* restrict spf, const char* restrict domain, spf_result_t cb, bool no_explanation)
+static bool spf_subquery(spf_t *restrict spf, const char* restrict domain, spf_result_t cb, bool no_explanation)
 {
     if (spf->recursions >= SPF_MAX_RECUSION) {
         return false;
@@ -559,7 +570,7 @@ static bool spf_subquery(spf_t* restrict spf, const char* restrict domain, spf_r
     }
 }
 
-static void spf_explanation_expand(spf_t* spf)
+static void spf_explanation_expand(spf_t *spf)
 {
     if (array_len(spf->explanation) == 0) {
         spf_exit(spf, SPF_FAIL);
@@ -582,14 +593,14 @@ static void spf_explanation_expand(spf_t* spf)
     }
 }
 
-static void spf_explanation(spf_t* spf)
+static void spf_explanation(spf_t *spf)
 {
     if (array_len(spf->explanation) > 0) {
         spf_explanation_expand(spf);
         return;
     }
     spf->in_exp = true;
-    spf_rule_t* rule = array_ptr(spf->rules, spf->explanation_pos);
+    spf_rule_t *rule = array_ptr(spf->rules, spf->explanation_pos);
     switch (spf_expand(spf, array_start(rule->content))) {
       case SPFEXP_SYNTAX:
         spf_exit(spf, SPF_FAIL);
@@ -602,7 +613,7 @@ static void spf_explanation(spf_t* spf)
     spf_query(spf, array_start(spf->domainspec), DNS_RRT_TXT, spf_exp_receive);
 }
 
-static void spf_match(spf_t* spf)
+static void spf_match(spf_t *spf)
 {
     if (array_elt(spf->rules, spf->current_rule).qualifier == SPF_FAIL
         && spf->use_exp && spf->explanation_pos >= 0) {
@@ -613,7 +624,7 @@ static void spf_match(spf_t* spf)
     }
 }
 
-static bool spf_limit_dns_mechanism(spf_t* spf, bool increment)
+static bool spf_limit_dns_mechanism(spf_t *spf, bool increment)
 {
     if (spf->mech_withdns >= 10) {
         spf_exit(spf, SPF_PERMERROR);
@@ -625,12 +636,12 @@ static bool spf_limit_dns_mechanism(spf_t* spf, bool increment)
     return false;
 }
 
-static inline const char* spf_domainspec(const spf_t* spf)
+static inline const char* spf_domainspec(const spf_t *spf)
 {
     return spf->use_domain ? array_start(spf->domain) : array_start(spf->domainspec);
 }
 
-static void spf_next(spf_t* spf, bool start)
+static void spf_next(spf_t *spf, bool start)
 {
     while (true) {
         if (!start && !spf->in_macro) {
@@ -651,7 +662,7 @@ static void spf_next(spf_t* spf, bool start)
                     return;
                 }
                 debug("spf (debug=%d): reached the end of spf record, running redirect", spf->recursions);
-                spf_rule_t* rule = array_ptr(spf->rules, spf->redirect_pos);
+                spf_rule_t *rule = array_ptr(spf->rules, spf->redirect_pos);
                 switch (spf_expand(spf, array_start(rule->content))) {
                   case SPFEXP_SYNTAX:
                     spf_exit(spf, SPF_PERMERROR);
@@ -670,7 +681,7 @@ static void spf_next(spf_t* spf, bool start)
                 return;
             }
         }
-        spf_rule_t* rule = array_ptr(spf->rules, spf->current_rule);
+        spf_rule_t *rule = array_ptr(spf->rules, spf->current_rule);
         info("spf (depth=%d): processing rule %s: %s", spf->recursions,
               rule->rule == SPF_RULE_UNKNOWN ? "unknown" : spftokens[rule->rule],
               array_len(rule->content) == 0 ? "(empty)" : array_start(rule->content));
@@ -779,7 +790,7 @@ static void spf_next(spf_t* spf, bool start)
  */
 static void spf_a_receive(void* arg, int err, struct ub_result* result)
 {
-    spf_t* spf = arg;
+    spf_t *spf = arg;
     int i;
     --spf->a_resolutions;
     if (spf_release(spf, true)) {
@@ -836,7 +847,7 @@ static void spf_a_receive(void* arg, int err, struct ub_result* result)
  */
 static void spf_mx_receive(void* arg, int err, struct ub_result* result)
 {
-    spf_t* spf = arg;
+    spf_t *spf = arg;
     int i;
     if (spf_release(spf, true)) {
         debug("spf (depth=%d): MX received but processing already finished", spf->recursions);
@@ -852,7 +863,7 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
     debug("spf (depth=%d): MX entry received for %s", spf->recursions, result->qname);
     for (i = 0 ; result->data[i] != NULL ; ++i) {
         const char* pos = result->data[i] + 2;
-        buffer_reset(&dns_buffer);
+        buffer_reset(&_G.dns_buffer);
         if (i >= 10) {
             info("spf (depth=%d): too many MX entries for %s", spf->recursions, result->qname);
             break;
@@ -860,12 +871,13 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
         while (*pos != '\0') {
             uint8_t count = *pos;
             ++pos;
-            buffer_add(&dns_buffer, pos, count);
-            buffer_addch(&dns_buffer, '.');
+            buffer_add(&_G.dns_buffer, pos, count);
+            buffer_addch(&_G.dns_buffer, '.');
             pos += count;
         }
-        spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A,
-                                                spf_a_receive);
+        spf_query(spf, array_start(_G.dns_buffer),
+                  spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A,
+                  spf_a_receive);
     }
     if (spf->a_resolutions == 0) {
         info("spf (depth=%d): no MX entry for %s", spf->recursions, result->qname);
@@ -878,7 +890,7 @@ static void spf_mx_receive(void* arg, int err, struct ub_result* result)
  */
 static void spf_exists_receive(void* arg, int err, struct ub_result* result)
 {
-    spf_t* spf = arg;
+    spf_t *spf = arg;
     if (spf_release(spf, true)) {
         debug("spf (depth=%d): A received but processing already finished", spf->recursions);
         ub_resolve_free(result);
@@ -903,7 +915,7 @@ static void spf_exists_receive(void* arg, int err, struct ub_result* result)
  */
 static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
 {
-    spf_t* spf = arg;
+    spf_t *spf = arg;
     if (spf_release(spf, true)) {
         debug("spf (depth=%d): PTR received but processing already finished", spf->recursions);
         ub_resolve_free(result);
@@ -917,7 +929,7 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
     }
     for (int i = 0 ; result->data[i] != NULL ; ++i) {
         const char* pos = result->data[i];
-        buffer_reset(&dns_buffer);
+        buffer_reset(&_G.dns_buffer);
         if (spf->a_resolutions >= 10) {
             info("spf (depth=%d): too many PTR entries for %s", spf->recursions, result->qname);
             break;
@@ -925,34 +937,34 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
         while (*pos != '\0') {
             uint8_t count = *pos;
             ++pos;
-            buffer_add(&dns_buffer, pos, count);
-            buffer_addch(&dns_buffer, '.');
+            buffer_add(&_G.dns_buffer, pos, count);
+            buffer_addch(&_G.dns_buffer, '.');
             pos += count;
         }
 
         debug("spf (depth=%d): found %s, to be compared to %s", spf->recursions,
-              array_start(dns_buffer), array_start(spf->domainspec));
-        ssize_t diff = ((ssize_t)array_len(dns_buffer)) - ((ssize_t)array_len(spf->domainspec));
+              array_start(_G.dns_buffer), array_start(spf->domainspec));
+        ssize_t diff = ((ssize_t)array_len(_G.dns_buffer)) - ((ssize_t)array_len(spf->domainspec));
         bool match = false;
         if (diff == 0) {
-            if (strcasecmp(array_start(spf->domainspec), array_start(dns_buffer)) == 0) {
-                debug("spf (depth=%d): PTR potential entry found for domain %s", spf->recursions, array_start(dns_buffer));
+            if (strcasecmp(array_start(spf->domainspec), array_start(_G.dns_buffer)) == 0) {
+                debug("spf (depth=%d): PTR potential entry found for domain %s", spf->recursions, array_start(_G.dns_buffer));
                 match = true;
             }
-        } else if (diff > 0 && array_elt(dns_buffer, diff - 1) == '.') {
-            if (strcasecmp(array_start(spf->domainspec), array_ptr(dns_buffer, diff)) == 0) {
-                debug("spf (depth=%d): PTR potential entry found for subdomain %s", spf->recursions, array_start(dns_buffer));
+        } else if (diff > 0 && array_elt(_G.dns_buffer, diff - 1) == '.') {
+            if (strcasecmp(array_start(spf->domainspec), array_ptr(_G.dns_buffer, diff)) == 0) {
+                debug("spf (depth=%d): PTR potential entry found for subdomain %s", spf->recursions, array_start(_G.dns_buffer));
                 match = true;
             }
         }
         if (match) {
-            spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_a_receive);
+            spf_query(spf, array_start(_G.dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_a_receive);
         }
     }
     if (spf->a_resolutions == 0 && spf->in_macro) {
         for (int i = 0 ; result->data[i] != NULL ; ++i) {
             const char* pos = result->data[i];
-            buffer_reset(&dns_buffer);
+            buffer_reset(&_G.dns_buffer);
             if (spf->a_resolutions >= 10) {
                 info("spf (depth=%d): too many PTR entries for %s", spf->recursions, result->qname);
                 break;
@@ -960,11 +972,12 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
             while (*pos != '\0') {
                 uint8_t count = *pos;
                 ++pos;
-                buffer_add(&dns_buffer, pos, count);
-                buffer_addch(&dns_buffer, '.');
+                buffer_add(&_G.dns_buffer, pos, count);
+                buffer_addch(&_G.dns_buffer, '.');
                 pos += count;
             }
-            spf_query(spf, array_start(dns_buffer), spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_a_receive);
+            spf_query(spf, array_start(_G.dns_buffer),
+                      spf->is_ip6 ? DNS_RRT_AAAA : DNS_RRT_A, spf_a_receive);
         }
     }
     if (spf->a_resolutions == 0) {
@@ -973,7 +986,7 @@ static void spf_ptr_receive(void* arg, int err, struct ub_result* result)
     ub_resolve_free(result);
 }
 
-static bool spf_run_ptr_resolution(spf_t* spf, const char* domainspec, bool in_macro)
+static bool spf_run_ptr_resolution(spf_t *spf, const char* domainspec, bool in_macro)
 {
     spf->in_macro = in_macro;
     switch (spf_expand(spf, domainspec)) {
@@ -996,21 +1009,21 @@ static bool spf_run_ptr_resolution(spf_t* spf, const char* domainspec, bool in_m
         if (array_last(spf->domainspec) != '.') {
             buffer_addch(&spf->domainspec, '.');
         }
-        buffer_reset(&dns_buffer);
+        buffer_reset(&_G.dns_buffer);
         if (!spf->is_ip6) {
-            ip_print_4(&dns_buffer, spf->ip4, false, true);
-            buffer_addstr(&dns_buffer, ".in-addr.arpa.");
+            ip_print_4(&_G.dns_buffer, spf->ip4, false, true);
+            buffer_addstr(&_G.dns_buffer, ".in-addr.arpa.");
         } else {
-            ip_print_6(&dns_buffer, spf->ip6, false, true);
-            buffer_addstr(&dns_buffer, ".ip6.arpa.");
+            ip_print_6(&_G.dns_buffer, spf->ip6, false, true);
+            buffer_addstr(&_G.dns_buffer, ".ip6.arpa.");
         }
         if (spf->use_domain) {
             buffer_addstr(&spf->validated, "unknown");
         }
-        spf_query(spf, array_start(dns_buffer), DNS_RRT_PTR, spf_ptr_receive);
+        spf_query(spf, array_start(_G.dns_buffer), DNS_RRT_PTR, spf_ptr_receive);
         return true;
       default:
-        return false;;
+        return false;
     }
     return false;
 }
@@ -1020,7 +1033,7 @@ static bool spf_run_ptr_resolution(spf_t* spf, const char* domainspec, bool in_m
  */
 static void spf_include_exit(spf_code_t result, const char* exp, void* arg)
 {
-    spf_t* spf = arg;
+    spf_t *spf = arg;
     spf->mech_withdns = spf->subquery->mech_withdns;
     spf->subquery = NULL;
     switch (result) {
@@ -1051,7 +1064,7 @@ static void spf_include_exit(spf_code_t result, const char* exp, void* arg)
  */
 static void spf_redirect_exit(spf_code_t result, const char* exp, void* arg)
 {
-    spf_t* spf = arg;
+    spf_t *spf = arg;
     spf->subquery = NULL;
     if (result == SPF_NONE) {
         spf_exit(spf, SPF_PERMERROR);
@@ -1067,7 +1080,7 @@ static void spf_redirect_exit(spf_code_t result, const char* exp, void* arg)
  */
 static void spf_exp_receive(void *arg, int err, struct ub_result* result)
 {
-    spf_t* spf = arg;
+    spf_t *spf = arg;
     if (spf_release(spf, true)) {
         debug("spf (depth=%d): TXT for %s received but processing alread finished",
               spf->recursions, result->qname);
@@ -1228,7 +1241,7 @@ static bool spf_check_domainspec(const char* pos, const char* end,
 #undef READ_NEXT
 }
 
-static const char* spf_parse_cidr_simple(const char* start, const char* end, uint8_t* cidr)
+static const char* spf_parse_cidr_simple(const char* start, const char* end, uint8_t *cidr)
 {
     *cidr = 0;
     if (end <= start || !isdigit(end[-1])) {
@@ -1249,7 +1262,7 @@ static const char* spf_parse_cidr_simple(const char* start, const char* end, uin
     return end - 1;
 }
 
-static const char* spf_parse_cidr(const char* start, const char* end, uint8_t* cidr4, uint8_t* cidr6)
+static const char* spf_parse_cidr(const char* start, const char* end, uint8_t *cidr4, uint8_t *cidr6)
 {
     assert(cidr4 != NULL || cidr6 != NULL);
     if (cidr4 != NULL) {
@@ -1304,7 +1317,7 @@ static const char* spf_parse_cidr(const char* start, const char* end, uint8_t* c
     return end;
 }
 
-static bool spf_parse(spf_t* spf)
+static bool spf_parse(spf_t *spf)
 {
     const char* pos = array_start(spf->record);
     const char* end = pos + array_len(spf->record);
@@ -1441,8 +1454,8 @@ static bool spf_parse(spf_t* spf)
         }
 
         spf_rule_t rule = SPF_RULE_INIT;
-        if (array_len(spf_rule_pool) > 0) {
-            rule = array_pop_last(spf_rule_pool);
+        if (array_len(_G.spf_rule_pool) > 0) {
+            rule = array_pop_last(_G.spf_rule_pool);
         }
         rule.qualifier = qual;
         rule.rule = id;
@@ -1463,7 +1476,7 @@ static bool spf_parse(spf_t* spf)
 
 static void spf_line_callback(void *arg, int err, struct ub_result* result)
 {
-    spf_t* spf = arg;
+    spf_t *spf = arg;
     if (spf_release(spf, true)) {
         debug("spf (depth=%d): %s for %s received but processing already finished", spf->recursions,
               result->qtype == DNS_RRT_TXT ? "TXT" : "SPF", result->qname);
@@ -1593,12 +1606,12 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
 }
 
 
-spf_t* spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
+spf_t *spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
                  spf_result_t resultcb, bool no_spf_lookup, bool no_explanation, void *data,
-                 spf_code_t* code)
+                 spf_code_t *code)
 {
     info("spf: new SPF lookup of (%s, %s, %s)", ip, domain, sender);
-    spf_t* spf = spf_acquire();
+    spf_t *spf = spf_acquire();
     spf->redirect_pos = -1;
     spf->explanation_pos = -1;
 
@@ -1660,7 +1673,7 @@ spf_t* spf_check(const char *ip, const char *domain, const char *sender, const c
     }
 }
 
-void spf_cancel(spf_t* spf)
+void spf_cancel(spf_t *spf)
 {
     if (spf->subquery != NULL) {
         spf_cancel(spf->subquery);
