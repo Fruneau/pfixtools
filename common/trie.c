@@ -357,6 +357,7 @@ static bool trie_compile_aux(trie_t *trie, uint32_t id,
     /* Recursively call compile_aux to build the subtree for each fork.
      */
     const uint8_t children_len = array_elt(trie->entries, id).children_len;
+    assert (children_len == 0 || fork_pos == (uint32_t)children_len - 1);
     for (uint16_t i = 0 ; i < children_len ; ++i) {
         int child = array_elt(trie->entries, id).children_offset + i;
         if (forks[i] - 1 > first_key) {
@@ -589,7 +590,9 @@ static void trie_entry_inspect(const trie_t *trie, bool show_content,
         printf("Number of nodes: %d\n", trie->entries.len);
         printf("Number of leaves: %d\n", leaves);
         printf("Max depth: %d\n", max_depth);
-        printf("Average leaf depth: %d\n", depth_sum / leaves);
+        if (leaves != 0) {
+            printf("Average leaf depth: %d\n", depth_sum / leaves);
+        }
         printf("Memory used: %zd\n",
                (trie->entries.size * sizeof(trie_entry_t))
                + (trie->c.size) + sizeof(trie_t));
