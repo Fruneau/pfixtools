@@ -120,30 +120,28 @@ typedef struct filter_context_t {
 
 
 #define FILTER_INIT { NULL, NULL, ARRAY_INIT, NULL, ARRAY_INIT, -1 }
-#define CHECK_FILTER(Filter)                                                   \
-    assert(Filter != FTK_UNKNOWN && Filter != FTK_count                        \
+#define CHECK_FILTER(Filter)                                                 \
+    assert(Filter != FTK_UNKNOWN && Filter != FTK_count                      \
            && "Unknown filter type")
-#define CHECK_HOOK(Hook)                                                       \
-    assert(Hook != HTK_UNKNOWN && Hook != HTK_count                            \
-           && "Unknown hook")
-#define CHECK_PARAM(Param)                                                     \
-    assert(Param != ATK_UNKNOWN && Param != ATK_count                          \
-           && "Unknown param")
+#define CHECK_HOOK(Hook)                                                     \
+    assert(Hook != HTK_UNKNOWN && Hook != HTK_count && "Unknown hook")
+#define CHECK_PARAM(Param)                                                   \
+    assert(Param != ATK_UNKNOWN && Param != ATK_count && "Unknown param")
 
 
 /* Callback to be implemented by a filter.
  */
 
-typedef filter_result_t (*filter_runner_t)(const filter_t *filter,
+typedef filter_result_t (*filter_runner_f)(const filter_t *filter,
                                            const query_t *query,
                                            filter_context_t *context);
-typedef bool (*filter_constructor_t)(filter_t *filter);
-typedef void (*filter_destructor_t)(filter_t *filter);
+typedef bool (*filter_constructor_f)(filter_t *filter);
+typedef void (*filter_destructor_f)(filter_t *filter);
 
-typedef void *(*filter_context_constructor_t)(void);
-typedef void (*filter_context_destructor_t)(void*);
+typedef void *(*filter_context_constructor_f)(void);
+typedef void (*filter_context_destructor_f)(void*);
 
-typedef void (*filter_async_handler_t)(filter_context_t *context,
+typedef void (*filter_async_handler_f)(filter_context_t *context,
                                        const filter_hook_t *result);
 
 /** Number of filter currently running.
@@ -153,35 +151,42 @@ extern uint32_t filter_running_g;
 /* Registration.
  */
 #define filter_constructor_name(filter)  filter ## _init_filter
-#define filter_constructor_prototype(filter)                                   \
+#define filter_constructor_prototype(filter)                                 \
     int filter_constructor_name(filter)(void)
 
-#define filter_constructor(filter)                                             \
-    __attribute__((used)) filter_constructor_prototype(filter);                \
-                                                                               \
+#define filter_constructor(filter)                                           \
+    __attribute__((used)) filter_constructor_prototype(filter);              \
+                                                                             \
     filter_constructor_prototype(filter)
 
 __attribute__((nonnull(1,4)))
-filter_type_t filter_register(const char *type, filter_constructor_t constructor,
-                              filter_destructor_t destructor, filter_runner_t runner,
-                              filter_context_constructor_t context_constructor,
-                              filter_context_destructor_t context_destructor);
+filter_type_t
+filter_register(const char *type,
+                filter_constructor_f constructor,
+                filter_destructor_f destructor,
+                filter_runner_f runner,
+                filter_context_constructor_f context_constructor,
+                filter_context_destructor_f context_destructor);
 
 __attribute__((nonnull(2)))
 filter_result_t filter_hook_register(filter_type_t filter, const char *name);
 
 __attribute__((nonnull(2)))
-filter_param_id_t filter_param_register(filter_type_t filter, const char *name);
+filter_param_id_t filter_param_register(filter_type_t filter,
+                                        const char *name);
 
 __attribute__((nonnull))
-void filter_async_handler_register(filter_async_handler_t handler);
+void filter_async_handler_register(filter_async_handler_f handler);
 
 /** Register a result forwarding.
  *
- * If no hook is declared for the given @p source result value for a filter of type @p filter,
- * postlicyd will process the result as if the result was @p target.
+ * If no hook is declared for the given @p source result value for a filter of
+ * type @p filter, postlicyd will process the result as if the result was
+ * @p target.
  */
-void filter_hook_forward_register(filter_type_t filter, filter_result_t source, filter_result_t target);
+void filter_hook_forward_register(filter_type_t filter,
+                                  filter_result_t source,
+                                  filter_result_t target);
 
 
 /* Filter builder.
@@ -190,8 +195,7 @@ void filter_hook_forward_register(filter_type_t filter, filter_result_t source, 
 __attribute__((nonnull(1)))
 static inline void filter_init(filter_t *filter)
 {
-    const filter_t f = FILTER_INIT;
-    *filter = f;
+    *filter = (filter_t)FILTER_INIT;
 }
 
 __attribute__((nonnull(1,2)))
@@ -212,7 +216,8 @@ __attribute__((nonnull(1)))
 bool filter_build(filter_t *filter);
 
 __attribute__((nonnull(1,2)))
-static inline int filter_find_with_name(const A(filter_t) *array, const char *name)
+static inline int filter_find_with_name(const A(filter_t) *array,
+                                        const char *name)
 {
     int start = 0;
     int end   = array->len;
@@ -270,42 +275,43 @@ bool filter_test(const filter_t *filter, const query_t *query,
 /* Parsing Helpers
  */
 
-#define FILTER_PARAM_PARSE_STRING(Param, Dest, Copy)                           \
-    case ATK_ ## Param: {                                                      \
-        (Dest) = (Copy) ? m_strdup(param->value) : param->value;               \
+#define FILTER_PARAM_PARSE_STRING(Param, Dest, Copy)                         \
+    case ATK_ ## Param: {                                                    \
+        (Dest) = (Copy) ? m_strdup(param->value) : param->value;             \
     } break
 
-#define FILTER_PARAM_PARSE_INT(Param, Dest)                                    \
-    case ATK_ ## Param: {                                                      \
-        char *next;                                                            \
-        (Dest) = strtol(param->value, &next, 10);                              \
-        PARSE_CHECK(!*next, "invalid %s value %.*s", atokens[ATK_ ## Param],   \
-                    param->value_len, param->value);                           \
+#define FILTER_PARAM_PARSE_INT(Param, Dest)                                  \
+    case ATK_ ## Param: {                                                    \
+        char *next;                                                          \
+        (Dest) = strtol(param->value, &next, 10);                            \
+        PARSE_CHECK(!*next, "invalid %s value %.*s", atokens[ATK_ ## Param], \
+                    param->value_len, param->value);                         \
      } break
 
-#define FILTER_PARAM_PARSE_BOOLEAN(Param, Dest)                                \
-    case ATK_ ## Param: {                                                      \
-        if (param->value_len == 1 && param->value[0] == '1') {                 \
-            (Dest) = true;                                                     \
-        } else if (param->value_len == 1 && param->value[0] == '0') {          \
-            (Dest) = false;                                                    \
-        } else if (param->value_len == 4                                       \
-                   && ascii_tolower(param->value[0]) == 't'                    \
-                   && ascii_tolower(param->value[1]) == 'r'                    \
-                   && ascii_tolower(param->value[2]) == 'u'                    \
-                   && ascii_tolower(param->value[3]) == 'e') {                 \
-            (Dest) = true;                                                     \
-        } else if (param->value_len == 5                                       \
-                   && ascii_tolower(param->value[0]) == 'f'                    \
-                   && ascii_tolower(param->value[1]) == 'a'                    \
-                   && ascii_tolower(param->value[2]) == 'l'                    \
-                   && ascii_tolower(param->value[3]) == 's'                    \
-                   && ascii_tolower(param->value[4]) == 'e') {                 \
-            (Dest) = false;                                                    \
-        } else {                                                               \
-            PARSE_CHECK(false, "invalid %s value %.*s", atokens[ATK_ ## Param],\
-                        param->value_len, param->value);                       \
-        }                                                                      \
+#define FILTER_PARAM_PARSE_BOOLEAN(Param, Dest)                              \
+    case ATK_ ## Param: {                                                    \
+        if (param->value_len == 1 && param->value[0] == '1') {               \
+            (Dest) = true;                                                   \
+        } else if (param->value_len == 1 && param->value[0] == '0') {        \
+            (Dest) = false;                                                  \
+        } else if (param->value_len == 4                                     \
+                   && ascii_tolower(param->value[0]) == 't'                  \
+                   && ascii_tolower(param->value[1]) == 'r'                  \
+                   && ascii_tolower(param->value[2]) == 'u'                  \
+                   && ascii_tolower(param->value[3]) == 'e') {               \
+            (Dest) = true;                                                   \
+        } else if (param->value_len == 5                                     \
+                   && ascii_tolower(param->value[0]) == 'f'                  \
+                   && ascii_tolower(param->value[1]) == 'a'                  \
+                   && ascii_tolower(param->value[2]) == 'l'                  \
+                   && ascii_tolower(param->value[3]) == 's'                  \
+                   && ascii_tolower(param->value[4]) == 'e') {               \
+            (Dest) = false;                                                  \
+        } else {                                                             \
+            PARSE_CHECK(false, "invalid %s value %.*s",                      \
+                        atokens[ATK_ ## Param],                              \
+                        param->value_len, param->value);                     \
+        }                                                                    \
     } break
 
 
@@ -325,7 +331,8 @@ __attribute__((nonnull))
 void* filter_context(const filter_t * filter, filter_context_t *context);
 
 __attribute__((nonnull))
-void filter_post_async_result(filter_context_t *context, filter_result_t result);
+void filter_post_async_result(filter_context_t *context,
+                              filter_result_t result);
 
 __attribute__((nonnull(1)))
 void filter_post_async_result_with_explanation(filter_context_t *context,
@@ -333,7 +340,8 @@ void filter_post_async_result_with_explanation(filter_context_t *context,
                                                const char *str, ssize_t len);
 
 __attribute__((nonnull(1)))
-void filter_set_explanation(filter_context_t *context, const char* str, ssize_t len);
+void filter_set_explanation(filter_context_t *context, const char* str,
+                            ssize_t len);
 
 #endif
 

@@ -129,23 +129,26 @@ static void policy_answer(client_t *pcy, const char *message)
 }
 
 static const filter_t *next_filter(client_t *pcy, const filter_t *filter,
-                                   const query_t *query, const filter_hook_t *hook, bool *ok) {
+                                   const query_t *query,
+                                   const filter_hook_t *hook, bool *ok)
+{
     char log_prefix[BUFSIZ];
     log_prefix[0] = '\0';
 
-#define log_reply(Level, Msg, ...)                                             \
-    if (log_level >= LOG_ ## Level) {                                          \
-        if (log_prefix[0] == '\0') {                                           \
-            query_format(log_prefix, BUFSIZ,                                   \
-                         _G.config->log_format && _G.config->log_format[0] ?   \
-                            _G.config->log_format : DEFAULT_LOG_FORMAT, query);\
-        }                                                                      \
-        __log(LOG_ ## Level, "%s: " Msg, log_prefix, ##__VA_ARGS__);           \
+#define log_reply(Level, Msg, ...)                                           \
+    if (log_level >= LOG_ ## Level) {                                        \
+        if (log_prefix[0] == '\0') {                                         \
+            query_format(log_prefix, BUFSIZ,                                 \
+                         _G.config->log_format && _G.config->log_format[0] ? \
+                         _G.config->log_format : DEFAULT_LOG_FORMAT, query); \
+        }                                                                    \
+        __log(LOG_ ## Level, "%s: " Msg, log_prefix, ##__VA_ARGS__);         \
     }
 
     if (hook != NULL) {
         query_context_t *context = client_data(pcy);
-        if (hook->counter >= 0 && hook->counter < MAX_COUNTERS && hook->cost > 0) {
+        if (hook->counter >= 0 && hook->counter < MAX_COUNTERS
+            && hook->cost > 0) {
             context->context.counters[hook->counter] += hook->cost;
             log_reply(DEBUG, "added %d to counter %d (now %u)",
                       hook->cost, hook->counter,
@@ -186,18 +189,21 @@ static bool policy_process(client_t *pcy, const config_t *mconfig)
     const query_t *query = &context->query;
     const filter_t *filter;
     if (mconfig->entry_points[query->state] == -1) {
-        warn("no filter defined for current protocol_state (%s)", smtp_state_names_g[query->state].str);
+        warn("no filter defined for current protocol_state (%s)",
+             smtp_state_names_g[query->state].str);
         return false;
     }
     if (context->context.current_filter != NULL) {
         filter = context->context.current_filter;
     } else {
-        filter = array_ptr(mconfig->filters, mconfig->entry_points[query->state]);
+        filter = array_ptr(mconfig->filters,
+                           mconfig->entry_points[query->state]);
     }
     context->context.current_filter = NULL;
     while (true) {
         bool  ok = false;
-        const filter_hook_t *hook = filter_run(filter, query, &context->context);
+        const filter_hook_t *hook = filter_run(filter, query,
+                                               &context->context);
         filter = next_filter(pcy, filter, query, hook, &ok);
         if (filter == NULL) {
             return ok;
@@ -316,7 +322,9 @@ int main(int argc, char *argv[])
         { NULL, 0, NULL, 0 }
     };
 
-    for (int c = 0; (c = getopt_long(argc, argv, COMMON_DAEMON_OPTION_SHORTLIST "cl:", longopts, NULL)) >= 0;) {
+    for (int c = 0; (c = getopt_long(argc, argv,
+                                     COMMON_DAEMON_OPTION_SHORTLIST "cl:",
+                                     longopts, NULL)) >= 0;) {
         switch (c) {
           case 'l':
             port = atoi(optarg);

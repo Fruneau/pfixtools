@@ -41,20 +41,23 @@
 #define PFIXTOOLS_DB_H
 
 typedef struct db_t db_t;
-typedef bool (*db_entry_checker_t)(const void* entry, size_t entry_len, time_t now, void* config);
-typedef bool (*db_checker_t)(time_t last_cleanup, time_t now, void* config);
+typedef bool (*db_entry_checker_f)(const void* entry, size_t entry_len,
+                                   time_t now, void* config);
+typedef bool (*db_checker_f)(time_t last_cleanup, time_t now, void* config);
 
 /** Load the database at the given path.
  * @param ns The resource namespace.
  * @param path The path to the database on-disk storage.
  * @param can_expire true if the entries of the database can expire.
  * @param need_cleanup A callback that check if the database requires cleanup.
- * @param entry_check A callback that check if an entry of the database is obsolete.
+ * @param entry_check A callback that check if an entry of the database is
+ * obsolete.
  * @param config A pointer to a user data.
  * @return a db object or NULL if an error occured.
  */
-db_t *db_load(const char* ns, const char* path, bool can_expire, db_checker_t need_cleanup,
-              db_entry_checker_t entry_check, void* config);
+db_t *db_load(const char* ns, const char* path, bool can_expire,
+              db_checker_f need_cleanup, db_entry_checker_f entry_check,
+              void* config);
 
 /** Release and invalidate a db object.
  */
@@ -62,21 +65,26 @@ bool db_release(db_t *db);
 
 /** Get an entry in a db.
  *
- * The pointer returned by this function is owned by the database handler, you must not free it.
- * If the key cannot be found in the databse, this functions returns NULL.
+ * The pointer returned by this function is owned by the database handler,
+ * you must not free it. If the key cannot be found in the databse, this
+ * functions returns NULL.
  */
-const void* db_get(const db_t *db, const void* key, size_t key_len, size_t *entry_len);
+const void* db_get(const db_t *db, const void* key, size_t key_len,
+                   size_t *entry_len);
 
 /** Get an entry and ensure it has the correct size.
  *
- * The data is copied in the @p entry buffer. If the key is not found in the database or
- * if the entry does not have the length @p entry_len, this function returrns false.
+ * The data is copied in the @p entry buffer. If the key is not found in the
+ * database or if the entry does not have the length @p entry_len, this
+ * function returrns false.
  */
-bool db_get_len(const db_t *db, const void* key, size_t key_len, void* entry, size_t entry_len);
+bool db_get_len(const db_t *db, const void* key, size_t key_len,
+                void* entry, size_t entry_len);
 
 /** Add or replace the value associated to the given key in the database.
  */
-bool db_put(const db_t *db, const void* key, size_t key_len, const void* entry, size_t entry_len);
+bool db_put(const db_t *db, const void* key, size_t key_len,
+            const void* entry, size_t entry_len);
 
 #endif
 

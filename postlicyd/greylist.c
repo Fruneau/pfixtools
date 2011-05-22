@@ -81,32 +81,37 @@ struct obj_entry {
 };
 
 static inline bool greylist_check_objentry(const greylist_config_t *config,
-                                           const struct obj_entry* oent, time_t now)
+                                           const struct obj_entry* oent,
+                                           time_t now)
 {
     return !((config->max_age > 0 && now - oent->last > config->max_age)
              || (oent->last - oent->first < config->delay
                  && now - oent->last > config->retry_window));
 }
 
-static bool greylist_db_check_objentry(const void *entry, size_t entry_len, time_t now, void *data)
+static bool greylist_db_check_objentry(const void *entry, size_t entry_len,
+                                    time_t now, void *data)
 {
     return entry_len == sizeof(struct obj_entry)
         && greylist_check_objentry(data, entry, now);
 }
 
 static inline bool greylist_check_awlentry(const greylist_config_t *config,
-                                           const struct awl_entry *aent, time_t now)
+                                           const struct awl_entry *aent,
+                                           time_t now)
 {
     return !(config->max_age > 0 && now - aent->last > config->max_age);
 }
 
-static bool greylist_db_check_awlentry(const void* entry, size_t entry_len, time_t now, void* data)
+static bool greylist_db_check_awlentry(const void* entry, size_t entry_len,
+                                       time_t now, void* data)
 {
     return entry_len == sizeof(struct awl_entry)
         && greylist_check_awlentry(data, entry, now);
 }
 
-static bool greylist_db_need_cleanup(time_t last_update, time_t now, void* data)
+static bool greylist_db_need_cleanup(time_t last_update, time_t now,
+                                     void* data)
 {
     const greylist_config_t *config = data;
     return now - last_update >= config->cleanup_period;
@@ -119,7 +124,8 @@ static bool greylist_db_load(greylist_config_t *config,
 
     if (config->client_awl) {
         snprintf(path, sizeof(path), "%s/%swhitelist.db", directory, prefix);
-        config->awl = db_load("greylist", path, config->max_age > 0, greylist_db_need_cleanup,
+        config->awl = db_load("greylist", path, config->max_age > 0,
+                              greylist_db_need_cleanup,
                               greylist_db_check_awlentry, config);
         if (config->awl == NULL) {
             return false;
@@ -127,7 +133,8 @@ static bool greylist_db_load(greylist_config_t *config,
     }
 
     snprintf(path, sizeof(path), "%s/%sgreylist.db", directory, prefix);
-    config->obj = db_load("greylist", path, config->max_age > 0, greylist_db_need_cleanup,
+    config->obj = db_load("greylist", path, config->max_age > 0,
+                          greylist_db_need_cleanup,
                           greylist_db_check_objentry, config);
     if (config->obj == NULL) {
         if (config->awl) {
@@ -139,13 +146,14 @@ static bool greylist_db_load(greylist_config_t *config,
     return true;
 }
 
-static bool try_greylist(const greylist_config_t *config, const query_t *query)
+static
+bool try_greylist(const greylist_config_t *config, const query_t *query)
 {
-#define INCR_AWL                                              \
-    aent.count++;                                             \
-    aent.last = now;                                          \
-    debug("whitelist entry for %.*s updated, count %d",       \
-          (int)c_addr->len, c_addr->str, aent.count);         \
+#define INCR_AWL                                                             \
+    aent.count++;                                                            \
+    aent.last = now;                                                         \
+    debug("whitelist entry for %.*s updated, count %d",                      \
+          (int)c_addr->len, c_addr->str, aent.count);                        \
     db_put(config->awl, c_addr->str, c_addr->len, &aent, sizeof(aent));
 
     char key[BUFSIZ];
@@ -160,7 +168,8 @@ static bool try_greylist(const greylist_config_t *config, const query_t *query)
     /* Auto whitelist clients.
      */
     if (config->client_awl) {
-        if (db_get_len(config->awl, c_addr->str, c_addr->len, &aent, sizeof(aent))) {
+        if (db_get_len(config->awl, c_addr->str, c_addr->len,
+                       &aent, sizeof(aent))) {
             debug("client %.*s has a whitelist entry, count is %d",
                   (int)c_addr->len, c_addr->str, aent.count);
         }
@@ -188,12 +197,16 @@ static bool try_greylist(const greylist_config_t *config, const query_t *query)
 
     /* Lookup.
      */
-    const clstr_t *cnet = query_field_for_id(query, config->lookup_by_host ? PTK_CLIENT_ADDRESS
-                                                                                : PTK_NORMALIZED_CLIENT);
+    const clstr_t *cnet = query_field_for_id(query,
+                                             config->lookup_by_host ?
+                                             PTK_CLIENT_ADDRESS :
+                                             PTK_NORMALIZED_CLIENT);
     const clstr_t *sender = NULL;
     if (!config->no_sender) {
-        sender = query_field_for_id(query, config->normalize_sender ? PTK_NORMALIZED_SENDER
-                                                                    : PTK_SENDER);
+        sender = query_field_for_id(query,
+                                    config->normalize_sender ?
+                                    PTK_NORMALIZED_SENDER :
+                                    PTK_SENDER);
     }
     klen = snprintf(key, sizeof(key), "%s/%s/%s", cnet->str,
                     config->no_sender ? "" : sender->str,
@@ -273,11 +286,11 @@ static bool greylist_filter_constructor(filter_t *filter)
     const char* prefix = NULL;
     greylist_config_t *config = greylist_config_new();
 
-#define PARSE_CHECK(Expr, Str, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Str, ##__VA_ARGS__);                                               \
-        greylist_config_delete(&config);                                       \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Str, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Str, ##__VA_ARGS__);                                             \
+        greylist_config_delete(&config);                                     \
+        return false;                                                        \
     }
 
     foreach (param, filter->params) {
@@ -287,7 +300,8 @@ static bool greylist_filter_constructor(filter_t *filter)
           FILTER_PARAM_PARSE_BOOLEAN(LOOKUP_BY_HOST, config->lookup_by_host);
           FILTER_PARAM_PARSE_BOOLEAN(NO_SENDER, config->no_sender);
           FILTER_PARAM_PARSE_BOOLEAN(NO_RECIPIENT, config->no_recipient);
-          FILTER_PARAM_PARSE_BOOLEAN(NORMALIZE_SENDER, config->normalize_sender);
+          FILTER_PARAM_PARSE_BOOLEAN(NORMALIZE_SENDER,
+                                     config->normalize_sender);
           FILTER_PARAM_PARSE_INT(RETRY_WINDOW, config->retry_window);
           FILTER_PARAM_PARSE_INT(CLIENT_AWL,   config->client_awl);
           FILTER_PARAM_PARSE_INT(DELAY,        config->delay);
@@ -319,7 +333,8 @@ static filter_result_t greylist_filter(const filter_t *filter,
 {
     const greylist_config_t *config = filter->data;
     if (!config->no_recipient && query->state != SMTP_RCPT) {
-        warn("greylisting on recipient only works as smtpd_recipient_restrictions");
+        warn("greylisting on recipient only works "
+             "as smtpd_recipient_restrictions");
         return HTK_ABORT;
     }
     if (!config->no_sender && query->state < SMTP_MAIL) {
@@ -332,9 +347,10 @@ static filter_result_t greylist_filter(const filter_t *filter,
 
 filter_constructor(greylist)
 {
-    filter_type_t type =  filter_register("greylist", greylist_filter_constructor,
-                                          greylist_filter_destructor,
-                                          greylist_filter, NULL, NULL);
+    filter_type_t type
+        = filter_register("greylist", greylist_filter_constructor,
+                          greylist_filter_destructor,
+                          greylist_filter, NULL, NULL);
     /* Hooks.
      */
     (void)filter_hook_register(type, "abort");

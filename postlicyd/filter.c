@@ -49,17 +49,17 @@ struct filter_description_t {
 
     /* Filter execution function
      */
-    filter_runner_t      runner;
+    filter_runner_f      runner;
 
     /* Construction/destruction
      */
-    filter_constructor_t constructor;
-    filter_destructor_t  destructor;
+    filter_constructor_f constructor;
+    filter_destructor_f  destructor;
 
     /* Filter context construction/destruction
      */
-    filter_context_constructor_t ctx_constructor;
-    filter_context_destructor_t  ctx_destructor;
+    filter_context_constructor_f ctx_constructor;
+    filter_context_destructor_f  ctx_destructor;
 
     /* Valid hooks
      */
@@ -73,7 +73,7 @@ struct filter_description_t {
 
 static struct {
     filter_description_t filter_descriptions[FTK_count];
-    filter_async_handler_t async_handler;
+    filter_async_handler_f async_handler;
 
     const filter_hook_t default_hook;
     const filter_hook_t async_hook;
@@ -104,8 +104,8 @@ static struct {
 
 uint32_t filter_running_g = 0;
 
-#define filter_declare(filter)                                                 \
-    filter_constructor_prototype(filter);                                      \
+#define filter_declare(filter)                                               \
+    filter_constructor_prototype(filter);                                    \
     module_init(filter ## _init_filter);
 filter_declare(iplist)
 filter_declare(greylist)
@@ -134,10 +134,13 @@ static int filter_module_init(void)
 }
 module_init(filter_module_init);
 
-filter_type_t filter_register(const char *type, filter_constructor_t constructor,
-                              filter_destructor_t destructor, filter_runner_t runner,
-                              filter_context_constructor_t context_constructor,
-                              filter_context_destructor_t context_destructor)
+filter_type_t
+filter_register(const char *type,
+                filter_constructor_f constructor,
+                filter_destructor_f destructor,
+                filter_runner_f runner,
+                filter_context_constructor_f context_constructor,
+                filter_context_destructor_f context_destructor)
 {
     filter_token tok = filter_tokenize(type, m_strlen(type));
     CHECK_FILTER(tok);
@@ -164,13 +167,15 @@ filter_result_t filter_hook_register(filter_type_t filter,
 }
 
 void filter_hook_forward_register(filter_type_t filter,
-                                  filter_result_t source, filter_result_t target)
+                                  filter_result_t source,
+                                  filter_result_t target)
 {
     filter_module_init();
     CHECK_FILTER(filter->id);
     CHECK_HOOK(source);
     CHECK_HOOK(target);
-    assert(target != HTK_ASYNC && target != HTK_ABORT && "Cannot forward async or abort");
+    assert(target != HTK_ASYNC && target != HTK_ABORT
+           && "Cannot forward async or abort");
     assert(target != HTK_ASYNC && "Cannot forward result to async");
 
     ((filter_description_t*)filter)->forward[source] = target;
@@ -187,7 +192,7 @@ filter_param_id_t filter_param_register(filter_type_t filter,
     return tok;
 }
 
-void filter_async_handler_register(filter_async_handler_t handler)
+void filter_async_handler_register(filter_async_handler_f handler)
 {
     _G.async_handler = handler;
 }
@@ -228,7 +233,8 @@ bool filter_update_references(filter_t *filter, A(filter_t) *filter_list)
     return true;
 }
 
-static inline bool filter_check_loop(filter_t *filter, A(filter_t) *array, int level)
+static inline bool filter_check_loop(filter_t *filter, A(filter_t) *array,
+                                     int level)
 {
     if (filter->last_seen == level) {
         return true;
@@ -241,7 +247,8 @@ static inline bool filter_check_loop(filter_t *filter, A(filter_t) *array, int l
         if (hook->filter_id == level) {
             return false;
         }
-        if (!filter_check_loop(array_ptr(*array, hook->filter_id), array, level)) {
+        if (!filter_check_loop(array_ptr(*array, hook->filter_id),
+                               array, level)) {
             return false;
         }
     }
@@ -270,8 +277,9 @@ void filter_wipe(filter_t *filter)
     p_delete(&filter->name);
 }
 
-static inline const filter_hook_t *filter_hook_for_result(const filter_t *filter,
-                                                          filter_result_t res)
+static inline
+const filter_hook_t *filter_hook_for_result(const filter_t *filter,
+                                            filter_result_t res)
 {
     int start = 0;
     int end   = filter->hooks.len;
@@ -298,7 +306,8 @@ static inline const filter_hook_t *filter_hook_for_result(const filter_t *filter
     }
 
     if (filter->type->forward[res] != HTK_UNKNOWN) {
-        debug("no hook for result %s, forwarding to %s", htokens[res], htokens[filter->type->forward[res]]);
+        debug("no hook for result %s, forwarding to %s", htokens[res],
+              htokens[filter->type->forward[res]]);
         return filter_hook_for_result(filter,  filter->type->forward[res]);
     } else {
         warn("missing hook %s for filter %s", htokens[res], filter->name);
@@ -370,11 +379,11 @@ bool filter_add_param(filter_t *filter, const char *name, int name_len,
 bool filter_add_hook(filter_t *filter, const char *name, int name_len,
                      const char *value, int value_len)
 {
-#define PARSE_CHECK(Cond, Message, ...)                                        \
-    if (!(Cond)) {                                                             \
-        err("hook %s, " Message, htokens[hook.type], ##__VA_ARGS__);           \
-        filter_hook_wipe(&hook);                                               \
-        return false;                                                          \
+#define PARSE_CHECK(Cond, Message, ...)                                      \
+    if (!(Cond)) {                                                           \
+        err("hook %s, " Message, htokens[hook.type], ##__VA_ARGS__);         \
+        filter_hook_wipe(&hook);                                             \
+        return false;                                                        \
     }
     filter_hook_t hook;
     hook.filter_id = -1;
@@ -395,26 +404,32 @@ bool filter_add_hook(filter_t *filter, const char *name, int name_len,
      */
     while (true) {
         if (strncmp(value, "counter:", 8) == 0) {
-            PARSE_CHECK(hook.counter == -1, "cannot specify more than one counter");
+            PARSE_CHECK(hook.counter == -1,
+                        "cannot specify more than one counter");
             char *end = NULL;
             value += 8;
             hook.counter = strtol(value, &end, 10);
-            PARSE_CHECK(end != value && *end == ':', "cannot read counter id");
+            PARSE_CHECK(end != value && *end == ':',
+                        "cannot read counter id");
             PARSE_CHECK(hook.counter >= 0 && hook.counter < MAX_COUNTERS,
                         "invalid counter id %d", hook.counter);
             value = end + 1;
             hook.cost = strtol(value, &end, 10);
-            PARSE_CHECK(end != value && *end == ':', "cannot read counter increment");
-            PARSE_CHECK(hook.cost >= 0, "invalid counter increment value %d", hook.cost);
+            PARSE_CHECK(end != value && *end == ':',
+                        "cannot read counter increment");
+            PARSE_CHECK(hook.cost >= 0,
+                        "invalid counter increment value %d", hook.cost);
             value = end + 1;
         } else if (strncmp(value, "warn:", 5) == 0) {
-            PARSE_CHECK(hook.warn == NULL, "cannot specify more than one warning message");
+            PARSE_CHECK(hook.warn == NULL,
+                        "cannot specify more than one warning message");
             value += 5;
             const char* end = strchr(value, ':');
             PARSE_CHECK(end != NULL, "invalid unterminated warning message");
             PARSE_CHECK(end != value, "empty warning message");
             hook.warn = p_dupstr(value, end - value);
-            PARSE_CHECK(query_format_check(hook.warn), "invalid message format: \"%s\"", hook.warn);
+            PARSE_CHECK(query_format_check(hook.warn),
+                        "invalid message format: \"%s\"", hook.warn);
             value = end + 1;
         } else {
             break;
@@ -436,7 +451,8 @@ void filter_context_prepare(filter_context_t *context, void *qctx)
 {
     for (int i = 0 ; i < FTK_count ; ++i) {
         if (_G.filter_descriptions[i].ctx_constructor != NULL) {
-            context->contexts[i] = _G.filter_descriptions[i].ctx_constructor();
+            context->contexts[i]
+                = _G.filter_descriptions[i].ctx_constructor();
         }
     }
     context->current_filter = NULL;
@@ -454,7 +470,8 @@ void filter_context_wipe(filter_context_t *context)
     }
 }
 
-void* filter_context(const filter_t *filter, filter_context_t *context) {
+void* filter_context(const filter_t *filter, filter_context_t *context)
+{
     return context->contexts[filter->type->id];
 }
 
@@ -464,7 +481,8 @@ void filter_context_clean(filter_context_t *context)
     context->instance[0] = '\0';
 }
 
-void filter_post_async_result(filter_context_t *context, filter_result_t result)
+void filter_post_async_result(filter_context_t *context,
+                              filter_result_t result)
 {
     const filter_t *filter = context->current_filter;
     const filter_hook_t *hook = NULL;
@@ -477,13 +495,15 @@ void filter_post_async_result(filter_context_t *context, filter_result_t result)
     _G.async_handler(context, hook);
 }
 
-void filter_set_explanation(filter_context_t *context, const char* str, ssize_t len)
+void filter_set_explanation(filter_context_t *context, const char* str,
+                            ssize_t len)
 {
     context->explanation.str = str;
     context->explanation.len = len >= 0 ? len : m_strlen(str);
 }
 
-void filter_post_async_result_with_explanation(filter_context_t *context, filter_result_t result,
+void filter_post_async_result_with_explanation(filter_context_t *context,
+                                               filter_result_t result,
                                                const char* str, ssize_t len)
 {
     filter_set_explanation(context, str, len);

@@ -66,7 +66,7 @@ typedef struct match_condition_t {
     } data;
 } match_condition_t;
 ARRAY(match_condition_t)
-#define CONDITION_INIT { PTK_UNKNOWN, false, MATCH_UNKNOWN, { .value = { NULL, 0 } } }
+#define CONDITION_INIT { .field = PTK_UNKNOWN }
 
 struct match_operator_t {
     const clstr_t short_name;
@@ -189,13 +189,15 @@ static bool match_filter_constructor(filter_t *filter)
 
             condition.condition = MATCH_UNKNOWN;
             const struct match_operator_t *op = _G.operators;
-            while (condition.condition == MATCH_UNKNOWN && op->condition != MATCH_UNKNOWN) {
+            while (condition.condition == MATCH_UNKNOWN
+                   && op->condition != MATCH_UNKNOWN) {
                 if (strncmp(p, op->short_name.str, op->short_name.len) == 0) {
                     condition.condition = op->condition;
                     condition.case_sensitive = op->cs;
                     p += op->short_name.len;
                     break;
-                } else if (strncmp(p, op->long_name.str, op->long_name.len) == 0) {
+                } else if (strncmp(p, op->long_name.str,
+                                   op->long_name.len) == 0) {
                     condition.condition = op->condition;
                     condition.case_sensitive = op->cs;
                     p += op->long_name.len;
@@ -203,7 +205,8 @@ static bool match_filter_constructor(filter_t *filter)
                 }
                 ++op;
             }
-            PARSE_CHECK((*p == '\0' || isspace(*p)) && condition.condition != MATCH_UNKNOWN,
+            PARSE_CHECK((*p == '\0' || isspace(*p))
+                        && condition.condition != MATCH_UNKNOWN,
                         "invalid operator");
             p = skipspaces(p);
             switch (condition.condition) {
@@ -216,20 +219,25 @@ static bool match_filter_constructor(filter_t *filter)
                 const char * const end = param->value + param->value_len;
                 clstr_t reg = { p, end - p };
                 buffer_addstr(&regexp, "");
-                PARSE_CHECK(regexp_parse_str(&reg, NULL, &regexp, NULL, &condition.case_sensitive),
+                PARSE_CHECK(regexp_parse_str(&reg, NULL, &regexp, NULL,
+                                             &condition.case_sensitive),
                             "invalid regexp");
                 reg.str = regexp.data;
                 reg.len = regexp.len;
-                PARSE_CHECK(regexp_compile_str(&condition.data.regexp, &reg, condition.case_sensitive),
+                PARSE_CHECK(regexp_compile_str(&condition.data.regexp, &reg,
+                                               condition.case_sensitive),
                             "cannot compile regexp %.*s", (int)(end - p), p);
               } break;
 
               default:
                 PARSE_CHECK(*p, "no value defined to check the condition");
-                condition.data.value.len = param->value_len - (p - param->value);
-                condition.data.value.str = p_dupstr(p, condition.data.value.len);
+                condition.data.value.len
+                    = param->value_len - (p - param->value);
+                condition.data.value.str
+                    = p_dupstr(p, condition.data.value.len);
                 PARSE_CHECK(query_format_check(condition.data.value.str),
-                            "invalid condition right hand expression \"%s\"", condition.data.value.str);
+                            "invalid condition right hand expression \"%s\"",
+                            condition.data.value.str);
                 break;
             }
             array_add(config->conditions, condition);
@@ -253,7 +261,8 @@ static void match_filter_destructor(filter_t *filter)
     filter->data = config;
 }
 
-static inline bool match_condition(const match_condition_t *cond, const query_t *query)
+static inline bool match_condition(const match_condition_t *cond,
+                                   const query_t *query)
 {
     const clstr_t *field = query_field_for_id(query, cond->field);
     if (cond->condition != MATCH_EMPTY && cond->condition != MATCH_MATCH
@@ -264,7 +273,7 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
     debug("running condition: \"%s\" %s %s\"%s\"",
           field->str, _G.condition_names[cond->condition],
           cond->case_sensitive ? "" : "(alternative) ",
-          cond->condition != MATCH_MATCH && cond->condition != MATCH_DONTMATCH 
+          cond->condition != MATCH_MATCH && cond->condition != MATCH_DONTMATCH
               && cond->data.value.str ? _G.match_buffer.data : "(none)");
     switch (cond->condition) {
       case MATCH_EQUAL:
@@ -276,7 +285,7 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
             return !!((strcmp(field->str, _G.match_buffer.data) == 0)
                       ^ (cond->condition == MATCH_DIFFER));
         } else {
-            return !!((ascii_strcasecmp(field->str, _G.match_buffer.data) == 0)
+            return !!(!ascii_strcasecmp(field->str, _G.match_buffer.data)
                       ^ (cond->condition == MATCH_DIFFER));
         }
         break;
@@ -288,7 +297,8 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
         if (cond->case_sensitive) {
             return strstr(field->str, _G.match_buffer.data);
         } else {
-            return m_stristrn(field->str, _G.match_buffer.data, _G.match_buffer.len);
+            return m_stristrn(field->str, _G.match_buffer.data,
+                              _G.match_buffer.len);
         }
         break;
 
@@ -304,7 +314,8 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
         break;
 
       case MATCH_EMPTY:
-        return !!((field == NULL || field->len == 0) ^ (!cond->case_sensitive));
+        return !!((field == NULL || field->len == 0)
+                  ^ (!cond->case_sensitive));
 
       case MATCH_MATCH:
         if (field == NULL || field->str == NULL) {
@@ -324,7 +335,8 @@ static inline bool match_condition(const match_condition_t *cond, const query_t 
     return true;
 }
 
-static filter_result_t match_filter(const filter_t *filter, const query_t *query,
+static filter_result_t match_filter(const filter_t *filter,
+                                    const query_t *query,
                                     filter_context_t *context)
 {
     const match_config_t *config = filter->data;
@@ -349,9 +361,10 @@ static filter_result_t match_filter(const filter_t *filter, const query_t *query
 
 filter_constructor(match)
 {
-    filter_type_t type =  filter_register("match", match_filter_constructor,
-                                          match_filter_destructor, match_filter,
-                                          NULL, NULL);
+    filter_type_t type
+        = filter_register("match", match_filter_constructor,
+                          match_filter_destructor, match_filter,
+                          NULL, NULL);
     /* Hooks.
      */
     (void)filter_hook_register(type, "match");

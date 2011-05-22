@@ -52,11 +52,11 @@ static bool hang_filter_constructor(filter_t *filter)
 {
     hang_filter_t *data = hang_filter_new();
 
-#define PARSE_CHECK(Expr, Str, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Str, ##__VA_ARGS__);                                               \
-        hang_filter_delete(&data);                                              \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Str, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Str, ##__VA_ARGS__);                                             \
+        hang_filter_delete(&data);                                           \
+        return false;                                                        \
     }
 
     foreach (param, filter->params) {
@@ -70,7 +70,8 @@ static bool hang_filter_constructor(filter_t *filter)
         }
     }
 
-    PARSE_CHECK(data->timeout > 0, "invalid timeout given: %d, must be a strictly positive integer", data->timeout);
+    PARSE_CHECK(data->timeout > 0, "invalid timeout given: %d, "
+                "must be a strictly positive integer", data->timeout);
     filter->data = data;
     return true;
 }
@@ -88,7 +89,8 @@ static void hang_filter_async(void* arg)
     filter_post_async_result(context, HTK_TIMEOUT);
 }
 
-static filter_result_t hang_filter(const filter_t *filter, const query_t *query,
+static filter_result_t hang_filter(const filter_t *filter,
+                                   const query_t *query,
                                    filter_context_t *context)
 {
     const hang_filter_t *data = filter->data;
@@ -99,9 +101,10 @@ static filter_result_t hang_filter(const filter_t *filter, const query_t *query,
 
 filter_constructor(hang)
 {
-    filter_type_t filter_type = filter_register("hang", hang_filter_constructor,
-                                                hang_filter_destructor, hang_filter,
-                                                NULL, NULL);
+    filter_type_t filter_type
+        = filter_register("hang", hang_filter_constructor,
+                          hang_filter_destructor, hang_filter,
+                          NULL, NULL);
 
     /* Hooks
      */

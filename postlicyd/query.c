@@ -94,7 +94,12 @@ bool query_parse(query_t *query, char *p)
 
         vtk = policy_tokenize(v, vlen);
         switch (policy_tokenize(k, klen)) {
-#define CASE(up, low)  case PTK_##up: query->low.str = v; query->low.len = vlen; v[vlen] = '\0';  break;
+#define CASE(up, low)                                                        \
+          case PTK_##up:                                                     \
+            query->low.str = v;                                              \
+            query->low.len = vlen;                                           \
+            v[vlen] = '\0';                                                  \
+            break;
             CASE(HELO_NAME,           helo_name);
             CASE(QUEUE_ID,            queue_id);
             CASE(RECIPIENT_COUNT,     recipient_count);
@@ -124,7 +129,8 @@ bool query_parse(query_t *query, char *p)
             if (query->sender_domain.str != NULL) {
                 ++query->sender_domain.str;
                 query->sender_domain.len = query->sender.len
-                                         - (query->sender_domain.str - query->sender.str);
+                                         - (query->sender_domain.str
+                                            - query->sender.str);
             }
             break;
 
@@ -132,11 +138,13 @@ bool query_parse(query_t *query, char *p)
             query->recipient.str = v;
             query->recipient.len = vlen;
             v[vlen] = '\0';
-            query->recipient_domain.str = memchr(query->recipient.str, '@', vlen);
+            query->recipient_domain.str
+                = memchr(query->recipient.str, '@', vlen);
             if (query->recipient_domain.str != NULL) {
                 ++query->recipient_domain.str;
                 query->recipient_domain.len = query->recipient.len
-                                         - (query->recipient_domain.str - query->recipient.str);
+                                            - (query->recipient_domain.str
+                                               - query->recipient.str);
 
             }
             break;
@@ -211,11 +219,13 @@ static void query_compute_normalized_client(query_t *query)
 
     /* skip if contains the last two ip numbers in the hostname,
        we assume it's a pool of dialup of a provider */
-    if (strstr(query->client_name.str, ip2) && strstr(query->client_name.str, ip3)) {
+    if (strstr(query->client_name.str, ip2)
+        && strstr(query->client_name.str, ip3)) {
         return;
     }
 
-    m_strncpy(query->n_client, 64, query->client_address.str, dot - query->client_address.str);
+    m_strncpy(query->n_client, 64, query->client_address.str,
+              dot - query->client_address.str);
     query->normalized_client.str = query->n_client;
     query->normalized_client.len = m_strlen(query->n_client);
 }
@@ -231,12 +241,15 @@ static void query_compute_normalized_sender(query_t *query)
     }
 
     /* strip extension used for VERP or alike */
-    userlen = ((char *)memchr(query->sender.str, '+', at - query->sender.str) ?: at) - query->sender.str;
+    userlen = ((char *)memchr(query->sender.str, '+',
+                              at - query->sender.str) ?: at)
+            - query->sender.str;
 
     while (rpos < userlen) {
         int count = 0;
 
-        while (isdigit(query->sender.str[rpos + count]) && rpos + count < userlen) {
+        while (isdigit(query->sender.str[rpos + count])
+               && rpos + count < userlen) {
             count++;
         }
         if (count && !isalnum(query->sender.str[rpos + count])) {
@@ -245,13 +258,16 @@ static void query_compute_normalized_sender(query_t *query)
             rpos += count;
             count = 0;
         }
-        while (isalnum(query->sender.str[rpos + count]) && rpos + count < userlen) {
+        while (isalnum(query->sender.str[rpos + count])
+               && rpos + count < userlen) {
             count++;
         }
-        while (!isalnum(query->sender.str[rpos + count]) && rpos + count < userlen) {
+        while (!isalnum(query->sender.str[rpos + count])
+               && rpos + count < userlen) {
             count++;
         }
-        wpos += m_strncpy(query->n_sender + wpos, 256 - wpos, query->sender.str + rpos, count);
+        wpos += m_strncpy(query->n_sender + wpos, 256 - wpos,
+                          query->sender.str + rpos, count);
         rpos += count;
     }
 
@@ -264,8 +280,7 @@ static void query_compute_normalized_sender(query_t *query)
 const clstr_t *query_field_for_id(const query_t *query, postlicyd_token id)
 {
     switch (id) {
-#define CASE(Up, Low)                                                          \
-      case PTK_ ## Up: return &query->Low;
+#define CASE(Up, Low)  case PTK_ ## Up: return &query->Low;
       CASE(HELO_NAME, helo_name)
       CASE(QUEUE_ID, queue_id)
       CASE(SENDER, sender)
@@ -379,20 +394,21 @@ static bool query_format_field_content(const char* field, ssize_t field_len,
     return true;
 }
 
-ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *query)
+ssize_t query_format(char *dest, size_t len, const char *fmt,
+                     const query_t *query)
 {
     size_t written = 0;
     size_t pos = 0;
 
-#define WRITE(Src, Len)                                                        \
-    do {                                                                       \
-        size_t __len     = (Len);                                              \
-        if (written < len) {                                                   \
-            size_t __to_write = MIN(len - written - 1, __len);                 \
-            memcpy(dest + written, (Src), __to_write);                         \
-            written += __to_write;                                             \
-        }                                                                      \
-        pos += __len;                                                          \
+#define WRITE(Src, Len)                                                      \
+    do {                                                                     \
+        size_t __len     = (Len);                                            \
+        if (written < len) {                                                 \
+            size_t __to_write = MIN(len - written - 1, __len);               \
+            memcpy(dest + written, (Src), __to_write);                       \
+            written += __to_write;                                           \
+        }                                                                    \
+        pos += __len;                                                        \
     } while (0)
     while (*fmt != '\0') {
         const char *next_format = strchr(fmt, '$');
@@ -432,7 +448,8 @@ ssize_t query_format(char *dest, size_t len, const char *fmt, const query_t *que
                 WRITE("(null)", 6);
             } else {
                 clstr_t field;
-                if (query_format_field_content(fmt, fmt_len, part, query, &field)) {
+                if (query_format_field_content(fmt, fmt_len, part, query,
+                                               &field)) {
                     WRITE(field.str, field.len);
                 } else {
                     WRITE("(none)", 6);

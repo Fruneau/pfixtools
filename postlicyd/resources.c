@@ -56,10 +56,10 @@ static struct {
 } resources_g;
 #define _G  resources_g
 
-#define RESOURCE_KEY                                                           \
-    char rskey[BUFSIZ];                                                        \
-    m_strcpy(rskey, BUFSIZ, ns);                                               \
-    m_strcat(rskey, BUFSIZ, "@@");                                             \
+#define RESOURCE_KEY                                                         \
+    char rskey[BUFSIZ];                                                      \
+    m_strcpy(rskey, BUFSIZ, ns);                                             \
+    m_strcat(rskey, BUFSIZ, "@@");                                           \
     m_strcat(rskey, BUFSIZ, key);
 
 static inline void resource_wipe(resource_t *res)

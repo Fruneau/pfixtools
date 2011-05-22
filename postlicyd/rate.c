@@ -88,7 +88,8 @@ static bool rate_db_need_cleanup(time_t last_cleanup, time_t now, void *data)
     return (now - last_cleanup) >= config->cleanup_period;
 }
 
-static bool rate_db_check_entry(const void *entry, size_t entry_len, time_t now, void *data)
+static bool rate_db_check_entry(const void *entry, size_t entry_len,
+                                time_t now, void *data)
 {
     const size_t len = offsetof(struct rate_entry_t, entries);
     rate_config_t *config = data;
@@ -101,7 +102,8 @@ static bool rate_db_check_entry(const void *entry, size_t entry_len, time_t now,
         && entry_len == len + 2 * rate->active_entries;
 }
 
-static bool rate_db_load(rate_config_t *config, const char *directory, const char *prefix)
+static bool rate_db_load(rate_config_t *config, const char *directory,
+                         const char *prefix)
 {
     char path[PATH_MAX];
 
@@ -117,11 +119,11 @@ static bool rate_filter_constructor(filter_t *filter)
     const char *prefix = NULL;
     rate_config_t *config = rate_config_new();
 
-#define PARSE_CHECK(Expr, Str, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Str, ##__VA_ARGS__);                                               \
-        rate_config_delete(&config);                                           \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Str, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Str, ##__VA_ARGS__);                                             \
+        rate_config_delete(&config);                                         \
+        return false;                                                        \
     }
 
     foreach (param, filter->params) {
@@ -138,7 +140,8 @@ static bool rate_filter_constructor(filter_t *filter)
         }
     }
 
-    PARSE_CHECK(config->key_format != NULL && query_format_check(config->key_format),
+    PARSE_CHECK(config->key_format != NULL
+                && query_format_check(config->key_format),
                 "invalid key for rate filter");
     PARSE_CHECK(rate_db_load(config, path, prefix == NULL ? "" : prefix),
                 "can not load rate database");
@@ -234,16 +237,19 @@ static filter_result_t rate_filter(const filter_t *filter,
             entry.entries[0] = 1;
         } else if (first_active_slot >= 0) {
             if (first_active_slot > 0) {
-                entry.ts += rate_delay_for_slot(first_active_slot, config->delay);
+                entry.ts += rate_delay_for_slot(first_active_slot,
+                                                config->delay);
                 memmove(entry.entries, &entry.entries[first_active_slot],
                         2 * (entry.active_entries - first_active_slot));
                 entry.active_entries -= first_active_slot;
             }
-            int current_slot = rate_slot_for_delay(now - entry.ts, entry.delay);
+            int current_slot = rate_slot_for_delay(now - entry.ts,
+                                                   entry.delay);
             debug("rate current entry belongs to slot %d", current_slot);
             assert(current_slot < RATE_MAX_SLOTS);
             if (current_slot >= entry.active_entries) {
-                p_clear(&entry.entries[entry.active_entries], current_slot - entry.active_entries);
+                p_clear(&entry.entries[entry.active_entries],
+                        current_slot - entry.active_entries);
                 entry.entries[current_slot] = 1;
                 entry.active_entries = current_slot + 1;
             } else {
@@ -260,7 +266,8 @@ static filter_result_t rate_filter(const filter_t *filter,
     if (entry.active_entries == 1 && entry.entries[0] == 1) {
         entry.active_entries = 0;
     }
-    db_put(config->db, key, key_len, &entry, entry_header_len + 2 * entry.active_entries);
+    db_put(config->db, key, key_len, &entry,
+           entry_header_len + 2 * entry.active_entries);
 
     if (total >= config->hard_threshold) {
         if (last_total < (uint32_t)config->hard_threshold) {

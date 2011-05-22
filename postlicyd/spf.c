@@ -62,11 +62,11 @@ static bool spf_filter_constructor(filter_t *filter)
 {
     spf_filter_t *data = spf_filter_new();
 
-#define PARSE_CHECK(Expr, Str, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Str, ##__VA_ARGS__);                                               \
-        spf_filter_delete(&data);                                              \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Str, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Str, ##__VA_ARGS__);                                             \
+        spf_filter_delete(&data);                                            \
+        return false;                                                        \
     }
 
     foreach (param, filter->params) {
@@ -129,12 +129,15 @@ static filter_result_t spf_code_to_result(spf_code_t code) {
 static void spf_filter_async(spf_code_t result, const char* exp, void *arg)
 {
     filter_context_t *context = arg;
-    filter_post_async_result_with_explanation(context, spf_code_to_result(result), exp, -1);
+    filter_post_async_result_with_explanation(context,
+                                              spf_code_to_result(result),
+                                              exp, -1);
 }
 
 
-static filter_result_t spf_filter(const filter_t *filter, const query_t *query,
-                                  filter_context_t *context)
+static
+filter_result_t spf_filter(const filter_t *filter, const query_t *query,
+                           filter_context_t *context)
 {
     const spf_filter_t *data = filter->data;
     array_len(_G.domain) = 0;
@@ -146,7 +149,8 @@ static filter_result_t spf_filter(const filter_t *filter, const query_t *query,
         buffer_addstr(&_G.sender, "postmaster@");
         buffer_add(&_G.sender, array_start(_G.domain), array_len(_G.domain));
     } else {
-        buffer_add(&_G.domain, query->sender_domain.str, query->sender_domain.len);
+        buffer_add(&_G.domain, query->sender_domain.str,
+                   query->sender_domain.len);
         buffer_add(&_G.sender, query->sender.str, query->sender.len);
     }
 
@@ -172,9 +176,10 @@ module_exit(spf_exit);
 
 filter_constructor(spf)
 {
-    filter_type_t filter_type = filter_register("spf", spf_filter_constructor,
-                                                spf_filter_destructor, spf_filter,
-                                                NULL, NULL);
+    filter_type_t filter_type
+        = filter_register("spf", spf_filter_constructor,
+                          spf_filter_destructor, spf_filter,
+                          NULL, NULL);
 
     /* Hooks.
      */

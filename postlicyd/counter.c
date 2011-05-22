@@ -54,11 +54,11 @@ static bool counter_filter_constructor(filter_t *filter)
     counter_config_t *config = counter_config_new();
     config->counter = -1;
 
-#define PARSE_CHECK(Expr, Str, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Str, ##__VA_ARGS__);                                               \
-        counter_config_delete(&config);                                          \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Str, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Str, ##__VA_ARGS__);                                             \
+        counter_config_delete(&config);                                      \
+        return false;                                                        \
     }
 
     config->hard_threshold = 1;
@@ -85,7 +85,8 @@ static void counter_filter_destructor(filter_t *filter)
     filter->data = config;
 }
 
-static filter_result_t counter_filter(const filter_t *filter, const query_t *query,
+static filter_result_t counter_filter(const filter_t *filter,
+                                      const query_t *query,
                                       filter_context_t *context)
 {
     const counter_config_t *counter = filter->data;
@@ -102,9 +103,10 @@ static filter_result_t counter_filter(const filter_t *filter, const query_t *que
 
 filter_constructor(counter)
 {
-    filter_type_t type =  filter_register("counter", counter_filter_constructor,
-                                          counter_filter_destructor, counter_filter,
-                                          NULL, NULL);
+    filter_type_t type
+        = filter_register("counter", counter_filter_constructor,
+                          counter_filter_destructor, counter_filter,
+                          NULL, NULL);
     /* Hooks.
      */
     (void)filter_hook_register(type, "fail");

@@ -83,8 +83,8 @@ struct config_t {
     bool include_explanation;
 };
 
-#define DEFAULT_LOG_FORMAT                                                     \
-    "request client=${client_name}[${client_address}] from=<${sender}> "       \
+#define DEFAULT_LOG_FORMAT                                                   \
+    "request client=${client_name}[${client_address}] from=<${sender}> "     \
     "to=<${recipient}> at ${protocol_state}"
 
 __attribute__((nonnull(1)))

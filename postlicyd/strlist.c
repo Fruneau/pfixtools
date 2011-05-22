@@ -164,9 +164,11 @@ static bool strlist_create(strlist_local_t *local,
     strlist_resource_t *res = resource_get("strlist", file);
     if (res == NULL) {
         res = p_new(strlist_resource_t, 1);
-        resource_set("strlist", file, res, (resource_destructor_t)strlist_resource_wipe);
+        resource_set("strlist", file, res,
+                     (resource_destructor_t)strlist_resource_wipe);
     } else if (res->trie2 != NULL) {
-        err("%s not loaded: the file is already used as a rbldns zone file", file);
+        err("%s not loaded: the file is already used as a rbldns zone file",
+            file);
         resource_release("strlist", file);
         file_map_close(&map);
         return false;
@@ -204,7 +206,8 @@ static bool strlist_create(strlist_local_t *local,
         if (eol == NULL) {
             eol = end;
         }
-        CHECK_DATA(eol - p < BUFSIZ, "%s not loaded: unreasonnable long line", file);
+        CHECK_DATA(eol - p < BUFSIZ, "%s not loaded: unreasonnable long line",
+                   file);
         if (*p != '#') {
             const char *eos = eol;
             while (p < eos && isspace(*p)) {
@@ -216,21 +219,29 @@ static bool strlist_create(strlist_local_t *local,
             if (p < eos) {
                 clstr_t substr = { p, eos - p };
                 if (allowregexp && *p == '/') {
-                    CHECK_DATA(regexp_parse_str(&substr, reverse ? NULL : &anchor,
-                                                &regexp, reverse ? &anchor : NULL, NULL),
-                               "cannot parse regexp %.*s", (int)substr.len, substr.str);
+                    CHECK_DATA(regexp_parse_str(&substr,
+                                                reverse ? NULL : &anchor,
+                                                &regexp,
+                                                reverse ? &anchor : NULL,
+                                                NULL),
+                               "cannot parse regexp %.*s", (int)substr.len,
+                               substr.str);
                     strlist_copy(line, anchor.data, anchor.len, reverse);
                     CHECK_DATA(anchor.len > 0, "no fix %s found in %.*s",
-                               reverse ? "suffix" : "prefix", (int)substr.len, substr.str);
+                               reverse ? "suffix" : "prefix", (int)substr.len,
+                               substr.str);
                     substr.str = line;
                     substr.len = anchor.len;
                     clstr_t restr = buffer_tostr(&regexp);
-                    CHECK_DATA(trie_insert_regexp_str(res->trie1, &substr, &restr),
-                               "connot insert regexp %.*s in the trie", (int)(eos - p), p);
+                    CHECK_DATA(trie_insert_regexp_str(res->trie1, &substr,
+                                                      &restr),
+                               "connot insert regexp %.*s in the trie",
+                               (int)(eos - p), p);
                 } else {
                     strlist_copy(line, substr.str, substr.len, reverse);
                     CHECK_DATA(trie_insert(res->trie1, line),
-                               "connot insert string \"%.*s\" in the trie", (int)(eos - p), p);
+                               "connot insert string \"%.*s\" in the trie",
+                               (int)(eos - p), p);
                 }
                 ++count;
             }
@@ -245,11 +256,13 @@ static bool strlist_create(strlist_local_t *local,
         err("%s not loaded: invalid data", file);
         return false;
     }
-    notice("%s loaded: done in %us, %u entries", file, (uint32_t)(time(0) - now), count);
+    notice("%s loaded: done in %us, %u entries", file,
+           (uint32_t)(time(0) - now), count);
     return true;
 }
 
-static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *domains,
+static bool strlist_create_from_rhbl(strlist_local_t *hosts,
+                                     strlist_local_t *domains,
                                      const char *file, int weight, bool lock)
 {
     uint32_t host_count, domain_count;
@@ -274,7 +287,8 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts, strlist_local_t *do
     strlist_resource_t *res = resource_get("strlist", file);
     if (res == NULL) {
         res = p_new(strlist_resource_t, 1);
-        resource_set("strlist", file, res, (resource_destructor_t)strlist_resource_wipe);
+        resource_set("strlist", file, res,
+                     (resource_destructor_t)strlist_resource_wipe);
     }
 
     p_clear(hosts, 1);
@@ -375,11 +389,11 @@ static bool strlist_filter_constructor(filter_t *filter)
 {
     strlist_config_t *config = strlist_config_new();
 
-#define PARSE_CHECK(Expr, Str, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Str, ##__VA_ARGS__);                                               \
-        strlist_config_delete(&config);                                        \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Str, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Str, ##__VA_ARGS__);                                             \
+        strlist_config_delete(&config);                                      \
+        return false;                                                        \
     }
 
     config->hard_threshold = 1;
@@ -395,8 +409,9 @@ static bool strlist_filter_constructor(filter_t *filter)
            *    - suffix  perform "suffix" compression on storage.
            *    - \d+:    a number describing the weight to give to the match
            *              the given list [mandatory]
-           *  the file pointed by filename MUST be a valid string list (one string per
-           *  line, empty lines and lines beginning with a '#' are ignored).
+           *  the file pointed by filename MUST be a valid string list (one
+           *  string per line, empty lines and lines beginning with a '#' are
+           *  ignored).
            */
           case ATK_FILE: {
             bool lock = false;
@@ -412,9 +427,11 @@ static bool strlist_filter_constructor(filter_t *filter)
                             "and a weight option");
                 switch (i) {
                   case 0:
-                    if ((p - current) == 4 && strncmp(current, "lock", 4) == 0) {
+                    if ((p - current) == 4
+                        && strncmp(current, "lock", 4) == 0) {
                         lock = true;
-                    } else if ((p - current) == 6 && strncmp(current, "nolock", 6) == 0) {
+                    } else if ((p - current) == 6
+                               && strncmp(current, "nolock", 6) == 0) {
                         lock = false;
                     } else {
                         PARSE_CHECK(false, "illegal locking state %.*s",
@@ -424,16 +441,20 @@ static bool strlist_filter_constructor(filter_t *filter)
 
                   case 1:
                     if (p - current > (ssize_t)strlen("partial-") 
-                        && strncmp(current, "partial-", strlen("partial-")) == 0) {
+                        && strncmp(current, "partial-",
+                                   strlen("partial-")) == 0) {
                         partial = true;
                         current += strlen("partial-");
                     }
-                    if ((p - current) == 6 && strncmp(current, "suffix", 6) == 0) {
+                    if ((p - current) == 6
+                        && strncmp(current, "suffix", 6) == 0) {
                         reverse = true;
-                    } else if ((p - current) == 6 && strncmp(current, "prefix", 6) == 0) {
+                    } else if ((p - current) == 6
+                               && strncmp(current, "prefix", 6) == 0) {
                         reverse = false;
                     } else {
-                        PARSE_CHECK(false, "illegal character order value %.*s",
+                        PARSE_CHECK(false, "illegal character order "
+                                    "value %.*s",
                                     (int)(p - current), current);
                     }
                     break;
@@ -481,9 +502,11 @@ static bool strlist_filter_constructor(filter_t *filter)
                             "and a weight option");
                 switch (i) {
                   case 0:
-                    if ((p - current) == 4 && strncmp(current, "lock", 4) == 0) {
+                    if ((p - current) == 4
+                        && strncmp(current, "lock", 4) == 0) {
                         lock = true;
-                    } else if ((p - current) == 6 && strncmp(current, "nolock", 6) == 0) {
+                    } else if ((p - current) == 6
+                               && strncmp(current, "nolock", 6) == 0) {
                         lock = false;
                     } else {
                         PARSE_CHECK(false, "illegal locking state %.*s",
@@ -500,9 +523,12 @@ static bool strlist_filter_constructor(filter_t *filter)
 
                   case 2: {
                     strlist_local_t trie_hosts, trie_domains;
-                    PARSE_CHECK(strlist_create_from_rhbl(&trie_hosts, &trie_domains,
-                                                         current, weight, lock),
-                                "cannot load string list from rhbl %s", current);
+                    PARSE_CHECK(strlist_create_from_rhbl(&trie_hosts,
+                                                         &trie_domains,
+                                                         current, weight,
+                                                         lock),
+                                "cannot load string list from rhbl %s",
+                                current);
                     if (*(trie_hosts.db) != NULL) {
                         array_add(config->locals, trie_hosts);
                     }
@@ -562,8 +588,8 @@ static bool strlist_filter_constructor(filter_t *filter)
 
           /* soft_threshold parameter is an integer.
            *  if the matching score is greater or equal than this threshold
-           *  and smaller or equal than the hard_threshold, the hook "soft_match"
-           *  is called.
+           *  and smaller or equal than the hard_threshold, the hook
+           *  "soft_match" is called.
            * default is 1;
            */
           FILTER_PARAM_PARSE_INT(SOFT_THRESHOLD, config->soft_threshold);
@@ -580,10 +606,10 @@ static bool strlist_filter_constructor(filter_t *filter)
             do {
                 postlicyd_token tok = policy_tokenize(current, p - current);
                 switch (tok) {
-#define           CASE(Up, Low, Type)                                          \
-                  case PTK_ ## Up:                                             \
-                    config->match_ ## Low = true;                              \
-                    config->is_ ## Type = true;                                \
+#define           CASE(Up, Low, Type)                                        \
+                  case PTK_ ## Up:                                           \
+                    config->match_ ## Low = true;                            \
+                    config->is_ ## Type = true;                              \
                     break
                   CASE(HELO_NAME, helo, hostname);
                   CASE(CLIENT_NAME, client, hostname);
@@ -594,7 +620,8 @@ static bool strlist_filter_constructor(filter_t *filter)
                   CASE(RECIPIENT, recipient, email);
 #undef CASE
                   default:
-                    PARSE_CHECK(false, "unknown field %.*s", (int)(p - current), current);
+                    PARSE_CHECK(false, "unknown field %.*s",
+                                (int)(p - current), current);
                     break;
                 }
                 if (!*p) {
@@ -636,8 +663,9 @@ static void strlist_filter_async(dns_result_t *result, void *arg)
     }
     --async->awaited;
 
-    debug("got asynchronous request result for filter %s, rbl %d, still awaiting %d answers",
-          filter->name, (int)(result - array_ptr(async->results, 0)), async->awaited);
+    debug("got asynchronous request result for filter %s, rbl %d, "
+          "still awaiting %d answers", filter->name,
+          (int)(result - array_ptr(async->results, 0)), async->awaited);
 
     if (async->awaited == 0) {
         filter_result_t res = HTK_FAIL;
@@ -645,23 +673,23 @@ static void strlist_filter_async(dns_result_t *result, void *arg)
             res = HTK_ERROR;
         } else {
             uint32_t j = 0;
-#define DO_SUM(Field)                                                          \
-        if (data->match_ ## Field) {                                           \
-            for (uint32_t i = 0 ; i < array_len(data->host_offsets) ; ++i) {   \
-                int weight = array_elt(data->host_weights, i);                 \
-                                                                               \
-                switch (array_elt(async->results, j)) {                        \
-                  case DNS_ASYNC:                                              \
-                    crit("no more awaited answer but result is ASYNC");        \
-                    abort();                                                   \
-                  case DNS_FOUND:                                              \
-                    async->sum += weight;                                      \
-                    break;                                                     \
-                  default:                                                     \
-                    break;                                                     \
-                }                                                              \
-                ++j;                                                           \
-            }                                                                  \
+#define DO_SUM(Field)                                                        \
+        if (data->match_ ## Field) {                                         \
+            for (uint32_t i = 0 ; i < array_len(data->host_offsets) ; ++i) { \
+                int weight = array_elt(data->host_weights, i);               \
+                                                                             \
+                switch (array_elt(async->results, j)) {                      \
+                  case DNS_ASYNC:                                            \
+                    crit("no more awaited answer but result is ASYNC");      \
+                    abort();                                                 \
+                  case DNS_FOUND:                                            \
+                    async->sum += weight;                                    \
+                    break;                                                   \
+                  default:                                                   \
+                    break;                                                   \
+                }                                                            \
+                ++j;                                                         \
+            }                                                                \
         }
             DO_SUM(helo);
             DO_SUM(client);
@@ -682,9 +710,12 @@ static void strlist_filter_async(dns_result_t *result, void *arg)
 }
 
 
-static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_context_t *context,
-                                       strlist_async_data_t *async, int *result_pos,
-                                       const clstr_t *str, const char *fieldname) {
+static inline bool strlist_trie_lookup(const strlist_config_t *config,
+                                       filter_context_t *context,
+                                       strlist_async_data_t *async,
+                                       int *result_pos, const clstr_t *str,
+                                       const char *fieldname)
+{
     char reverse[BUFSIZ];
     char normal[BUFSIZ];
 
@@ -719,9 +750,12 @@ static inline bool strlist_trie_lookup(const strlist_config_t *config, filter_co
     return false;
 }
 
-static inline bool strlist_rhbl_lookup(const strlist_config_t *config, filter_context_t *context,
-                                       strlist_async_data_t *async, int *result_pos,
-                                       const clstr_t *str, const char* fieldname) {
+static inline bool strlist_rhbl_lookup(const strlist_config_t *config,
+                                       filter_context_t *context,
+                                       strlist_async_data_t *async,
+                                       int *result_pos, const clstr_t *str,
+                                       const char *fieldname)
+{
     char normal[BUFSIZ];
 
     const int len = str->len;
@@ -729,8 +763,10 @@ static inline bool strlist_rhbl_lookup(const strlist_config_t *config, filter_co
     for (uint32_t i = 0 ; len > 0 && i < config->host_offsets.len ; ++i) {
         const char *rbl = array_ptr(config->hosts,
                                     array_elt(config->host_offsets, i));
-        debug("running check of field %s (%s) against %s", fieldname, normal, rbl);
-        if (dns_rhbl_check(rbl, normal, array_ptr(async->results, *result_pos),
+        debug("running check of field %s (%s) against %s", fieldname,
+              normal, rbl);
+        if (dns_rhbl_check(rbl, normal, array_ptr(async->results,
+                                                  *result_pos),
                            strlist_filter_async, context)) {
             async->error = false;
             ++async->awaited;
@@ -740,7 +776,8 @@ static inline bool strlist_rhbl_lookup(const strlist_config_t *config, filter_co
     return false;
 }
 
-static filter_result_t strlist_filter(const filter_t *filter, const query_t *query,
+static filter_result_t strlist_filter(const filter_t *filter,
+                                      const query_t *query,
                                       filter_context_t *context)
 {
     const strlist_config_t *config = filter->data;
@@ -750,7 +787,8 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
     async->error = true;
     array_ensure_exact_capacity(async->results, (config->match_client
                                 + config->match_sender + config->match_helo
-                                + config->match_recipient + config->match_reverse)
+                                + config->match_recipient
+                                + config->match_reverse)
                                 * array_len(config->host_offsets));
     async->awaited = 0;
 
@@ -761,17 +799,19 @@ static filter_result_t strlist_filter(const filter_t *filter, const query_t *que
         warn("trying to match an email against a field that is not "
              "available in current protocol state");
         return HTK_ABORT;
-    } else if (config->is_hostname && config->match_helo && query->state < SMTP_HELO) {
+    } else if (config->is_hostname && config->match_helo
+               && query->state < SMTP_HELO) {
         warn("trying to match hostname against helo before helo is received");
         return HTK_ABORT;
     }
 
-#define LOOKUP(Flag, Field, Method)                                                   \
-    if (config->match_ ## Flag) {                                                     \
-        if (strlist_ ## Method ## _lookup(config, context, async, &result_pos,        \
-                                          &query->Field, STR(Field))) {               \
-            return HTK_HARD_MATCH;                                                    \
-        }                                                                             \
+#define LOOKUP(Flag, Field, Method)                                          \
+    if (config->match_ ## Flag) {                                            \
+        if (strlist_ ## Method ## _lookup(config, context, async,            \
+                                          &result_pos,                       \
+                                          &query->Field, STR(Field))) {      \
+            return HTK_HARD_MATCH;                                           \
+        }                                                                    \
     }
     if (config->is_email) {
         LOOKUP(sender, sender, trie);
@@ -822,10 +862,11 @@ static void strlist_context_destructor(void *data)
 
 filter_constructor(strlist)
 {
-    filter_type_t filter_type =  filter_register("strlist", strlist_filter_constructor,
-                                                 strlist_filter_destructor, strlist_filter,
-                                                 strlist_context_constructor,
-                                                 strlist_context_destructor);
+    filter_type_t filter_type
+        = filter_register("strlist", strlist_filter_constructor,
+                          strlist_filter_destructor, strlist_filter,
+                          strlist_context_constructor,
+                          strlist_context_destructor);
     /* Hooks.
      */
     (void)filter_hook_register(filter_type, "abort");

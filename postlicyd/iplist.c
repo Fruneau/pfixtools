@@ -153,7 +153,8 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     rbldb_resource_t *res = resource_get("iplist", file);
     if (res == NULL) {
         res = p_new(rbldb_resource_t, 1);
-        resource_set("iplist", file, res, (resource_destructor_t)rbldb_resource_wipe);
+        resource_set("iplist", file, res,
+                     (resource_destructor_t)rbldb_resource_wipe);
     }
 
     db = p_new(rbldb_t, 1);
@@ -214,7 +215,8 @@ rbldb_t *rbldb_create(const char *file, bool lock)
         }
     }
 
-    notice("%s loaded: done in %us, %u IPs", file, (uint32_t)(time(0) - now), ips);
+    notice("%s loaded: done in %us, %u IPs", file, (uint32_t)(time(0) - now),
+           ips);
     return db;
 }
 
@@ -303,11 +305,11 @@ static bool iplist_filter_constructor(filter_t *filter)
 {
     iplist_filter_t *data = iplist_filter_new();
 
-#define PARSE_CHECK(Expr, Str, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Str, ##__VA_ARGS__);                                               \
-        iplist_filter_delete(&data);                                           \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Str, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Str, ##__VA_ARGS__);                                             \
+        iplist_filter_delete(&data);                                         \
+        return false;                                                        \
     }
 
     data->hard_threshold = 1;
@@ -337,7 +339,8 @@ static bool iplist_filter_constructor(filter_t *filter)
                             "and a weight option");
                 switch (i) {
                   case 0:
-                    if ((p - current) == 4 && strncmp(current, "lock", 4) == 0) {
+                    if ((p - current) == 4
+                        && strncmp(current, "lock", 4) == 0) {
                         lock = true;
                     } else if ((p - current) == 6
                                && strncmp(current, "nolock", 6) == 0) {
@@ -413,8 +416,8 @@ static bool iplist_filter_constructor(filter_t *filter)
 
           /* soft_threshold parameter is an integer.
            *  if the matching score is greater or equal than this threshold
-           *  and smaller or equal than the hard_threshold, the hook "soft_match"
-           *  is called.
+           *  and smaller or equal than the hard_threshold, the hook
+           *  "soft_match" is called.
            * default is 1;
            */
           FILTER_PARAM_PARSE_INT(SOFT_THRESHOLD, data->soft_threshold);
@@ -449,8 +452,9 @@ static void iplist_filter_async(dns_result_t *result, void *arg)
     }
     --async->awaited;
 
-    debug("got asynchronous request result for filter %s, rbl %d, still awaiting %d answers",
-          filter->name, (int)(result - array_ptr(async->results, 0)), async->awaited);
+    debug("got asynchronous request result for filter %s, rbl %d, "
+          "still awaiting %d answers", filter->name,
+          (int)(result - array_ptr(async->results, 0)), async->awaited);
 
     if (async->awaited == 0) {
         filter_result_t res = HTK_FAIL;
@@ -482,7 +486,8 @@ static void iplist_filter_async(dns_result_t *result, void *arg)
     }
 }
 
-static filter_result_t iplist_filter(const filter_t *filter, const query_t *query,
+static filter_result_t iplist_filter(const filter_t *filter,
+                                     const query_t *query,
                                      filter_context_t *context)
 {
     uint32_t ip;
@@ -518,18 +523,21 @@ static filter_result_t iplist_filter(const filter_t *filter, const query_t *quer
     }
     if (array_len(data->host_offsets) > 0) {
         iplist_async_data_t *async = filter_context(filter, context);
-        array_ensure_exact_capacity(async->results, array_len(data->host_offsets));
+        array_ensure_exact_capacity(async->results,
+                                    array_len(data->host_offsets));
         async->sum = sum;
         async->awaited = 0;
         for (uint32_t i = 0 ; i < data->host_offsets.len ; ++i) {
-            const char *rbl = array_ptr(data->hosts, array_elt(data->host_offsets, i));
+            const char *rbl = array_ptr(data->hosts,
+                                        array_elt(data->host_offsets, i));
             if (dns_rbl_check(rbl, ip, array_ptr(async->results, i),
                              iplist_filter_async, context)) {
                 error = false;
                 ++async->awaited;
             }
         }
-        debug("filter %s awaiting %d asynchronous queries", filter->name, async->awaited);
+        debug("filter %s awaiting %d asynchronous queries",
+              filter->name, async->awaited);
         async->error = error;
         return HTK_ASYNC;
     }
@@ -560,10 +568,12 @@ static void iplist_context_destructor(void *data)
 
 filter_constructor(iplist)
 {
-    filter_type_t filter_type =  filter_register("iplist", iplist_filter_constructor,
-                                                 iplist_filter_destructor, iplist_filter,
-                                                 iplist_context_constructor,
-                                                 iplist_context_destructor);
+    filter_type_t filter_type
+        = filter_register("iplist", iplist_filter_constructor,
+                          iplist_filter_destructor, iplist_filter,
+                          iplist_context_constructor,
+                          iplist_context_destructor);
+
     /* Hooks.
      */
     (void)filter_hook_register(filter_type, "error");

@@ -162,7 +162,8 @@ static filter_result_t srs_filter(const filter_t *filter,
         return HTK_NONE;
     }
 
-    if (srs_reverse(config->srs, buf, ssizeof(buf), query->recipient.str) == SRS_SUCCESS) {
+    if (srs_reverse(config->srs, buf, ssizeof(buf),
+                    query->recipient.str) == SRS_SUCCESS) {
         return HTK_MATCH;
     } else {
         return HTK_FAIL;
@@ -171,9 +172,10 @@ static filter_result_t srs_filter(const filter_t *filter,
 
 filter_constructor(srs)
 {
-    filter_type_t filter_type = filter_register("srs", srs_filter_constructor,
-                                                srs_filter_destructor, srs_filter,
-                                                NULL, NULL);
+    filter_type_t filter_type
+        = filter_register("srs", srs_filter_constructor,
+                          srs_filter_destructor, srs_filter,
+                          NULL, NULL);
 
     /* Hooks.
      */

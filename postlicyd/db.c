@@ -57,8 +57,8 @@ struct db_t {
     char *filename;
     TCBDB **db;
 
-    db_checker_t need_cleanup;
-    db_entry_checker_t entry_check;
+    db_checker_f need_cleanup;
+    db_entry_checker_f entry_check;
     void *config;
 };
 
@@ -81,7 +81,8 @@ static bool db_need_cleanup(const db_t *db, TCBDB* tcdb)
 {
     int len = 0;
     time_t now = time(NULL);
-    const time_t *last_cleanup = tcbdbget3(tcdb, _G.static_cleanup.str, _G.static_cleanup.len, &len);
+    const time_t *last_cleanup = tcbdbget3(tcdb, _G.static_cleanup.str,
+                                           _G.static_cleanup.len, &len);
     if (last_cleanup == NULL) {
         debug("No last cleanup time");
     }
@@ -98,7 +99,8 @@ static TCBDB** db_resource_acquire(const db_t *db)
     db_resource_t *res = resource_get(db->ns, db->filename);
     if (res == NULL) {
         res = p_new(db_resource_t, 1);
-        resource_set(db->ns, db->filename, res, (resource_destructor_t)db_resource_wipe);
+        resource_set(db->ns, db->filename, res,
+                     (resource_destructor_t)db_resource_wipe);
     }
 
     /* Open the database and check if cleanup is needed
@@ -136,7 +138,8 @@ static TCBDB** db_resource_acquire(const db_t *db)
         awl_db = tcbdbnew();
         if (tcbdbopen(awl_db, db->filename, BDBOREADER)) {
             tmp_db = tcbdbnew();
-            if (tcbdbopen(tmp_db, tmppath, BDBOWRITER | BDBOCREAT | BDBOTRUNC)) {
+            if (tcbdbopen(tmp_db, tmppath,
+                          BDBOWRITER | BDBOCREAT | BDBOTRUNC)) {
                 BDBCUR *cur = tcbdbcurnew(awl_db);
                 TCXSTR *key, *value;
 
@@ -149,39 +152,46 @@ static TCBDB** db_resource_acquire(const db_t *db)
                         tcxstrclear(value);
                         (void)tcbdbcurrec(cur, key, value);
 
-                        if (db->entry_check(tcxstrptr(value), (size_t)tcxstrsize(value), now, db->config)) {
+                        if (db->entry_check(tcxstrptr(value),
+                                            (size_t)tcxstrsize(value),
+                                            now, db->config)) {
                             tcbdbput(tmp_db, tcxstrptr(key), tcxstrsize(key),
                                      tcxstrptr(value), tcxstrsize(value));
                             ++new_count;
                         }
                         ++old_count;
                     } while (tcbdbcurnext(cur));
-                    tcbdbput(tmp_db, _G.static_cleanup.str, _G.static_cleanup.len, &now, sizeof(now));
+                    tcbdbput(tmp_db, _G.static_cleanup.str,
+                             _G.static_cleanup.len, &now, sizeof(now));
                 }
                 tcxstrdel(key);
                 tcxstrdel(value);
                 tcbdbcurdel(cur);
                 tcbdbsync(tmp_db);
             } else {
-                warn("cannot run database cleanup: can't open destination database: %s",
+                warn("cannot run database cleanup: "
+                     "can't open destination database: %s",
                      tcbdberrmsg(tcbdbecode(awl_db)));
             }
             tcbdbdel(tmp_db);
         } else {
             int ecode = tcbdbecode(awl_db);
             warn("can not open database: %s", tcbdberrmsg(ecode));
-            trashable = ecode != TCENOPERM && ecode != TCEOPEN && ecode != TCENOFILE && ecode != TCESUCCESS;
+            trashable = (ecode != TCENOPERM && ecode != TCEOPEN
+                         && ecode != TCENOFILE && ecode != TCESUCCESS);
         }
         tcbdbdel(awl_db);
 
         /** Cleanup successful, replace the old database with the new one.
          */
         if (trashable) {
-            notice("%s cleanup: database was corrupted, create a new one", db->filename);
+            notice("%s cleanup: database was corrupted, create a new one",
+                   db->filename);
             unlink(db->filename);
         } else if (replace) {
             notice("%s cleanup: done in %us, before %u, after %u entries",
-                   db->filename, (uint32_t)(time(0) - now), old_count, new_count);
+                   db->filename, (uint32_t)(time(0) - now), old_count,
+                   new_count);
             unlink(db->filename);
             if (rename(tmppath, db->filename) != 0) {
                 UNIXERR("rename");
@@ -212,7 +222,8 @@ static TCBDB** db_resource_acquire(const db_t *db)
 }
 
 db_t *db_load(const char* ns, const char* path, bool can_expire,
-              db_checker_t need_cleanup, db_entry_checker_t entry_check, void *config)
+              db_checker_f need_cleanup, db_entry_checker_f entry_check,
+              void *config)
 {
     db_t *db = db_new();
     db->can_expire = can_expire;
@@ -235,7 +246,8 @@ bool db_release(db_t *db)
     return true;
 }
 
-const void* db_get(const db_t *db, const void* key, size_t key_len, size_t *entry_len)
+const void* db_get(const db_t *db, const void* key, size_t key_len,
+                   size_t *entry_len)
 {
     int len = 0;
     const void* data = tcbdbget3(*db->db, key, key_len, &len);
@@ -243,7 +255,8 @@ const void* db_get(const db_t *db, const void* key, size_t key_len, size_t *entr
     return data;
 }
 
-bool db_get_len(const db_t *db, const void* key, size_t key_len, void* entry, size_t entry_len)
+bool db_get_len(const db_t *db, const void* key, size_t key_len,
+                void* entry, size_t entry_len)
 {
     int len = 0;
     const void* data = tcbdbget3(*db->db, key, key_len, &len);
@@ -255,7 +268,8 @@ bool db_get_len(const db_t *db, const void* key, size_t key_len, void* entry, si
     }
 }
 
-bool db_put(const db_t *db, const void* key, size_t key_len, const void* entry, size_t entry_len)
+bool db_put(const db_t *db, const void* key, size_t key_len,
+            const void* entry, size_t entry_len)
 {
     tcbdbput(*db->db, key, key_len, entry, entry_len);
     return true;

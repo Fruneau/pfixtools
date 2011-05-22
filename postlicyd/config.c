@@ -168,120 +168,121 @@ static bool config_parse(config_t *config)
     filter_init(&filter);
     linep = p = map.map;
 
-#define READ_LOG(Lev, Fmt, ...)                                                \
-    __log(LOG_ ## Lev, "config file %s:%d:%d: " Fmt, config->filename,         \
+#define READ_LOG(Lev, Fmt, ...)                                              \
+    __log(LOG_ ## Lev, "config file %s:%d:%d: " Fmt, config->filename,       \
            line + 1, (int)(p - linep + 1), ##__VA_ARGS__)
-#define READ_ERROR(Fmt, ...)                                                   \
-    do {                                                                       \
-        READ_LOG(ERR, Fmt, ##__VA_ARGS__);                                     \
-        goto error;                                                            \
+#define READ_ERROR(Fmt, ...)                                                 \
+    do {                                                                     \
+        READ_LOG(ERR, Fmt, ##__VA_ARGS__);                                   \
+        goto error;                                                          \
     } while (0)
-#define ADD_IN_BUFFER(Buffer, Len, Char)                                       \
-    do {                                                                       \
-        if ((Len) >= BUFSIZ - 1) {                                             \
-            READ_ERROR("unreasonnable long line");                             \
-        }                                                                      \
-        (Buffer)[(Len)++] = (Char);                                            \
-        (Buffer)[(Len)]   = '\0';                                              \
+#define ADD_IN_BUFFER(Buffer, Len, Char)                                     \
+    do {                                                                     \
+        if ((Len) >= BUFSIZ - 1) {                                           \
+            READ_ERROR("unreasonnable long line");                           \
+        }                                                                    \
+        (Buffer)[(Len)++] = (Char);                                          \
+        (Buffer)[(Len)]   = '\0';                                            \
     } while (0)
-#define READ_NEXT                                                              \
-    do {                                                                       \
-        if (*p == '\n') {                                                      \
-            ++line;                                                            \
-            linep = p + 1;                                                     \
-        }                                                                      \
-        if (++p >= map.end) {                                                  \
-            if (!end_of_section) {                                             \
-                if (in_section) {                                              \
-                    goto badeof;                                               \
-                } else {                                                       \
-                    goto ok;                                                   \
-                }                                                              \
-            }                                                                  \
-        }                                                                      \
+#define READ_NEXT                                                            \
+    do {                                                                     \
+        if (*p == '\n') {                                                    \
+            ++line;                                                          \
+            linep = p + 1;                                                   \
+        }                                                                    \
+        if (++p >= map.end) {                                                \
+            if (!end_of_section) {                                           \
+                if (in_section) {                                            \
+                    goto badeof;                                             \
+                } else {                                                     \
+                    goto ok;                                                 \
+                }                                                            \
+            }                                                                \
+        }                                                                    \
     } while (0)
-#define READ_BLANK                                                             \
-    do {                                                                       \
-        bool in_comment = false;                                               \
-        while (in_comment || isspace(*p) || *p == '#') {                       \
-            if (*p == '\n') {                                                  \
-                in_comment = false;                                            \
-            } else if (*p == '#') {                                            \
-                in_comment = true;                                             \
-            }                                                                  \
-            READ_NEXT;                                                         \
-        }                                                                      \
+#define READ_BLANK                                                           \
+    do {                                                                     \
+        bool in_comment = false;                                             \
+        while (in_comment || isspace(*p) || *p == '#') {                     \
+            if (*p == '\n') {                                                \
+                in_comment = false;                                          \
+            } else if (*p == '#') {                                          \
+                in_comment = true;                                           \
+            }                                                                \
+            READ_NEXT;                                                       \
+        }                                                                    \
     } while (0)
-#define READ_TOKEN(Name, Buffer, Len)                                          \
-    do {                                                                       \
-        (Len) = 0;                                                             \
-        (Buffer)[0] = '\0';                                                    \
-        if (!isalpha(*p)) {                                                    \
-            READ_ERROR("invalid %s, unexpected character '%c'", Name, *p);     \
-        }                                                                      \
-        do {                                                                   \
-            ADD_IN_BUFFER(Buffer, Len, *p);                                    \
-            READ_NEXT;                                                         \
-        } while (isalnum(*p) || *p == '_');                                    \
+#define READ_TOKEN(Name, Buffer, Len)                                        \
+    do {                                                                     \
+        (Len) = 0;                                                           \
+        (Buffer)[0] = '\0';                                                  \
+        if (!isalpha(*p)) {                                                  \
+            READ_ERROR("invalid %s, unexpected character '%c'", Name, *p);   \
+        }                                                                    \
+        do {                                                                 \
+            ADD_IN_BUFFER(Buffer, Len, *p);                                  \
+            READ_NEXT;                                                       \
+        } while (isalnum(*p) || *p == '_');                                  \
     } while (0)
-#define READ_STRING(Name, Buffer, Len, Ignore)                                 \
-    do {                                                                       \
-        (Len) = 0;                                                             \
-        (Buffer)[0] = '\0';                                                    \
-        if (*p == '"') {                                                       \
-            bool escaped = false;                                              \
-            while (*p == '"') {                                                \
-                READ_NEXT;                                                     \
-                while (true) {                                                 \
-                    if (*p == '\n') {                                          \
-                        READ_ERROR("string must not contain EOL");             \
-                    } else if (escaped) {                                      \
-                        ADD_IN_BUFFER(Buffer, Len, *p);                        \
-                        escaped = false;                                       \
-                    } else if (*p == '\\') {                                   \
-                        escaped = true;                                        \
-                    } else if (*p == '"') {                                    \
-                        READ_NEXT;                                             \
-                        break;                                                 \
-                    } else {                                                   \
-                        ADD_IN_BUFFER(Buffer, Len, *p);                        \
-                    }                                                          \
-                    READ_NEXT;                                                 \
-                }                                                              \
-                READ_BLANK;                                                    \
-            }                                                                  \
-            if (*p != ';') {                                                   \
-                READ_ERROR("%s must end with a ';'", Name);                    \
-            }                                                                  \
-        } else {                                                               \
-            bool escaped = false;                                              \
-            while (*p != ';' && isascii(*p) && (isprint(*p) || isspace(*p))) { \
-                if (escaped) {                                                 \
-                    if (*p == '\r' || *p == '\n') {                            \
-                        READ_BLANK;                                            \
-                    } else {                                                   \
-                        ADD_IN_BUFFER(Buffer, Len, '\\');                      \
-                    }                                                          \
-                    escaped = false;                                           \
-                }                                                              \
-                if (*p == '\\') {                                              \
-                    escaped = true;                                            \
-                } else if (*p == '\r' || *p == '\n') {                         \
-                    READ_ERROR("%s must not contain EOL", Name);               \
-                } else {                                                       \
-                    ADD_IN_BUFFER(Buffer, Len, *p);                            \
-                }                                                              \
-                READ_NEXT;                                                     \
-            }                                                                  \
-            if (escaped) {                                                     \
-                ADD_IN_BUFFER(Buffer, Len, '\\');                              \
-            }                                                                  \
-            while ((Len) > 0 && isspace((Buffer)[(Len) - 1])) {                \
-                (Buffer)[--(Len)] = '\0';                                      \
-            }                                                                  \
-        }                                                                      \
-        end_of_section = Ignore;                                               \
-        READ_NEXT;                                                             \
+#define READ_STRING(Name, Buffer, Len, Ignore)                               \
+    do {                                                                     \
+        (Len) = 0;                                                           \
+        (Buffer)[0] = '\0';                                                  \
+        if (*p == '"') {                                                     \
+            bool escaped = false;                                            \
+            while (*p == '"') {                                              \
+                READ_NEXT;                                                   \
+                while (true) {                                               \
+                    if (*p == '\n') {                                        \
+                        READ_ERROR("string must not contain EOL");           \
+                    } else if (escaped) {                                    \
+                        ADD_IN_BUFFER(Buffer, Len, *p);                      \
+                        escaped = false;                                     \
+                    } else if (*p == '\\') {                                 \
+                        escaped = true;                                      \
+                    } else if (*p == '"') {                                  \
+                        READ_NEXT;                                           \
+                        break;                                               \
+                    } else {                                                 \
+                        ADD_IN_BUFFER(Buffer, Len, *p);                      \
+                    }                                                        \
+                    READ_NEXT;                                               \
+                }                                                            \
+                READ_BLANK;                                                  \
+            }                                                                \
+            if (*p != ';') {                                                 \
+                READ_ERROR("%s must end with a ';'", Name);                  \
+            }                                                                \
+        } else {                                                             \
+            bool escaped = false;                                            \
+            while (*p != ';' && isascii(*p) && (isprint(*p) || isspace(*p))) \
+            {                                                                \
+                if (escaped) {                                               \
+                    if (*p == '\r' || *p == '\n') {                          \
+                        READ_BLANK;                                          \
+                    } else {                                                 \
+                        ADD_IN_BUFFER(Buffer, Len, '\\');                    \
+                    }                                                        \
+                    escaped = false;                                         \
+                }                                                            \
+                if (*p == '\\') {                                            \
+                    escaped = true;                                          \
+                } else if (*p == '\r' || *p == '\n') {                       \
+                    READ_ERROR("%s must not contain EOL", Name);             \
+                } else {                                                     \
+                    ADD_IN_BUFFER(Buffer, Len, *p);                          \
+                }                                                            \
+                READ_NEXT;                                                   \
+            }                                                                \
+            if (escaped) {                                                   \
+                ADD_IN_BUFFER(Buffer, Len, '\\');                            \
+            }                                                                \
+            while ((Len) > 0 && isspace((Buffer)[(Len) - 1])) {              \
+                (Buffer)[--(Len)] = '\0';                                    \
+            }                                                                \
+        }                                                                    \
+        end_of_section = Ignore;                                             \
+        READ_NEXT;                                                           \
     } while(0)
 
 
@@ -403,20 +404,20 @@ static bool config_build_structure(config_t *config)
     }
 
     ok = false;
-#define PARSE_CHECK(Expr, Fmt, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Fmt, ##__VA_ARGS__);                                               \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Fmt, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Fmt, ##__VA_ARGS__);                                             \
+        return false;                                                        \
     }
     foreach (param, config->params) {
         switch (param->type) {
-#define   CASE(Param, State)                                                   \
-            case ATK_ ## Param ## _FILTER:                                     \
-              ok = true;                                                       \
-              config->entry_points[SMTP_ ## State]                             \
-                  = filter_find_with_name(&config->filters, param->value);     \
-              PARSE_CHECK(config->entry_points[SMTP_ ## State] >= 0,           \
-                          "invalid filter name %s", param->value);             \
+#define   CASE(Param, State)                                                 \
+            case ATK_ ## Param ## _FILTER:                                   \
+              ok = true;                                                     \
+              config->entry_points[SMTP_ ## State]                           \
+                  = filter_find_with_name(&config->filters, param->value);   \
+              PARSE_CHECK(config->entry_points[SMTP_ ## State] >= 0,         \
+                          "invalid filter name %s", param->value);           \
               break;
           CASE(CLIENT,      CONNECT)
           CASE(EHLO,        EHLO)
@@ -430,8 +431,10 @@ static bool config_build_structure(config_t *config)
 #undef    CASE
           FILTER_PARAM_PARSE_INT(PORT, config->port);
           FILTER_PARAM_PARSE_STRING(LOG_FORMAT, config->log_format, true);
-          FILTER_PARAM_PARSE_STRING(USE_RESOLV_CONF, config->resolv_conf, true);
-          FILTER_PARAM_PARSE_BOOLEAN(INCLUDE_EXPLANATION, config->include_explanation);
+          FILTER_PARAM_PARSE_STRING(USE_RESOLV_CONF,
+                                    config->resolv_conf, true);
+          FILTER_PARAM_PARSE_BOOLEAN(INCLUDE_EXPLANATION,
+                                     config->include_explanation);
           default: break;
         }
     }
@@ -463,7 +466,8 @@ static bool config_load(config_t *config) {
     config_wipe(config);
 
     if (!config_parse(config)) {
-        err("Invalid configuration: cannot parse configuration file \"%s\"", config->filename);
+        err("Invalid configuration: cannot parse configuration file \"%s\"",
+            config->filename);
         return false;
     }
     if (!config_build_structure(config)) {
