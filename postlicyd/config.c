@@ -290,6 +290,7 @@ read_section:
 
     value[0] = key[0] = '\0';
     value_len = key_len = 0;
+    (void)value_len; /* Fix a warning */
 
     in_section = end_of_section = false;
     READ_BLANK;

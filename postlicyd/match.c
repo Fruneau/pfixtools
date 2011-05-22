@@ -182,7 +182,7 @@ static bool match_filter_constructor(filter_t *filter)
           case ATK_CONDITION: {
             match_condition_t condition = CONDITION_INIT;
             const char *p = skipspaces(param->value);
-            const char *n = p + 1;
+            const char *n;
             PARSE_CHECK(isalnum(*p), "invalid field name");
             for (n = p + 1 ; *n && (isalnum(*n) || *n == '_') ; ++n);
             condition.field = policy_tokenize(p, n - p);

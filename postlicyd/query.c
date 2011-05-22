@@ -255,7 +255,7 @@ static void query_compute_normalized_sender(query_t *query)
     }
 
     wpos += m_strputc(query->n_sender + wpos, 256 - wpos, '#');
-    wpos += m_strcpy(query->n_sender + wpos, 256 - wpos, at + 1);
+    m_strcpy(query->n_sender + wpos, 256 - wpos, at + 1);
     query->normalized_sender.str = query->n_sender;
     query->normalized_sender.len = m_strlen(query->n_sender);
 }
