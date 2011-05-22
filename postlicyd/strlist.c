@@ -103,21 +103,17 @@ static void strlist_resource_wipe(strlist_resource_t *res)
     p_delete(&res);
 }
 
-static strlist_config_t *strlist_config_new(void)
-{
-    return p_new(strlist_config_t, 1);
-}
+DO_INIT(strlist_config_t, strlist_config)
+DO_NEW(strlist_config_t, strlist_config)
 
-static void strlist_config_delete(strlist_config_t **config)
+static void strlist_config_wipe(strlist_config_t *config)
 {
-    if (*config) {
-        array_deep_wipe((*config)->locals, strlist_local_wipe);
-        array_wipe((*config)->hosts);
-        array_wipe((*config)->host_offsets);
-        array_wipe((*config)->host_weights);
-        p_delete(config);
-    }
+    array_deep_wipe(config->locals, strlist_local_wipe);
+    array_wipe(config->hosts);
+    array_wipe(config->host_offsets);
+    array_wipe(config->host_weights);
 }
+DO_DELETE(strlist_config_t, strlist_config)
 
 static inline void strlist_copy(char *dest, const char *str, ssize_t str_len,
                                 bool reverse)
@@ -191,15 +187,15 @@ static bool strlist_create(strlist_local_t *local,
     res->size  = map.st.st_size;
     res->mtime = map.st.st_mtime;
 
-  #define CHECK_DATA(cond, message, ...)                                       \
-    if (!(cond)) {                                                             \
-        err(message, __VA_ARGS__);                                             \
-        file_map_close(&map);                                                  \
-        trie_delete(&res->trie1);                                              \
-        strlist_local_wipe(local);                                             \
-        buffer_wipe(&anchor);                                                  \
-        buffer_wipe(&regexp);                                                  \
-        return false;                                                          \
+  #define CHECK_DATA(cond, message, ...)                                     \
+    if (!(cond)) {                                                           \
+        err(message, __VA_ARGS__);                                           \
+        file_map_close(&map);                                                \
+        trie_delete(&res->trie1);                                            \
+        strlist_local_wipe(local);                                           \
+        buffer_wipe(&anchor);                                                \
+        buffer_wipe(&regexp);                                                \
+        return false;                                                        \
     }
 
     while (p < end && p != NULL) {

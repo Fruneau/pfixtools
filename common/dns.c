@@ -48,33 +48,21 @@ typedef struct dns_context_t {
     void *data;
 } dns_context_t;
 ARRAY(dns_context_t);
+DO_ALL(dns_context_t, dns_context)
 
-static char *use_local_config = false;
-static struct ub_ctx *ctx = NULL;
-static client_t *async_event = NULL;
-static PA(dns_context_t) ctx_pool = ARRAY_INIT;
+static struct {
+    char *use_local_config;
+    struct ub_ctx *ctx;
+    client_t *async_event;
+    PA(dns_context_t) ctx_pool;
+} dns_g;
+#define _G  dns_g
 
-static dns_context_t *dns_context_new(void)
-{
-    return p_new(dns_context_t, 1);
-}
-
-static void dns_context_delete(dns_context_t **context)
-{
-    if (*context) {
-        p_delete(context);
-    }
-}
-
-static void dns_context_wipe(dns_context_t *context)
-{
-    p_clear(context, 1);
-}
 
 static dns_context_t *dns_context_acquire(void)
 {
-    if (array_len(ctx_pool) > 0) {
-        return array_pop_last(ctx_pool);
+    if (array_len(_G.ctx_pool) > 0) {
+        return array_pop_last(_G.ctx_pool);
     } else {
         return dns_context_new();
     }
@@ -83,24 +71,24 @@ static dns_context_t *dns_context_acquire(void)
 static void dns_context_release(dns_context_t *context)
 {
     dns_context_wipe(context);
-    array_add(ctx_pool, context);
+    array_add(_G.ctx_pool, context);
 }
 
 static void dns_exit(void)
 {
-    if (async_event != NULL) {
-        client_io_none(async_event);
+    if (_G.async_event != NULL) {
+        client_io_none(_G.async_event);
     }
-    if (ctx != NULL) {
-        ub_ctx_delete(ctx);
-        ctx = NULL;
+    if (_G.ctx != NULL) {
+        ub_ctx_delete(_G.ctx);
+        _G.ctx = NULL;
     }
-    if (async_event != NULL) {
-        client_release(async_event);
-        async_event = NULL;
+    if (_G.async_event != NULL) {
+        client_release(_G.async_event);
+        _G.async_event = NULL;
     }
-    p_delete(&use_local_config);
-    array_deep_wipe(ctx_pool, dns_context_delete);
+    p_delete(&_G.use_local_config);
+    array_deep_wipe(_G.ctx_pool, dns_context_delete);
 }
 module_exit(dns_exit);
 
@@ -129,7 +117,7 @@ static int dns_handler(client_t *event, void *config)
     int retval = 0;
     debug("dns_handler called: ub_fd triggered");
     client_io_none(event);
-    if ((retval = ub_process(ctx)) != 0) {
+    if ((retval = ub_process(_G.ctx)) != 0) {
         err("error in DNS resolution: %s", ub_strerror(retval));
     }
     client_io_ro(event);
@@ -138,20 +126,20 @@ static int dns_handler(client_t *event, void *config)
 
 bool dns_resolve(const char *hostname, dns_rrtype_t type, ub_callback_t callback, void *data)
 {
-    if (ctx == NULL) {
-        ctx = ub_ctx_create();
-        if (use_local_config != NULL) {
+    if (_G.ctx == NULL) {
+        _G.ctx = ub_ctx_create();
+        if (_G.use_local_config != NULL) {
             debug("using local dns configuration");
-            ub_ctx_resolvconf(ctx, use_local_config);
+            ub_ctx_resolvconf(_G.ctx, _G.use_local_config);
         }
-        ub_ctx_async(ctx, true);
-        if ((async_event = client_register(ub_fd(ctx), dns_handler, NULL)) == NULL) {
+        ub_ctx_async(_G.ctx, true);
+        if ((_G.async_event = client_register(ub_fd(_G.ctx), dns_handler, NULL)) == NULL) {
             crit("cannot register asynchronous DNS event handler");
             abort();
         }
     }
     debug("running dns resolution on %s (type: %d)", hostname, type);
-    return (ub_resolve_async(ctx, (char*)hostname, type, DNS_RRC_IN, data, callback, NULL) == 0);
+    return (ub_resolve_async(_G.ctx, (char*)hostname, type, DNS_RRC_IN, data, callback, NULL) == 0);
 }
 
 bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
@@ -202,8 +190,8 @@ bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result
 }
 
 void dns_use_local_conf(const char* resolv) {
-    p_delete(&use_local_config);
-    use_local_config = m_strdup(resolv);
+    p_delete(&_G.use_local_config);
+    _G.use_local_config = m_strdup(resolv);
 }
 
 /* vim:set et sw=4 sts=4 sws=4: */

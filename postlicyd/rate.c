@@ -51,11 +51,11 @@ typedef struct rate_config_t {
     db_t *db;
 } rate_config_t;
 
-#define RATE_CONFIG_INIT { .key_format     = NULL,                             \
-                           .delay          = 0,                                \
-                           .soft_threshold = 1,                                \
-                           .hard_threshold = 1,                                \
-                           .cleanup_period = 86400,                            \
+#define RATE_CONFIG_INIT { .key_format     = NULL,                           \
+                           .delay          = 0,                              \
+                           .soft_threshold = 1,                              \
+                           .hard_threshold = 1,                              \
+                           .cleanup_period = 86400,                          \
                            .db             = NULL }
 
 struct rate_entry_t {
@@ -66,12 +66,12 @@ struct rate_entry_t {
     uint16_t entries[RATE_MAX_SLOTS];
 };
 
-static rate_config_t *rate_config_new(void)
+static rate_config_t *rate_config_init(rate_config_t *config)
 {
-    rate_config_t *rc = p_new(rate_config_t, 1);
-    *rc = (rate_config_t)RATE_CONFIG_INIT;
-    return rc;
+    *config = (rate_config_t)RATE_CONFIG_INIT;
+    return config;
 }
+DO_NEW(rate_config_t, rate_config);
 
 static void rate_config_wipe(rate_config_t *config)
 {
@@ -79,14 +79,7 @@ static void rate_config_wipe(rate_config_t *config)
     db_release(config->db);
     config->db = NULL;
 }
-
-static void rate_config_delete(rate_config_t **config)
-{
-    if (*config) {
-        rate_config_wipe(*config);
-        p_delete(config);
-    }
-}
+DO_DELETE(rate_config_t, rate_config);
 
 static bool rate_db_need_cleanup(time_t last_cleanup, time_t now, void *data)
 {

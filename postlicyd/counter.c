@@ -46,18 +46,7 @@ typedef struct counter_config_t {
     uint32_t soft_threshold;
 } counter_config_t;
 
-
-static counter_config_t *counter_config_new(void)
-{
-    return p_new(counter_config_t, 1);
-}
-
-static void counter_config_delete(counter_config_t **config)
-{
-    if (*config) {
-        p_delete(config);
-    }
-}
+DO_ALL(counter_config_t, counter_config);
 
 static bool counter_filter_constructor(filter_t *filter)
 {

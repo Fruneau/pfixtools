@@ -45,19 +45,7 @@
 typedef struct hang_filter_t {
     int timeout;
 } hang_filter_t;
-
-
-static hang_filter_t *hang_filter_new(void)
-{
-    return p_new(hang_filter_t, 1);
-}
-
-static void hang_filter_delete(hang_filter_t **filter)
-{
-    if (*filter) {
-        p_delete(filter);
-    }
-}
+DO_ALL(hang_filter_t, hang_filter);
 
 static bool hang_filter_constructor(filter_t *filter)
 {

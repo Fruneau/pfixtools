@@ -76,25 +76,30 @@ struct trie_t {
     bool locked;
 };
 
+DO_INIT(trie_t, trie)
 trie_t *trie_new(void)
 {
-    return p_new(trie_t, 1);
+    return trie_init(p_new(trie_t, 1));
 }
 
-static inline void trie_cleanup_build_data(trie_t *trie)
+static inline void trie_wipe_build_data(trie_t *trie)
 {
     array_wipe(trie->keys);
     array_wipe(trie->keys_offset);
 }
 
+static inline void trie_wipe(trie_t *trie)
+{
+    trie_wipe_build_data(trie);
+    trie_unlock(trie);
+    array_wipe(trie->entries);
+    array_wipe(trie->c);
+    array_deep_wipe(trie->regexps, regexp_wipe);
+}
 void trie_delete(trie_t **trie)
 {
     if (*trie) {
-        trie_cleanup_build_data(*trie);
-        trie_unlock(*trie);
-        array_wipe((*trie)->entries);
-        array_wipe((*trie)->c);
-        array_deep_wipe((*trie)->regexps, regexp_wipe);
+        trie_wipe(*trie);
         p_delete(trie);
     }
 }
@@ -376,7 +381,7 @@ bool trie_compile(trie_t *trie, bool memlock)
 
     /* Cleanup structure and reduce memory consumption.
      */
-    trie_cleanup_build_data(trie);
+    trie_wipe_build_data(trie);
     array_adjust(trie->entries);
     array_adjust(trie->c);
     if (memlock) {

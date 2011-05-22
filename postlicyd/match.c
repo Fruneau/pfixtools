@@ -94,10 +94,10 @@ static struct {
 
     .operators = {
 #define DEFINE_OP(Short, Long, Cond, Cs)                                     \
-        { .short_name = CLSTR_IMMED(Short),                                      \
-          .long_name  = CLSTR_IMMED(Long),                                       \
-          .condition  = MATCH_##Cond,                                            \
-          .cs         = Cs,                                                      \
+        { .short_name = CLSTR_IMMED(Short),                                  \
+          .long_name  = CLSTR_IMMED(Long),                                   \
+          .condition  = MATCH_##Cond,                                        \
+          .cs         = Cs,                                                  \
         }
         DEFINE_OP("=i", "EQUALS_i", EQUAL, false),
         DEFINE_OP("==", "EQUALS", EQUAL, true),
@@ -120,15 +120,13 @@ typedef struct match_config_t {
     A(match_condition_t) conditions;
     bool match_all;
 } match_config_t;
-
-static match_config_t *match_config_new(void)
-{
-    return p_new(match_config_t, 1);
-}
+DO_INIT(match_config_t, match_config);
+DO_NEW(match_config_t, match_config);
 
 static inline void match_condition_wipe(match_condition_t *condition)
 {
-    if (condition->condition == MATCH_MATCH || condition->condition == MATCH_DONTMATCH) {
+    if (condition->condition == MATCH_MATCH
+        || condition->condition == MATCH_DONTMATCH) {
         regexp_wipe(&condition->data.regexp);
     } else {
         char *str = (char*)condition->data.value.str;
@@ -137,26 +135,23 @@ static inline void match_condition_wipe(match_condition_t *condition)
         condition->data.value.len = 0;
     }
 }
-
-static void match_config_delete(match_config_t **config)
+static inline void match_config_wipe(match_config_t *config)
 {
-    if (*config) {
-        array_deep_wipe((*config)->conditions, match_condition_wipe);
-        p_delete(config);
-    }
+    array_deep_wipe(config->conditions, match_condition_wipe);
 }
+DO_DELETE(match_config_t, match_config)
 
 static bool match_filter_constructor(filter_t *filter)
 {
     match_config_t *config = match_config_new();
     buffer_t regexp = ARRAY_INIT;
 
-#define PARSE_CHECK(Expr, Str, ...)                                            \
-    if (!(Expr)) {                                                             \
-        err(Str, ##__VA_ARGS__);                                               \
-        match_config_delete(&config);                                          \
-        buffer_wipe(&regexp);                                                  \
-        return false;                                                          \
+#define PARSE_CHECK(Expr, Str, ...)                                          \
+    if (!(Expr)) {                                                           \
+        err(Str, ##__VA_ARGS__);                                             \
+        match_config_delete(&config);                                        \
+        buffer_wipe(&regexp);                                                \
+        return false;                                                        \
     }
 
     foreach (param, filter->params) {

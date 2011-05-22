@@ -138,18 +138,6 @@ static bool greylist_db_load(greylist_config_t *config,
     return true;
 }
 
-static void greylist_config_wipe(greylist_config_t *config)
-{
-    if (config->awl) {
-        db_release(config->awl);
-        config->awl = NULL;
-    }
-    if (config->obj) {
-        db_release(config->obj);
-        config->obj = NULL;
-    }
-}
-
 static bool try_greylist(const greylist_config_t *config, const query_t *query)
 {
 #define INCR_AWL                                              \
@@ -258,21 +246,25 @@ static bool try_greylist(const greylist_config_t *config, const query_t *query)
 
 /* postlicyd filter declaration */
 
-
-static greylist_config_t *greylist_config_new(void)
+static greylist_config_t *greylist_config_init(greylist_config_t *config)
 {
-    greylist_config_t *config = p_new(greylist_config_t, 1);
-    *config = (greylist_config_t)GREYLIST_INIT;;
+    *config = (greylist_config_t)GREYLIST_INIT;
     return config;
 }
+DO_NEW(greylist_config_t, greylist_config);
 
-static void greylist_config_delete(greylist_config_t **config)
+static void greylist_config_wipe(greylist_config_t *config)
 {
-    if (*config) {
-        greylist_config_wipe(*config);
-        p_delete(config);
+    if (config->awl) {
+        db_release(config->awl);
+        config->awl = NULL;
+    }
+    if (config->obj) {
+        db_release(config->obj);
+        config->obj = NULL;
     }
 }
+DO_DELETE(greylist_config_t, greylist_config);
 
 static bool greylist_filter_constructor(filter_t *filter)
 {

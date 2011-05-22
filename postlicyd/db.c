@@ -65,19 +65,7 @@ typedef struct db_resource_t {
     TCBDB *db;
 } db_resource_t;
 
-static db_t *db_new(void)
-{
-    return p_new(db_t, 1);
-}
-
-static void db_delete(db_t **db)
-{
-    if (*db) {
-        p_delete(&(*db)->ns);
-        p_delete(&(*db)->filename);
-        p_delete(db);
-    }
-}
+DO_ALL(db_t, db);
 
 static void db_resource_wipe(db_resource_t *res)
 {

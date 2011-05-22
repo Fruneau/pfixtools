@@ -47,27 +47,19 @@ typedef struct srs_config_t {
 } srs_config_t;
 
 /* postlicyd filter declaration */
+DO_INIT(srs_config_t, srs_config);
+DO_NEW(srs_config_t, srs_config);
 
-static srs_config_t *srs_config_new(void)
+static inline void srs_config_wipe(srs_config_t *config)
 {
-    srs_config_t *config = p_new(srs_config_t, 1);
-    p_clear(config, 1);
-    return config;
-}
-
-static void srs_config_delete(srs_config_t **pconfig)
-{
-    if (*pconfig) {
-        srs_config_t *config = *pconfig;
-        if (config->srs) {
-            srs_free(config->srs);
-        }
-        if (config->bounce_domain.str != NULL) {
-            p_delete((char **)&config->bounce_domain.str);
-        }
-        p_delete(pconfig);
+    if (config->srs) {
+        srs_free(config->srs);
+    }
+    if (config->bounce_domain.str != NULL) {
+        p_delete((char **)&config->bounce_domain.str);
     }
 }
+DO_DELETE(srs_config_t, srs_config);
 
 static srs_t *srs_read_secrets(const char *sfile)
 {

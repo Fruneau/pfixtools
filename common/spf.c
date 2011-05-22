@@ -125,10 +125,11 @@ static struct {
     .dns_buffer    = ARRAY_INIT,
 };
 
+DO_INIT(spf_t, spf);
 static spf_t *spf_new(void)
 {
     _G.created++;
-    return p_new(spf_t, 1);
+    return spf_init(p_new(spf_t, 1));
 }
 
 static void spf_rule_wipe(spf_rule_t *rule)
@@ -148,7 +149,6 @@ static void spf_wipe(spf_t *spf)
     array_wipe(spf->record);
     array_wipe(spf->domainspec);
     array_wipe(spf->explanation);
-    p_clear(spf, 1);
 }
 
 static void spf_delete(spf_t **spf)
@@ -166,6 +166,7 @@ static spf_t *spf_acquire(void)
     spf_t *spf = NULL;
     if (array_len(_G.spf_pool)) {
         spf = array_pop_last(_G.spf_pool);
+        spf_init(spf);
     } else {
         spf = spf_new();
     }

@@ -169,6 +169,12 @@ static inline void *xmemdupstr(const void *src, ssize_t len) {
         }                                                   \
     }
 
+#define DO_ALL(type, prefix)                                \
+    DO_INIT(type, prefix)                                   \
+    DO_WIPE(type, prefix)                                   \
+    DO_NEW(type, prefix)                                    \
+    DO_DELETE(type, prefix)
+
 #endif /* PFIXTOOLS_MEM_H */
 
 /* vim:set et sw=4 sts=4 sws=4: */

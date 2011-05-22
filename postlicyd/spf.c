@@ -55,17 +55,7 @@ static struct {
 } spf_g;
 #define _G  spf_g
 
-static spf_filter_t *spf_filter_new(void)
-{
-    return p_new(spf_filter_t, 1);
-}
-
-static void spf_filter_delete(spf_filter_t **spf)
-{
-    if (*spf) {
-        p_delete(spf);
-    }
-}
+DO_ALL(spf_filter_t, spf_filter);
 
 static bool spf_filter_constructor(filter_t *filter)
 {

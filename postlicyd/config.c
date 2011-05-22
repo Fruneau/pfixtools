@@ -109,14 +109,15 @@ static struct {
 } config_g;
 #define _G  config_g
 
-static inline config_t *config_new(void)
+static config_t *config_init(config_t *config)
 {
-    config_t *config = p_new(config_t, 1);
+    p_clear(config, 1);
     _G.config = config;
     return config;
 }
+DO_NEW(config_t, config);
 
-static void config_close(config_t *config)
+static void config_wipe(config_t *config)
 {
     for (int i = 0 ; i < SMTP_count ; ++i) {
         config->entry_points[i] = -1;
@@ -125,14 +126,14 @@ static void config_close(config_t *config)
     array_deep_wipe(config->params, filter_params_wipe);
     p_delete(&config->log_format);
     p_delete(&config->resolv_conf);
+    _G.config = NULL;
 }
 
 void config_delete(config_t **config)
 {
     if (*config) {
-        config_close(*config);
+        config_wipe(*config);
         p_delete(config);
-        _G.config = NULL;
     }
 }
 
@@ -458,7 +459,7 @@ static bool config_build_filters(config_t *config)
 }
 
 static bool config_load(config_t *config) {
-    config_close(config);
+    config_wipe(config);
 
     if (!config_parse(config)) {
         err("Invalid configuration: cannot parse configuration file \"%s\"", config->filename);

@@ -284,23 +284,18 @@ typedef struct iplist_async_data_t {
     uint32_t sum;
     bool error;
 } iplist_async_data_t;
+DO_INIT(iplist_filter_t, iplist_filter);
+DO_NEW(iplist_filter_t, iplist_filter);
 
-static iplist_filter_t *iplist_filter_new(void)
+static void iplist_filter_wipe(iplist_filter_t *rbl)
 {
-    return p_new(iplist_filter_t, 1);
+    array_deep_wipe(rbl->rbls, rbldb_delete);
+    array_wipe(rbl->weights);
+    array_wipe(rbl->hosts);
+    array_wipe(rbl->host_offsets);
+    array_wipe(rbl->host_weights);
 }
-
-static void iplist_filter_delete(iplist_filter_t **rbl)
-{
-    if (*rbl) {
-        array_deep_wipe((*rbl)->rbls, rbldb_delete);
-        array_wipe((*rbl)->weights);
-        array_wipe((*rbl)->hosts);
-        array_wipe((*rbl)->host_offsets);
-        array_wipe((*rbl)->host_weights);
-        p_delete(rbl);
-    }
-}
+DO_DELETE(iplist_filter_t, iplist_filter);
 
 
 static bool iplist_filter_constructor(filter_t *filter)

@@ -66,29 +66,30 @@ struct timeout_t {
     void* data;
 };
 
+static struct {
+    PA(listener_t)  listeners;
+    PA(client_t)    client_pool;
+    PA(timeout_t)   timeout_pool;
 
-static PA(listener_t) listeners = ARRAY_INIT;
-static PA(client_t) client_pool = ARRAY_INIT;
-static PA(timeout_t) timeout_pool = ARRAY_INIT;
-
-static struct ev_loop *gl_loop           = NULL;
-static start_client_t  gl_client_start   = NULL;
-static delete_client_t gl_client_delete  = NULL;
-static run_client_t    gl_client_run     = NULL;
-static refresh_t       gl_config_refresh = NULL;
-static void           *gl_config         = NULL;
-
+    struct ev_loop *loop;
+    start_client_t  client_start;
+    delete_client_t client_delete;
+    run_client_t    client_run;
+    refresh_t       config_refresh;
+    void           *config;
+} server_g;
+#define _G  server_g
 
 /* Server io structure methods.
  */
 
 static inline void server_io_wipe(server_io_t *io)
 {
-    if (unlikely(gl_loop == NULL)) {
+    if (unlikely(_G.loop == NULL)) {
         return;
     }
     if (io->fd >= 0) {
-        ev_io_stop(gl_loop, &io->io);
+        ev_io_stop(_G.loop, &io->io);
         close(io->fd);
         io->fd = -1;
     }
@@ -100,14 +101,15 @@ static inline void server_io_wipe(server_io_t *io)
 
 /* 1 - managing clients */
 
-static client_t *client_new(void)
+static client_t *client_init(client_t *client)
 {
-    client_t *server = p_new(client_t, 1);
-    server->io.fd  = -1;
-    return server;
+    p_clear(client, 1);
+    client->io.fd = -1;
+    return client;
 }
+DO_NEW(client_t, client);
 
-static void client_wipe(client_t *server)
+static void client_clear(client_t *server)
 {
     server_io_wipe(&server->io);
     if (server->data && server->clear_data) {
@@ -120,20 +122,25 @@ static void client_wipe(client_t *server)
     server->run = NULL;
 }
 
-void client_delete(client_t **server)
+static void client_wipe(client_t *server)
 {
-    if (*server) {
-        buffer_wipe(&(*server)->ibuf);
-        buffer_wipe(&(*server)->obuf);
-        client_wipe(*server);
-        p_delete(server);
+    buffer_wipe(&server->ibuf);
+    buffer_wipe(&server->obuf);
+    client_clear(server);
+}
+
+void client_delete(client_t **client)
+{
+    if (*client) {
+        client_wipe(*client);
+        p_delete(client);
     }
 }
 
 static client_t *client_acquire(void)
 {
-    if (client_pool.len != 0) {
-        return array_pop_last(client_pool);
+    if (_G.client_pool.len != 0) {
+        return array_pop_last(_G.client_pool);
     } else {
         return client_new();
     }
@@ -141,38 +148,38 @@ static client_t *client_acquire(void)
 
 void client_release(client_t *server)
 {
-    client_wipe(server);
-    array_add(client_pool, server);
+    client_clear(server);
+    array_add(_G.client_pool, server);
 }
 
 /* 2 - Doing I/O */
 
 void client_io_none(client_t *server)
 {
-    if (unlikely(gl_loop == NULL)) {
+    if (unlikely(_G.loop == NULL)) {
         return;
     }
-    ev_io_stop(gl_loop, &server->io.io);
+    ev_io_stop(_G.loop, &server->io.io);
 }
 
 void client_io_rw(client_t *server)
 {
-    if (unlikely(gl_loop == NULL)) {
+    if (unlikely(_G.loop == NULL)) {
         return;
     }
-    ev_io_stop(gl_loop, &server->io.io);
+    ev_io_stop(_G.loop, &server->io.io);
     ev_io_set(&server->io.io, server->io.fd, EV_READ | EV_WRITE);
-    ev_io_start(gl_loop, &server->io.io);
+    ev_io_start(_G.loop, &server->io.io);
 }
 
 void client_io_ro(client_t *server)
 {
-    if (unlikely(gl_loop == NULL)) {
+    if (unlikely(_G.loop == NULL)) {
         return;
     }
-    ev_io_stop(gl_loop, &server->io.io);
+    ev_io_stop(_G.loop, &server->io.io);
     ev_io_set(&server->io.io, server->io.fd, EV_READ);
-    ev_io_start(gl_loop, &server->io.io);
+    ev_io_start(_G.loop, &server->io.io);
 }
 
 ssize_t client_read(client_t *client)
@@ -211,7 +218,7 @@ static void client_cb(EV_P_ struct ev_io *w, int events)
     }
 
     if (events & EV_READ) {
-        if (server->run(server, gl_config) < 0) {
+        if (server->run(server, _G.config) < 0) {
             client_release(server);
             return;
         }
@@ -230,7 +237,7 @@ client_t *client_register(int fd, run_client_t runner, void *data)
     tmp->run        = runner;
     tmp->clear_data = NULL;
     ev_io_init(&tmp->io.io, client_cb, tmp->io.fd, EV_READ);
-    ev_io_start(gl_loop, &tmp->io.io);
+    ev_io_start(_G.loop, &tmp->io.io);
     return tmp;
 }
 
@@ -240,25 +247,19 @@ client_t *client_register(int fd, run_client_t runner, void *data)
 
 /* 1 - Allocation */
 
-static listener_t *listener_new(void)
+static listener_t *listener_init(listener_t *l)
 {
-    listener_t *io = p_new(listener_t, 1);
-    io->io.fd = -1;
-    return io;
+    p_clear(l, 1);
+    l->io.fd = -1;
+    return l;
 }
+DO_NEW(listener_t, listener);
 
 static inline void listener_wipe(listener_t *io)
 {
     server_io_wipe(&io->io);
 }
-
-static inline void listener_delete(listener_t **io)
-{
-    if (*io) {
-        listener_wipe(*io);
-        p_delete(io);
-    }
-}
+DO_DELETE(listener_t, listener);
 
 
 /* 2 - Management */
@@ -277,8 +278,8 @@ static void listener_cb(EV_P_ struct ev_io *w, int events)
         return;
     }
 
-    if (gl_client_start) {
-        data = gl_client_start(server);
+    if (_G.client_start) {
+        data = _G.client_start(server);
         if (data == NULL) {
             close(sock);
             ev_unloop(EV_A_ EVUNLOOP_ALL);
@@ -289,10 +290,10 @@ static void listener_cb(EV_P_ struct ev_io *w, int events)
     tmp             = client_acquire();
     tmp->io.fd      = sock;
     tmp->data       = data;
-    tmp->run        = gl_client_run;
-    tmp->clear_data = gl_client_delete;
+    tmp->run        = _G.client_run;
+    tmp->clear_data = _G.client_delete;
     ev_io_init(&tmp->io.io, client_cb, tmp->io.fd, EV_READ);
-    ev_io_start(gl_loop, &tmp->io.io);
+    ev_io_start(_G.loop, &tmp->io.io);
 }
 
 listener_t *start_listener(int port)
@@ -313,8 +314,8 @@ listener_t *start_listener(int port)
     tmp             = listener_new();
     tmp->io.fd      = sock;
     ev_io_init(&tmp->io.io, listener_cb, tmp->io.fd, EV_READ);
-    ev_io_start(gl_loop, &tmp->io.io);
-    array_add(listeners, tmp);
+    ev_io_start(_G.loop, &tmp->io.io);
+    array_add(_G.listeners, tmp);
     return tmp;
 }
 
@@ -323,28 +324,20 @@ listener_t *start_listener(int port)
 /* Timers
  */
 
-static timeout_t *timeout_new(void)
-{
-    return p_new(timeout_t, 1);
-}
+DO_INIT(timeout_t, timeout);
+DO_NEW(timeout_t, timeout);
 
 static void timeout_wipe(timeout_t *timer)
 {
-    ev_timer_stop(gl_loop, &timer->timer);
+    ev_timer_stop(_G.loop, &timer->timer);
 }
+DO_DELETE(timeout_t, timeout);
 
-static void timeout_delete(timeout_t **timer)
-{
-    if (*timer) {
-        timeout_wipe(*timer);
-        p_delete(timer);
-    }
-}
 
 static void timeout_release(timeout_t *timer)
 {
     timeout_wipe(timer);
-    array_add(timeout_pool, timer);
+    array_add(_G.timeout_pool, timer);
 }
 
 static void timeout_cb(EV_P_ struct ev_timer *w, int revents)
@@ -363,8 +356,8 @@ timeout_t *start_timer(int milliseconds, run_timeout_t runner, void *data)
 {
     timeout_t *timer = NULL;
     float timeout = ((float)milliseconds) / 1000.;
-    if (array_len(timeout_pool) > 0) {
-        timer = array_pop_last(timeout_pool);
+    if (array_len(_G.timeout_pool) > 0) {
+        timer = array_pop_last(_G.timeout_pool);
         ev_timer_set(&timer->timer, timeout, 0.);
     } else {
         timer = timeout_new();
@@ -372,7 +365,7 @@ timeout_t *start_timer(int milliseconds, run_timeout_t runner, void *data)
     }
     timer->run = runner;
     timer->data = data;
-    ev_timer_start(gl_loop, &timer->timer);
+    ev_timer_start(_G.loop, &timer->timer);
     return timer;
 }
 
@@ -388,18 +381,18 @@ void timer_cancel(timeout_t *timer)
 
 static int server_init(void)
 {
-    gl_loop = ev_default_loop(0);
+    _G.loop = ev_default_loop(0);
     return 0;
 }
 
 static void server_shutdown(void)
 {
-    array_deep_wipe(listeners, listener_delete);
-    array_deep_wipe(client_pool, client_delete);
-    array_deep_wipe(timeout_pool, timeout_delete);
+    array_deep_wipe(_G.listeners, listener_delete);
+    array_deep_wipe(_G.client_pool, client_delete);
+    array_deep_wipe(_G.timeout_pool, timeout_delete);
     if (daemon_process) {
         ev_default_destroy();
-        gl_loop = NULL;
+        _G.loop = NULL;
     }
 }
 module_init(server_init);
@@ -409,7 +402,7 @@ module_exit(server_shutdown);
 static void refresh_cb(EV_P_ struct ev_signal *w, int event)
 {
     log_state = "refreshing ";
-    if (!gl_config_refresh(gl_config)) {
+    if (!_G.config_refresh(_G.config)) {
         ev_unloop(EV_A_ EVUNLOOP_ALL);
         notice("failed");
     } else {
@@ -430,24 +423,24 @@ int server_loop(start_client_t starter, delete_client_t deleter,
     struct ev_signal ev_sigint;
     struct ev_signal ev_sigterm;
 
-    gl_client_start   = starter;
-    gl_client_delete  = deleter;
-    gl_client_run     = runner;
-    gl_config_refresh = refresh;
-    gl_config         = config;
+    _G.client_start   = starter;
+    _G.client_delete  = deleter;
+    _G.client_run     = runner;
+    _G.config_refresh = refresh;
+    _G.config         = config;
 
     if (refresh != NULL) {
         ev_signal_init(&ev_sighup, refresh_cb, SIGHUP);
-        ev_signal_start(gl_loop, &ev_sighup);
+        ev_signal_start(_G.loop, &ev_sighup);
     }
     ev_signal_init(&ev_sigint, exit_cb, SIGINT);
-    ev_signal_start(gl_loop, &ev_sigint);
+    ev_signal_start(_G.loop, &ev_sigint);
     ev_signal_init(&ev_sigterm, exit_cb, SIGTERM);
-    ev_signal_start(gl_loop, &ev_sigterm);
+    ev_signal_start(_G.loop, &ev_sigterm);
 
     log_state = "";
     notice("entering processing loop");
-    ev_loop(gl_loop, 0);
+    ev_loop(_G.loop, 0);
     notice("exit requested");
     return EXIT_SUCCESS;
 }
