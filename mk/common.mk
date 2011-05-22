@@ -28,7 +28,7 @@
 #  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE           #
 #  POSSIBILITY OF SUCH DAMAGE.                                               #
 #                                                                            #
-#   Copyright (c) 2006-2010 the Authors                                      #
+#   Copyright (c) 2006-2011 the Authors                                      #
 #   see AUTHORS and source files for details                                 #
 ##############################################################################
 
@@ -81,7 +81,7 @@ tags: .tags
 .tags: $(shell git ls-files | egrep '\.[hc]$$')
 	ctags -o $@ $^
 
-headers: HEADACHEOPTS=-c mk/headache.cfg -h mk/COPYING
+headers: HEADACHEOPTS=-c mk/headache.cfg -h LICENSE
 headers:
 	@which headache > /dev/null || \
 		( echo "package headache not installed" ; exit 1 )

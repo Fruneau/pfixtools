@@ -28,7 +28,7 @@
 /*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE           */
 /*  POSSIBILITY OF SUCH DAMAGE.                                               */
 /*                                                                            */
-/*   Copyright (c) 2006-2008 the Authors                                      */
+/*   Copyright (c) 2006-2011 the Authors                                      */
 /*   see AUTHORS and source files for details                                 */
 /******************************************************************************/
 
