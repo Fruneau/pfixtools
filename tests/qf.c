@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
       for (int i = 0 ; i < iterations ; ++i) {
           snprintf(str, BUFSIZ, "%s %s and %s[%s] at %s",
                    q.sender.str, q.recipient.str, q.client_name.str, q.client_address.str,
-                   smtp_state_names[q.state].str);
+                   smtp_state_names_g[q.state].str);
       }
       time_t ellapsed = time(0) - now;
       printf(" -> %s\n", str);

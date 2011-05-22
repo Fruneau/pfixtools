@@ -35,7 +35,7 @@
 include ../mk/tc.mk
 
 TESTS = trie regexp spf rbl filters greylist qf
-TESTLIBS=$(TC_LIBS) -lunbound -lev -lpcre
+TESTLIBS=$(TC_LIBS) -lunbound -lev -lpcre -lsrs2
 
 all:
 
