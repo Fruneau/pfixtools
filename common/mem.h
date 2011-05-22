@@ -91,7 +91,7 @@
 
 #  define p_delete(mem_pp)                                                   \
         do {                                                                 \
-            typeof(**(mem_pp)) **__ptr = (mem_pp);                           \
+            typeof(*(mem_pp)) *__ptr = (mem_pp);                             \
             free(*__ptr);                                                    \
             *__ptr = NULL;                                                   \
         } while(0)

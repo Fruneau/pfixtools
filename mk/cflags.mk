@@ -33,8 +33,12 @@
 #   see AUTHORS and source files for details                               #
 ############################################################################
 
-ifneq ($(filter 4.%,$(shell gcc -dumpversion)),)
+GCC_VERSION=$(shell $(CC) -dumpversion)
+ifneq ($(filter 4.%,$(GCC_VERSION)),)
   GCC4=1
+  ifneq ($(filter 4.4.%,$(GCC_VERSION)),)
+	GCC44=1
+  endif
 endif
 ifneq ($(filter Darwin%,$(shell uname)),)
   DARWIN=1
@@ -46,8 +50,8 @@ CFLAGSBASE += -pipe
 CFLAGSBASE += -O2
 # let the type char be unsigned by default
 CFLAGSBASE += -funsigned-char
-CFLAGSBASE += -fno-strict-aliasing
-# CFLAGSBASE += -Wstrict-aliasing=2
+CFLAGSBASE += $(if $(GCC44),-fno-strict-aliasing,-fstrict-aliasing)
+CFLAGSBASE += $(if $(GCC44),,-Wstrict-aliasing=2)
 # turn on all common warnings
 CFLAGSBASE += -Wall
 # turn on extra warnings
@@ -61,7 +65,7 @@ CFLAGSBASE += -Wundef
 # # disabled on Darwin because of warnings in ev.h
 CFLAGSBASE += -Wshadow
 # warn about casting of pointers to increased alignment requirements
-CFLAGSBASE += -Wcast-align
+#CFLAGSBASE += -Wcast-align
 # make string constants const
 CFLAGSBASE += -Wwrite-strings
 # warn about implicit conversions with side effects
