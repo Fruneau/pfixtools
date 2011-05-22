@@ -45,10 +45,15 @@ typedef struct server_io_t {
     struct ev_io io;
     int fd;
 } server_io_t;
+#define server_of_io(s)  containerof(s, server_io_t, io);
 
 struct listener_t {
     server_io_t io;
 };
+#define listener_of_io(l) ({                                                 \
+        const server_io_t *__ser = server_of_io(l);                          \
+        containerof(__ser, listener_t, io);                                  \
+    })
 
 struct client_t {
     server_io_t io;
@@ -60,12 +65,18 @@ struct client_t {
     delete_client_f clear_data;
     void* data;
 };
+#define client_of_io(s)  ({                                                  \
+        const server_io_t *__ser = server_of_io(s);                          \
+        containerof(__ser, client_t, io);                                    \
+    })
+
 
 struct timeout_t {
     struct ev_timer timer;
     run_timeout_f run;
     void* data;
 };
+#define timeout_of_timer(t)  containerof(t, timeout_t, timer)
 
 static struct {
     PA(listener_t)  listeners;
@@ -206,7 +217,7 @@ void *client_data(client_t *client)
 
 static void client_cb(EV_P_ struct ev_io *w, int events)
 {
-    client_t *server = (client_t*)w;
+    client_t *server = client_of_io(w);
 
     if (events & EV_WRITE && server->obuf.len) {
         if (buffer_write(&server->obuf, server->io.fd) < 0) {
@@ -267,7 +278,7 @@ DO_DELETE(listener_t, listener);
 
 static void listener_cb(EV_P_ struct ev_io *w, int events)
 {
-    listener_t *server = (listener_t*)w;
+    listener_t *server = listener_of_io(w);
     client_t *tmp;
     void* data = NULL;
     int sock;
@@ -343,7 +354,7 @@ static void timeout_release(timeout_t *timer)
 
 static void timeout_cb(EV_P_ struct ev_timer *w, int revents)
 {
-    timeout_t *timer = (timeout_t *)w;
+    timeout_t *timer = timeout_of_timer(w);
     run_timeout_f run = timer->run;
     void* data = timer->data;
     timeout_release(timer);

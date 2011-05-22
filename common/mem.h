@@ -78,7 +78,16 @@
         }                                                                    \
     } while (0)
 
+#define nullof(type) ((type *)0)
+
 #ifdef __GNUC__
+
+/* This implementation is typesafe */
+#define containerof(ptr, type, member)                                       \
+    ({                                                                       \
+        const typeof(nullof(type)->member) *__mbr = (ptr);                   \
+        (type *)((char *)(__mbr) - offsetof(type, member));                  \
+    })
 
 #  define p_delete(mem_pp)                                                   \
         do {                                                                 \
@@ -88,6 +97,9 @@
         } while(0)
 
 #else
+
+#define containerof(ptr, type, member)                                       \
+    ((type *)((char *)(ptr) - offsetof(type, member)))
 
 #  define p_delete(mem_p)                                                    \
         do {                                                                 \
