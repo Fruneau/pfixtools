@@ -86,7 +86,8 @@ bool ip_parse_6(ip6_t ip, const char* restrict txt, ssize_t len);
 
 /** Compare two IPv6 with the given cird mask len.
  */
-static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2, cidrlen_t cidr_len);
+static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2,
+                                cidrlen_t cidr_len);
 
 /** Print an IPv6 in the buffer.
  */
@@ -110,7 +111,8 @@ static inline bool ip_compare_4(ip4_t ip1, ip4_t ip2, cidrlen_t cidr_len)
     return (ip1 & mask) == (ip2 & mask);
 }
 
-static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2, cidrlen_t cidr_len)
+static inline bool ip_compare_6(const ip6_t ip1, const ip6_t ip2,
+                                cidrlen_t cidr_len)
 {
     size_t bytes = cidr_len >> 3;
     int bits  = cidr_len & 7;

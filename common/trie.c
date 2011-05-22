@@ -53,16 +53,17 @@ struct trie_entry_t {
 };
 #define TRIE_ENTRY_INIT { 0, 0, -1, 0, 0 }
 ARRAY(trie_entry_t)
-#define str(trie, entry) array_ptr((trie)->c, (entry)->c_offset)
-#define rex(trie, entry) (entry)->regexp_offset < 0 ? NULL \
-                              : array_ptr((trie)->regexps, (entry)->regexp_offset)
+#define str(trie, entry)  array_ptr((trie)->c, (entry)->c_offset)
+#define rex(trie, entry)  (entry)->regexp_offset < 0 ? NULL                  \
+                          : array_ptr((trie)->regexps, (entry)->regexp_offset)
 
 typedef struct trie_key_t {
     int offset;
     int regexp;
 } trie_key_t;
 ARRAY(trie_key_t)
-#define key(trie, id) array_ptr((trie)->keys, array_elt((trie)->keys_offset, (id)).offset)
+#define key(trie, id) array_ptr((trie)->keys,                                \
+                                array_elt((trie)->keys_offset, (id)).offset)
 #define rek(trie, id) (array_elt((trie)->keys_offset, (id)).regexp)
 
 struct trie_t {
@@ -122,13 +123,15 @@ static inline bool trie_entry_c_match(const trie_t *trie,
 }
 
 static inline bool trie_entry_match(const trie_t *trie,
-                                    const trie_entry_t *entry, const char *key)
+                                    const trie_entry_t *entry,
+                                    const char *key)
 {
     return !!(strcmp(str(trie, entry), key) == 0);
 }
 
 static inline bool trie_entry_prefix(const trie_t *trie,
-                                     const trie_entry_t *entry, const char *key)
+                                     const trie_entry_t *entry,
+                                     const char *key)
 {
     int len = entry->c_len;
     if (len > 0 && str(trie, entry)[len - 1] == '\0') {
@@ -177,7 +180,8 @@ static inline uint32_t trie_entry_new(trie_t *trie)
     return trie->entries.len - 1;
 }
 
-static inline uint32_t trie_add_leaf(trie_t *trie, const char *key, int regexp)
+static inline uint32_t trie_add_leaf(trie_t *trie, const char *key,
+                                     int regexp)
 {
     trie_entry_t *entry;
     int len = m_strlen(key) + 1;
@@ -202,14 +206,16 @@ static inline uint32_t trie_add_leaf(trie_t *trie, const char *key, int regexp)
     return trie->entries.len - 1;
 }
 
-static inline void trie_entry_insert_child(trie_t *trie, uint32_t id, uint32_t pchild)
+static inline void trie_entry_insert_child(trie_t *trie, uint32_t id,
+                                           uint32_t pchild)
 {
     trie_entry_t *entry = array_ptr(trie->entries, id);
     if (entry->children_len == 0) {
         entry->children_offset = pchild;
         entry->children_len    = 1;
     } else {
-        if ((uint32_t)(entry->children_offset + entry->children_len) != pchild) {
+        if ((uint32_t)(entry->children_offset + entry->children_len)
+            != pchild) {
             printf("Inserting child %d while offset is %d[%d]\n",
                    pchild, entry->children_offset, entry->children_len);
             abort();
@@ -243,7 +249,8 @@ static inline void trie_entry_split(trie_t *trie, uint32_t id, uint16_t pos)
     entry->regexp_offset   = -1;
 }
 
-bool trie_insert_regexp_str(trie_t *trie, const clstr_t *key, const clstr_t *regexp)
+bool trie_insert_regexp_str(trie_t *trie, const clstr_t *key,
+                            const clstr_t *regexp)
 {
     assert(trie->entries.len == 0 && "Trie already compiled");
 
@@ -285,7 +292,8 @@ static bool trie_compile_aux(trie_t *trie, uint32_t id,
                              uint32_t first_key, uint32_t last_key,
                              int offset, int initial_diff)
 {
-    /* The forks list will contain the list of row number where splits are found.
+    /* The forks list will contain the list of row number where splits
+     * are found.
      */
     uint32_t forks[256];
     uint32_t fork_pos = 0;
@@ -295,10 +303,12 @@ static bool trie_compile_aux(trie_t *trie, uint32_t id,
     assert(strcmp(key(trie, first_key) + offset, str(trie, entry)) == 0);
 #endif
 
-    /* Walk through the entries, column per column, and the first column where for one or more
-     * row entries[row,column] is not the same as entries[row-1,column].
+    /* Walk through the entries, column per column, and the first column where
+     * for one or more row entries[row,column] is not the same as
+     * entries[row-1,column].
      *
-     * The corresponding rows are stored in forks and a new node is created each time a fork is found.
+     * The corresponding rows are stored in forks and a new node is created
+     * each time a fork is found.
      */
     for (int off_diff = initial_diff ; fork_pos == 0 ; ++off_diff, ++offset) {
         current = key(trie, first_key)[offset];
@@ -317,22 +327,25 @@ static bool trie_compile_aux(trie_t *trie, uint32_t id,
                 }
                 /* Mark this row as a split point, create a node.
                  */
-                trie_entry_insert_child(trie, id, trie_add_leaf(trie, ckey, reg));
+                trie_entry_insert_child(trie, id,
+                                        trie_add_leaf(trie, ckey, reg));
                 forks[fork_pos++] = i;
                 current = c;
             } else if (current == '\0') {
-                /* Found a '\0', This should not happen since the rows are sorted, so, we are
-                 * sure this is a duplicated ==> check consistency and skip the first line.
+                /* Found a '\0', This should not happen since the rows are
+                 * sorted, so, we are sure this is a duplicated ==> check
+                 * consistency and skip the first line.
                  */
                 if (rek(trie, first_key) != reg) {
-                    err("duplicate entry in the trie with different associated regexps: %s",
-                        key(trie, i));
+                    err("duplicate entry in the trie with different "
+                        "associated regexps: %s", key(trie, i));
                     return false;
                 } else {
                     debug("dropping duplicate for key %s", key(trie, i));
                 }
                 return trie_compile_aux(trie, id, i, last_key,
-                                        offset - (off_diff - initial_diff), initial_diff);
+                                        offset - (off_diff - initial_diff),
+                                        initial_diff);
             }
         }
         if (fork_pos == 0 && current == '\0') {
@@ -347,7 +360,8 @@ static bool trie_compile_aux(trie_t *trie, uint32_t id,
     for (uint16_t i = 0 ; i < children_len ; ++i) {
         int child = array_elt(trie->entries, id).children_offset + i;
         if (forks[i] - 1 > first_key) {
-            if (!trie_compile_aux(trie, child, first_key, forks[i], offset, 1)) {
+            if (!trie_compile_aux(trie, child, first_key, forks[i],
+                                  offset, 1)) {
                 return false;
             }
         }
@@ -367,7 +381,8 @@ bool trie_compile(trie_t *trie, bool memlock)
 #       define QSORT_TYPE trie_key_t
 #       define QSORT_BASE trie->keys_offset.data
 #       define QSORT_NELT trie->keys_offset.len
-#       define QSORT_LT(a,b) strcmp(trie->keys.data + a->offset, trie->keys.data + b->offset) < 0
+#       define QSORT_LT(a,b) strcmp(trie->keys.data + a->offset,             \
+                                    trie->keys.data + b->offset) < 0
 #       include "qsort.c"
     }
 
@@ -375,7 +390,8 @@ bool trie_compile(trie_t *trie, bool memlock)
 
     /* Build the tree
      */
-    if (!trie_compile_aux(trie, trie_add_leaf(trie, key(trie, 0), rek(trie, 0)),
+    if (!trie_compile_aux(trie,
+                          trie_add_leaf(trie, key(trie, 0), rek(trie, 0)),
                           0, trie->keys_offset.len, 0, 0)) {
         return false;
     }
@@ -392,15 +408,16 @@ bool trie_compile(trie_t *trie, bool memlock)
 }
 
 
-#define FILL_MATCH(LEN, ALL, PREFIX, RES)                                      \
-    if (match != NULL) {                                                       \
-        match->match_len = (LEN);                                              \
-        match->match_all = (ALL);                                              \
-        match->match_prefix = (PREFIX);                                        \
+#define FILL_MATCH(LEN, ALL, PREFIX, RES)                                    \
+    if (match != NULL) {                                                     \
+        match->match_len = (LEN);                                            \
+        match->match_all = (ALL);                                            \
+        match->match_prefix = (PREFIX);                                      \
         match->regexp  = (RES);                                              \
     }
 
-bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
+bool trie_lookup_match(const trie_t *trie, const char *key,
+                       trie_match_t *match)
 {
     assert(trie->keys.len == 0L && "Can't lookup: trie not compiled");
     if (trie->entries.len == 0) {
@@ -425,7 +442,8 @@ bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
                 }
             } else if (trie_entry_c_match(trie, current, key)) {
                 key += current->c_len;
-                const trie_entry_t *nexte = trie_entry_child(trie, current, key[0]);
+                const trie_entry_t *nexte
+                    = trie_entry_child(trie, current, key[0]);
                 if (nexte == NULL) {
                     if (match) {
                       nexte = trie_entry_child(trie, current, '\0');
@@ -446,7 +464,8 @@ bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match)
     }
 }
 
-bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match)
+bool trie_prefix_match(const trie_t *trie, const char *key,
+                       trie_match_t *match)
 {
     assert(trie->keys.len == 0L && "Can't lookup: trie not compiled");
     if (trie->entries.len == 0) {
@@ -468,7 +487,8 @@ bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match)
                 }
             } else if (trie_entry_c_match(trie, current, key)) {
                 key += current->c_len;
-                const trie_entry_t *nexte = trie_entry_child(trie, current, key[0]);
+                const trie_entry_t *nexte
+                    = trie_entry_child(trie, current, key[0]);
                 if (nexte == NULL) {
                     nexte = trie_entry_child(trie, current, '\0');
                     if (nexte != NULL) {
@@ -559,17 +579,20 @@ static void trie_entry_inspect(const trie_t *trie, bool show_content,
     }
     for (uint32_t i = 0 ; i < entry->children_len ; ++i) {
         trie_entry_inspect(trie, show_content,
-                           array_ptr(trie->entries, entry->children_offset + i),
+                           array_ptr(trie->entries,
+                                     entry->children_offset + i),
                            level + 1);
     }
     if (level == 0) {
-        printf("Average char per node: %d\n", trie->c.len / trie->entries.len);
+        printf("Average char per node: %d\n",
+               trie->c.len / trie->entries.len);
         printf("Number of nodes: %d\n", trie->entries.len);
         printf("Number of leaves: %d\n", leaves);
         printf("Max depth: %d\n", max_depth);
         printf("Average leaf depth: %d\n", depth_sum / leaves);
-        printf("Memory used: %zd\n", (trie->entries.size * sizeof(trie_entry_t))
-                                  + (trie->c.size) + sizeof(trie_t));
+        printf("Memory used: %zd\n",
+               (trie->entries.size * sizeof(trie_entry_t))
+               + (trie->c.size) + sizeof(trie_t));
     }
 }
 

@@ -75,7 +75,7 @@ static inline clstr_t buffer_tostr(buffer_t *buf) {
     return str;
 }
 
-#define buffer_resize(buffer, newsize)                                         \
+#define buffer_resize(buffer, newsize)                                       \
   array_ensure_exact_capacity(*(buffer), (newsize) + 1)
 
 static inline void buffer_ensure(buffer_t *buf, int extra) {

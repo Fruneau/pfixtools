@@ -79,7 +79,8 @@ bool trie_insert_regexp(trie_t *trie, const char *key, const char *regexp);
 /** Insert a string followed by a regexp in the trie.
  */
 __attribute__((nonnull(1,2)))
-bool trie_insert_regexp_str(trie_t *trie, const clstr_t *key, const clstr_t *regexp);
+bool trie_insert_regexp_str(trie_t *trie, const clstr_t *key,
+                            const clstr_t *regexp);
 
 /** Compile the trie.
  * A trie must be compiled before lookup is possible. Compiling the trie
@@ -116,13 +117,15 @@ void trie_unlock(trie_t *trie);
 /** Check if the trie contains \p key.
  */
 __attribute__((nonnull(1,2)))
-bool trie_lookup_match(const trie_t *trie, const char *key, trie_match_t *match);
+bool trie_lookup_match(const trie_t *trie, const char *key,
+                       trie_match_t *match);
 #define trie_lookup(trie, key) (trie_lookup_match(trie, key, NULL))
 
 /** Check if the trie contains a prefix of \p key.
  */
 __attribute__((nonnull(1,2)))
-bool trie_prefix_match(const trie_t *trie, const char *key, trie_match_t *match);
+bool trie_prefix_match(const trie_t *trie, const char *key,
+                       trie_match_t *match);
 #define trie_prefix(trie, key) (trie_prefix_match(trie, key, NULL))
 
 /** Show the content of the trie and computes statistics.

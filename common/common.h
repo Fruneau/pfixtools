@@ -72,19 +72,19 @@ typedef void (*exitcall_f)(void);
 void common_register_exit(exitcall_f exitcall);
 void common_init(void);
 
-#define module_init(fn)                                                        \
-    __attribute__((constructor,used))                                          \
-    static void __init_wrapper__ ## fn (void) {                                \
-        common_init();                                                         \
-        if (fn() != 0) {                                                       \
-            exit(-1);                                                          \
-        }                                                                      \
+#define module_init(fn)                                                      \
+    __attribute__((constructor,used))                                        \
+    static void __init_wrapper__ ## fn (void) {                              \
+        common_init();                                                       \
+        if (fn() != 0) {                                                     \
+            exit(-1);                                                        \
+        }                                                                    \
     }
-#define module_exit(fn)                                                        \
-    __attribute__((constructor,used))                                          \
-    static void __exit_wrapper ## fn(void) {                                   \
-        common_init();                                                         \
-        common_register_exit(fn);                                              \
+#define module_exit(fn)                                                      \
+    __attribute__((constructor,used))                                        \
+    static void __exit_wrapper ## fn(void) {                                 \
+        common_init();                                                       \
+        common_register_exit(fn);                                            \
     }
 
 #define likely(expr)    __builtin_expect((expr) != 0, 1)
@@ -92,24 +92,24 @@ void common_init(void);
 
 #define unused(expr)    { size_t t __attribute__((unused)) = expr; }
 
-#define __level_name(L)                                            \
-  ( (L) == LOG_DEBUG   ? "debug "                                  \
-  : (L) == LOG_NOTICE  ? "notice"                                  \
-  : (L) == LOG_INFO    ? "info  "                                  \
-  : (L) == LOG_WARNING ? "warn  "                                  \
-  : (L) == LOG_ERR     ? "error "                                  \
-  : (L) == LOG_CRIT    ? "crit  "                                  \
-  : (L) == LOG_ALERT   ? "alert "                                  \
-  : "???   " )
+#define __level_name(L)                                                      \
+    ((L) == LOG_DEBUG   ? "debug "                                           \
+      : (L) == LOG_NOTICE  ? "notice"                                        \
+      : (L) == LOG_INFO    ? "info  "                                        \
+      : (L) == LOG_WARNING ? "warn  "                                        \
+      : (L) == LOG_ERR     ? "error "                                        \
+      : (L) == LOG_CRIT    ? "crit  "                                        \
+      : (L) == LOG_ALERT   ? "alert "                                        \
+      : "???   ")
 
-#define __log(Level, Fmt, ...)                                     \
-    if (log_level >= Level) {                                      \
-        if (log_syslog) {                                          \
-            syslog(Level, "%s" Fmt, log_state, ##__VA_ARGS__);     \
-        } else {                                                   \
-            fprintf(stderr, "[%s] %s" Fmt "\n",                    \
-                    __level_name(Level), log_state, ##__VA_ARGS__);\
-        }                                                          \
+#define __log(Level, Fmt, ...)                                               \
+    if (log_level >= Level) {                                                \
+        if (log_syslog) {                                                    \
+            syslog(Level, "%s" Fmt, log_state, ##__VA_ARGS__);               \
+        } else {                                                             \
+            fprintf(stderr, "[%s] %s" Fmt "\n",                              \
+                    __level_name(Level), log_state, ##__VA_ARGS__);          \
+        }                                                                    \
     }
 
 #define debug(Fmt, ...)  __log(LOG_DEBUG,   Fmt, ##__VA_ARGS__)
@@ -121,8 +121,8 @@ void common_init(void);
 #define alert(Fmt, ...)  __log(LOG_ALERT,   Fmt, ##__VA_ARGS__)
 #define emerg(Fmt, ...)  __log(LOG_ALERT,   Fmt, ##__VA_ARGS__)
 
-#define UNIXERR(fun)     err("%s:%d:%s %s: %s",                      \
-                             __FILE__, __LINE__, __func__, fun, strerror(errno))
+#define UNIXERR(fun)     err("%s:%d:%s %s: %s", __FILE__, __LINE__, __func__,\
+                             fun, strerror(errno))
 
 extern bool         daemon_process;
 extern int          log_level;
@@ -154,71 +154,71 @@ static inline void common_startup(void)
 }
 
 
-#define DECLARE_MAIN                                              \
-    static int main_initialize(void)                              \
-    {                                                             \
-        log_syslog = true;                                        \
-        openlog(DAEMON_NAME, LOG_PID, LOG_MAIL);                  \
-        common_startup();                                         \
-        return 0;                                                 \
-    }                                                             \
-                                                                  \
-    static void main_shutdown(void)                               \
-    {                                                             \
-        closelog();                                               \
-    }                                                             \
-                                                                  \
-    module_init(main_initialize);                                 \
+#define DECLARE_MAIN                                                         \
+    static int main_initialize(void)                                         \
+    {                                                                        \
+        log_syslog = true;                                                   \
+        openlog(DAEMON_NAME, LOG_PID, LOG_MAIL);                             \
+        common_startup();                                                    \
+        return 0;                                                            \
+    }                                                                        \
+                                                                             \
+    static void main_shutdown(void)                                          \
+    {                                                                        \
+        closelog();                                                          \
+    }                                                                        \
+                                                                             \
+    module_init(main_initialize);                                            \
     module_exit(main_shutdown);
 
-#define COMMON_OPTION_LIST                                        \
-    { "help", no_argument, NULL, 'h' },                           \
+#define COMMON_OPTION_LIST                                                   \
+    { "help", no_argument, NULL, 'h' },                                      \
     { "verbose", no_argument, NULL, 'v' }
 
 #define COMMON_OPTION_SHORTLIST "hv"
 
-#define COMMON_OPTION_CASES                                       \
-  case 'v':                                                       \
-    ++log_level;                                                  \
-    break;                                                        \
-  default:                                                        \
-    usage();                                                      \
+#define COMMON_OPTION_CASES                                                  \
+  case 'v':                                                                  \
+    ++log_level;                                                             \
+    break;                                                                   \
+  default:                                                                   \
+    usage();                                                                 \
     return EXIT_FAILURE;
 
-#define COMMON_OPTION_HELP                                        \
-    "    -v|--verbose                  increase logging level\n"  \
+#define COMMON_OPTION_HELP                                                   \
+    "    -v|--verbose                  increase logging level\n"             \
     "    -h|--help                     show this help message\n"
 
-#define COMMON_DAEMON_OPTION_LIST                                 \
-    COMMON_OPTION_LIST,                                           \
-    { "unsafe", no_argument, NULL, 'u' },                         \
-    { "foreground", no_argument, NULL, 'f' },                     \
+#define COMMON_DAEMON_OPTION_LIST                                            \
+    COMMON_OPTION_LIST,                                                      \
+    { "unsafe", no_argument, NULL, 'u' },                                    \
+    { "foreground", no_argument, NULL, 'f' },                                \
     { "pid-file", required_argument, NULL, 'p' }
 
 #define COMMON_DAEMON_OPTION_SHORTLIST COMMON_OPTION_SHORTLIST "ufp:"
 
-#define COMMON_DAEMON_OPTION_CASES                                \
-  case 'f':                                                       \
-    daemonize = false;                                            \
-    log_syslog = false;                                           \
-    break;                                                        \
-  case 'p':                                                       \
-    pidfile = optarg;                                             \
-    break;                                                        \
-  case 'u':                                                       \
-    unsafe = true;                                                \
-    break;                                                        \
+#define COMMON_DAEMON_OPTION_CASES                                           \
+  case 'f':                                                                  \
+    daemonize = false;                                                       \
+    log_syslog = false;                                                      \
+    break;                                                                   \
+  case 'p':                                                                  \
+    pidfile = optarg;                                                        \
+    break;                                                                   \
+  case 'u':                                                                  \
+    unsafe = true;                                                           \
+    break;                                                                   \
   COMMON_OPTION_CASES
 
-#define COMMON_DAEMON_OPTION_PARAMS                               \
-    bool unsafe = false;                                          \
-    const char *pidfile = NULL;                                   \
+#define COMMON_DAEMON_OPTION_PARAMS                                          \
+    bool unsafe = false;                                                     \
+    const char *pidfile = NULL;                                              \
     bool daemonize = true;
 
-#define COMMON_DAEMON_OPTION_HELP                                 \
-    "    -p|--pid-file <pidfile>       file to write our pid to\n"\
+#define COMMON_DAEMON_OPTION_HELP                                            \
+    "    -p|--pid-file <pidfile>       file to write our pid to\n"           \
     "    -u|--unsafe                   unsafe mode (don't drop privileges)\n"\
-    "    -f|--foreground               stay in foreground\n"      \
+    "    -f|--foreground               stay in foreground\n"                 \
     COMMON_OPTION_HELP
 #endif
 

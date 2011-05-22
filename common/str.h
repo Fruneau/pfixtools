@@ -74,7 +74,8 @@
  * Convert ascii digits into its integer value in base 36.
  * Non convertible values are converted to 255.
  *
- * Translating a digit \c c into its numerical value in base \c x is just doing:
+ * Translating a digit \c c into its numerical value in base \c x is just
+ * doing:
  * \code
  *   return !(c & ~127) && __m_strdigits[c] < x ? __m_strdigits[c] : -1;
  * \endcode
@@ -88,7 +89,8 @@ extern unsigned char const __m_strdigits[128];
  */
 extern signed char const __m_b64digits[128];
 
-/** \brief Convert ints from 0&ndash;64 into the corresponding base64 digit. */
+/** \brief Convert ints from 0&ndash;64 into the corresponding base64 digit.
+ */
 extern char const __m_b64chars[64];
 /** \brief Convert ints from 0&ndash;36 into a base36 lowercase digit. */
 extern char const __m_b36chars_lower[36];

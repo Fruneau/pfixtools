@@ -96,7 +96,8 @@ module_exit(dns_exit);
 static void dns_callback(void *arg, int err, struct ub_result *result)
 {
     dns_context_t *context = arg;
-    if (err != 0 || (result->rcode != DNS_RCODE_NOERROR && result->rcode != DNS_RCODE_NXDOMAIN)) {
+    if (err != 0 || (result->rcode != DNS_RCODE_NOERROR
+                     && result->rcode != DNS_RCODE_NXDOMAIN)) {
         debug("asynchronous request led to an error");
         *context->result = DNS_ERROR;
     } else if (result->nxdomain) {
@@ -125,7 +126,8 @@ static int dns_handler(client_t *event, void *config)
     return 0;
 }
 
-bool dns_resolve(const char *hostname, dns_rrtype_t type, ub_callback_t callback, void *data)
+bool dns_resolve(const char *hostname, dns_rrtype_t type,
+                 ub_callback_t callback, void *data)
 {
     if (_G.ctx == NULL) {
         _G.ctx = ub_ctx_create();
@@ -134,13 +136,15 @@ bool dns_resolve(const char *hostname, dns_rrtype_t type, ub_callback_t callback
             ub_ctx_resolvconf(_G.ctx, _G.use_local_config);
         }
         ub_ctx_async(_G.ctx, true);
-        if ((_G.async_event = client_register(ub_fd(_G.ctx), dns_handler, NULL)) == NULL) {
+        if ((_G.async_event = client_register(ub_fd(_G.ctx),
+                                              dns_handler, NULL)) == NULL) {
             crit("cannot register asynchronous DNS event handler");
             abort();
         }
     }
     debug("running dns resolution on %s (type: %d)", hostname, type);
-    return (ub_resolve_async(_G.ctx, (char*)hostname, type, DNS_RRC_IN, data, callback, NULL) == 0);
+    return (ub_resolve_async(_G.ctx, (char*)hostname, type, DNS_RRC_IN,
+                             data, callback, NULL) == 0);
 }
 
 bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
@@ -167,7 +171,8 @@ bool dns_rbl_check(const char *rbl, uint32_t ip, dns_result_t *result,
     int len;
 
     len = snprintf(host, 257, "%d.%d.%d.%d.%s.",
-                   ip & 0xff, (ip >> 8) & 0xff, (ip >> 16) & 0xff, (ip >> 24) & 0xff,
+                   ip & 0xff, (ip >> 8) & 0xff,
+                   (ip >> 16) & 0xff, (ip >> 24) & 0xff,
                    rbl);
     if (len >= (int)sizeof(host))
         return DNS_ERROR;
@@ -176,8 +181,9 @@ bool dns_rbl_check(const char *rbl, uint32_t ip, dns_result_t *result,
     return dns_check(host, DNS_RRT_A, result, callback, data);
 }
 
-bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result,
-                    dns_result_callback_f callback, void *data)
+bool dns_rhbl_check(const char *rhbl, const char *hostname,
+                    dns_result_t *result, dns_result_callback_f callback,
+                    void *data)
 {
     char host[257];
     int len;
@@ -190,7 +196,8 @@ bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result
     return dns_check(host, DNS_RRT_A, result, callback, data);
 }
 
-void dns_use_local_conf(const char* resolv) {
+void dns_use_local_conf(const char* resolv)
+{
     p_delete(&_G.use_local_config);
     _G.use_local_config = m_strdup(resolv);
 }

@@ -44,55 +44,55 @@
 #include "mem.h"
 #include <sys/mman.h>
 
-#define PRIV_ARRAY(Type)                                                       \
-    struct {                                                                   \
-        Type    *data;                                                         \
-        uint32_t len;                                                          \
-        uint32_t size;                                                         \
-        unsigned locked : 1;                                                   \
+#define PRIV_ARRAY(Type)                                                     \
+    struct {                                                                 \
+        Type    *data;                                                       \
+        uint32_t len;                                                        \
+        uint32_t size;                                                       \
+        unsigned locked : 1;                                                 \
     }
 
 /** Declare type PA(Type).
  */
-#define PARRAY(Type)                                                           \
-    typedef PRIV_ARRAY(Type*) PA(Type);                                        \
-    static inline PA(Type) *PA_NEW(Type)(void)                                 \
-    {                                                                          \
-        return p_new(PA(Type), 1);                                             \
-    }                                                                          \
-                                                                               \
-    static inline void PA_DELETE(Type)(PA(Type) **array)             \
-    {                                                                          \
-        if (*array) {                                                          \
-            if ((*array)->locked) {                                            \
-                array_unlock(**array);                                         \
-            }                                                                  \
-            array_wipe(**array);                                               \
-            p_delete(array);                                                   \
-        }                                                                      \
+#define PARRAY(Type)                                                         \
+    typedef PRIV_ARRAY(Type*) PA(Type);                                      \
+    static inline PA(Type) *PA_NEW(Type)(void)                               \
+    {                                                                        \
+        return p_new(PA(Type), 1);                                           \
+    }                                                                        \
+                                                                             \
+    static inline void PA_DELETE(Type)(PA(Type) **array)                     \
+    {                                                                        \
+        if (*array) {                                                        \
+            if ((*array)->locked) {                                          \
+                array_unlock(**array);                                       \
+            }                                                                \
+            array_wipe(**array);                                             \
+            p_delete(array);                                                 \
+        }                                                                    \
     }
 
 /** Declare types A(Type) and PA(Type).
  */
-#define ARRAY(Type)                                                            \
-    typedef PRIV_ARRAY(Type) A(Type);                                          \
-                                                                               \
-    static inline A(Type) *A_NEW(Type)(void)                                   \
-    {                                                                          \
-        return p_new(A(Type), 1);                                              \
-    }                                                                          \
-                                                                               \
-    static inline void A_DELETE(Type)(A(Type) **array)                         \
-    {                                                                          \
-        if (*array) {                                                          \
-            if ((*array)->locked) {                                            \
-                array_unlock(**array);                                         \
-            }                                                                  \
-            array_wipe(**array);                                               \
-            p_delete(array);                                                   \
-        }                                                                      \
-    }                                                                          \
-                                                                               \
+#define ARRAY(Type)                                                          \
+    typedef PRIV_ARRAY(Type) A(Type);                                        \
+                                                                             \
+    static inline A(Type) *A_NEW(Type)(void)                                 \
+    {                                                                        \
+        return p_new(A(Type), 1);                                            \
+    }                                                                        \
+                                                                             \
+    static inline void A_DELETE(Type)(A(Type) **array)                       \
+    {                                                                        \
+        if (*array) {                                                        \
+            if ((*array)->locked) {                                          \
+                array_unlock(**array);                                       \
+            }                                                                \
+            array_wipe(**array);                                             \
+            p_delete(array);                                                 \
+        }                                                                    \
+    }                                                                        \
+                                                                             \
     PARRAY(Type)
 
 /** Type A(Type) is a dynamic array of elements of type @c Type.
@@ -113,15 +113,15 @@
 
 #define array_can_edit(array) (!(array).locked)
 
-#define array_ensure_can_edit(array)                                           \
+#define array_ensure_can_edit(array)                                         \
     assert(array_can_edit(array) && "Trying to edit array while it is locked")
 
-#define array_wipe(array)                                                      \
-    do {                                                                       \
-        array_ensure_can_edit(array);                                          \
-        p_delete(&(array).data);                                               \
-        (array).len  = 0;                                                      \
-        (array).size = 0;                                                      \
+#define array_wipe(array)                                                    \
+    do {                                                                     \
+        array_ensure_can_edit(array);                                        \
+        p_delete(&(array).data);                                             \
+        (array).len  = 0;                                                    \
+        (array).size = 0;                                                    \
     } while (0)
 
 
@@ -150,73 +150,73 @@
 
 /** Ensure the capacity of the array if *at least* @c goal *elements*.
  */
-#define array_ensure_capacity(array, goal)                                     \
-    do {                                                                       \
-        array_ensure_can_edit(array);                                          \
-        if ((array).size < (goal)) {                                           \
-            const typeof((array).size) required_size = (goal);                 \
-            typeof((array).size) next_size = (array).size;                     \
-            do {                                                               \
-                next_size = p_alloc_nr(next_size);                             \
-            } while (next_size < required_size);                               \
-            p_allocgrow(&(array).data, next_size, &(array).size);              \
-        }                                                                      \
+#define array_ensure_capacity(array, goal)                                   \
+    do {                                                                     \
+        array_ensure_can_edit(array);                                        \
+        if ((array).size < (goal)) {                                         \
+            const typeof((array).size) required_size = (goal);               \
+            typeof((array).size) next_size = (array).size;                   \
+            do {                                                             \
+                next_size = p_alloc_nr(next_size);                           \
+            } while (next_size < required_size);                             \
+            p_allocgrow(&(array).data, next_size, &(array).size);            \
+        }                                                                    \
     } while (0)
 
 /** Ensure the array contains place for *at least* @c delta more elements.
  */
-#define array_ensure_capacity_delta(array, delta)                              \
+#define array_ensure_capacity_delta(array, delta)                            \
     array_ensure_capacity(array, (array).len + (delta))
 
 /** Ensure the array can contain @c goal elements.
  */
-#define array_ensure_exact_capacity(array, goal)                               \
-    if ((array).size < (goal)) {                                               \
-        array_ensure_can_edit(array);                                          \
-        p_allocgrow(&(array).data, (goal), &(array).size);                     \
+#define array_ensure_exact_capacity(array, goal)                             \
+    if ((array).size < (goal)) {                                             \
+        array_ensure_can_edit(array);                                        \
+        p_allocgrow(&(array).data, (goal), &(array).size);                   \
     }
 
 /** Shrink capacity of the array to MAX(len, @c cap).
  */
-#define array_shrink(array, cap)                                               \
-    do {                                                                       \
-        array_ensure_can_edit(array);                                          \
-        if ((cap) < (array).size && (array).size != (array).len) {             \
-            p_shrink(&(array).data, MAX((array).len, (cap)), &(array).size);   \
-        }                                                                      \
+#define array_shrink(array, cap)                                             \
+    do {                                                                     \
+        array_ensure_can_edit(array);                                        \
+        if ((cap) < (array).size && (array).size != (array).len) {           \
+            p_shrink(&(array).data, MAX((array).len, (cap)), &(array).size); \
+        }                                                                    \
     } while (0)
 
 /** Ensure the capacity of the array does not exceed its len.
  */
 #define array_adjust(array) array_shrink(array, 0)
 
-#define array_lock(array)                                                      \
-    ((array).locked                                                            \
-     || (mlock((array).data, array_byte_len(array)) == 0                       \
+#define array_lock(array)                                                    \
+    ((array).locked                                                          \
+     || (mlock((array).data, array_byte_len(array)) == 0                     \
          && ((array).locked = true)))
 
-#define array_unlock(array)                                                    \
-    if ((array).locked) {                                                      \
-        (void)munlock((array).data, (size_t)array_byte_len(array));            \
-        (array).locked = false;                                                \
+#define array_unlock(array)                                                  \
+    if ((array).locked) {                                                    \
+        (void)munlock((array).data, (size_t)array_byte_len(array));          \
+        (array).locked = false;                                              \
     }
 
 
 /******* ADDING ELEMENTS *******/
 
-#define array_add(array, obj)                                                  \
-    do {                                                                       \
-        array_ensure_capacity_delta(array, 1);                                 \
-        (array).data[(array).len++] = (obj);                                   \
+#define array_add(array, obj)                                                \
+    do {                                                                     \
+        array_ensure_capacity_delta(array, 1);                               \
+        (array).data[(array).len++] = (obj);                                 \
     } while (0)
 
-#define array_append(array, objs, Len)                                         \
-    do {                                                                       \
-        const typeof((array).len) __len = (Len);                               \
-        array_ensure_capacity_delta(array, __len);                             \
-        memcpy((array).data + (array).len, objs,                               \
-               __len * sizeof(*(array).data));                                 \
-        (array).len += __len;                                                  \
+#define array_append(array, objs, Len)                                       \
+    do {                                                                     \
+        const typeof((array).len) __len = (Len);                             \
+        array_ensure_capacity_delta(array, __len);                           \
+        memcpy((array).data + (array).len, objs,                             \
+               __len * sizeof(*(array).data));                               \
+        (array).len += __len;                                                \
     } while (0)
 
 
@@ -256,8 +256,9 @@
  * </code>
  */
 
-#define foreach(var, array)                                                    \
-    for (typeof(*(array).data) *var = (array).data; var < array_end(array); var++)
+#define foreach(var, array)                                                  \
+    for (typeof(*(array).data) *var = array_start(array);                    \
+         var < array_end(array); var++)
 
 /** Execute @c action for each element of the array.
  *
@@ -269,17 +270,17 @@
  * array_foreach(array, do_something);
  * </code>
  */
-#define array_foreach(array, action)                                           \
-    for (uint32_t __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                    \
-        action(array_ptr(array, __Ai));                                        \
+#define array_foreach(array, action)                                         \
+    for (uint32_t __Ai = 0 ; __Ai < (array).len ; ++__Ai) {                  \
+        action(array_ptr(array, __Ai));                                      \
     }
 
 /** Wipe each element of the array using @c wipe, then wipe the array.
  */
-#define array_deep_wipe(array, wipe)                                           \
-    do {                                                                       \
-        array_foreach(array, wipe);                                            \
-        array_wipe(array);                                                     \
+#define array_deep_wipe(array, wipe)                                         \
+    do {                                                                     \
+        array_foreach(array, wipe);                                          \
+        array_wipe(array);                                                   \
     } while (0)
 
 

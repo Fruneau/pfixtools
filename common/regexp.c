@@ -93,7 +93,8 @@ bool regexp_compile_str(regexp_t *re, const clstr_t *str, bool cs)
 
 bool regexp_match_str(const regexp_t *re, const clstr_t *str)
 {
-    return 0 == pcre_exec(re->re, re->extra, str->str, str->len, 0, 0, NULL, 0);
+    return 0 == pcre_exec(re->re, re->extra, str->str, str->len,
+                          0, 0, NULL, 0);
 }
 
 bool regexp_match(const regexp_t *re, const char *str)
@@ -102,16 +103,18 @@ bool regexp_match(const regexp_t *re, const char *str)
     return regexp_match_str(re, &s);
 }
 
-/** Returns true if the character has a special meaning in regexp when non escaped.
+/** Returns true if the character has a special meaning in regexp when
+ * non escaped.
  */
 static inline bool is_wildcard(const char c) {
     return c == '.' || c == '$' || c == '^'
         || c == '?' || c == '+' || c == '*' || c == '|'
-        || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
+        || c == '(' || c == ')' || c == '[' || c == ']'
+        || c == '{' || c == '}';
 }
 
-/** Returns true if the character affects the previous character behaviour in a regexp
- * when non escaped.
+/** Returns true if the character affects the previous character behaviour
+ * in a regexp when non escaped.
  */
 static inline bool is_modifier(const char c) {
     return c == '?' || c == '+' || c == '*' || c == '{';
@@ -226,7 +229,9 @@ bool regexp_parse_str(const clstr_t *str, buffer_t *prefix,
                 ++bs;
             }
             if ((bs & 1) == 1) {
-                /* The termination $ is escaped, it is not a termination, so, no suffix */
+                /* The termination $ is escaped, it is not a termination,
+                 * so, no suffix
+                 */
                 return true;
             }
             bs = 0;
@@ -279,7 +284,9 @@ bool regexp_parse_str(const clstr_t *str, buffer_t *prefix,
     return true;
 }
 
-bool regexp_parse(const char *str, buffer_t *prefix, buffer_t *re, buffer_t *suffix, bool *cs) {
+bool regexp_parse(const char *str, buffer_t *prefix, buffer_t *re,
+                  buffer_t *suffix, bool *cs)
+{
     clstr_t s = { str, m_strlen(str) };
     return regexp_parse_str(&s, prefix, re, suffix, cs);
 }

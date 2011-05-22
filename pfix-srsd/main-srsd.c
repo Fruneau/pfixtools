@@ -166,7 +166,8 @@ static int process_srs(client_t *srsd, void* vconfig)
             }
             err = srs_reverse(config->srs, buf, ssizeof(buf), p);
         } else {
-            err = srs_forward(config->srs, buf, ssizeof(buf), p, config->domain);
+            err = srs_forward(config->srs, buf, ssizeof(buf), p,
+                              config->domain);
         }
 
         if (err == SRS_SUCCESS) {
@@ -302,7 +303,9 @@ int main(int argc, char *argv[])
         { NULL, 0, NULL, 0 }
     };
 
-    for (int c = 0; (c = getopt_long(argc, argv, COMMON_DAEMON_OPTION_SHORTLIST "Ie:d:s:", longopts, NULL)) >= 0;) {
+    for (int c = 0; (c = getopt_long(argc, argv,
+                                     COMMON_DAEMON_OPTION_SHORTLIST "Ie:d:s:",
+                                     longopts, NULL)) >= 0;) {
         switch (c) {
           case 'e':
             port_enc = atoi(optarg);
@@ -343,7 +346,8 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     if (_G.config.separator != '\0'
-        && srs_set_separator(_G.config.srs, _G.config.separator) == SRS_ESEPARATORINVALID) {
+        && srs_set_separator(_G.config.srs, _G.config.separator)
+            == SRS_ESEPARATORINVALID) {
         return EXIT_FAILURE;
     }
     if (common_setup(pidfile, unsafe, RUNAS_USER, RUNAS_GROUP,
