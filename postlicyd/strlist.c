@@ -165,7 +165,7 @@ static bool strlist_create(strlist_local_t *local,
     if (res == NULL) {
         res = p_new(strlist_resource_t, 1);
         resource_set("strlist", file, res,
-                     (resource_destructor_t)strlist_resource_wipe);
+                     (resource_destructor_f)strlist_resource_wipe);
     } else if (res->trie2 != NULL) {
         err("%s not loaded: the file is already used as a rbldns zone file",
             file);
@@ -288,7 +288,7 @@ static bool strlist_create_from_rhbl(strlist_local_t *hosts,
     if (res == NULL) {
         res = p_new(strlist_resource_t, 1);
         resource_set("strlist", file, res,
-                     (resource_destructor_t)strlist_resource_wipe);
+                     (resource_destructor_f)strlist_resource_wipe);
     }
 
     p_clear(hosts, 1);

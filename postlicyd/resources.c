@@ -45,7 +45,7 @@ typedef struct resource_t {
     char *key;
     void *data;
     int  refcount;
-    resource_destructor_t destructor;
+    resource_destructor_f destructor;
 } resource_t;
 ARRAY(resource_t);
 
@@ -101,7 +101,7 @@ void *resource_get(const char *ns, const char *key)
 }
 
 bool resource_set(const char *ns, const char *key, void *data,
-                  resource_destructor_t destructor) {
+                  resource_destructor_f destructor) {
     RESOURCE_KEY;
     resource_t *entry = resource_find(rskey, true);
     if (entry->data != NULL) {

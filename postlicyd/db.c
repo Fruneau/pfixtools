@@ -100,7 +100,7 @@ static TCBDB** db_resource_acquire(const db_t *db)
     if (res == NULL) {
         res = p_new(db_resource_t, 1);
         resource_set(db->ns, db->filename, res,
-                     (resource_destructor_t)db_resource_wipe);
+                     (resource_destructor_f)db_resource_wipe);
     }
 
     /* Open the database and check if cleanup is needed

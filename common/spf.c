@@ -98,7 +98,7 @@ struct spf_t {
     uint8_t mech_withdns;
 
     uint8_t queries;
-    spf_result_t exit;
+    spf_result_f exit;
     void* data;
 };
 
@@ -554,7 +554,8 @@ static spf_expansion_t spf_expand(spf_t *spf, const char* restrict macrostring)
     }
 }
 
-static bool spf_subquery(spf_t *restrict spf, const char* restrict domain, spf_result_t cb, bool no_explanation)
+static bool spf_subquery(spf_t *restrict spf, const char* restrict domain,
+                         spf_result_f cb, bool no_explanation)
 {
     if (spf->recursions >= SPF_MAX_RECUSION) {
         return false;
@@ -672,7 +673,8 @@ static void spf_next(spf_t *spf, bool start)
                   default:
                     break;
                 }
-                if (!spf_subquery(spf, array_start(spf->domainspec), spf_redirect_exit, false)) {
+                if (!spf_subquery(spf, array_start(spf->domainspec),
+                                  spf_redirect_exit, false)) {
                     warn("spf: maximum recursion depth exceeded, error");
                     spf_exit(spf, SPF_PERMERROR);
                 }
@@ -1609,7 +1611,7 @@ static void spf_line_callback(void *arg, int err, struct ub_result* result)
 
 
 spf_t *spf_check(const char *ip, const char *domain, const char *sender, const char* helo,
-                 spf_result_t resultcb, bool no_spf_lookup, bool no_explanation, void *data,
+                 spf_result_f resultcb, bool no_spf_lookup, bool no_explanation, void *data,
                  spf_code_t *code)
 {
     info("spf: new SPF lookup of (%s, %s, %s)", ip, domain, sender);

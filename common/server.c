@@ -56,14 +56,14 @@ struct client_t {
     buffer_t ibuf;
     buffer_t obuf;
 
-    run_client_t run;
-    delete_client_t clear_data;
+    run_client_f run;
+    delete_client_f clear_data;
     void* data;
 };
 
 struct timeout_t {
     struct ev_timer timer;
-    run_timeout_t run;
+    run_timeout_f run;
     void* data;
 };
 
@@ -73,10 +73,10 @@ static struct {
     PA(timeout_t)   timeout_pool;
 
     struct ev_loop *loop;
-    start_client_t  client_start;
-    delete_client_t client_delete;
-    run_client_t    client_run;
-    refresh_t       config_refresh;
+    start_client_f  client_start;
+    delete_client_f client_delete;
+    run_client_f    client_run;
+    refresh_f       config_refresh;
     void           *config;
 } server_g;
 #define _G  server_g
@@ -226,7 +226,7 @@ static void client_cb(EV_P_ struct ev_io *w, int events)
     }
 }
 
-client_t *client_register(int fd, run_client_t runner, void *data)
+client_t *client_register(int fd, run_client_f runner, void *data)
 {
     if (fd < 0) {
         return NULL;
@@ -343,8 +343,8 @@ static void timeout_release(timeout_t *timer)
 
 static void timeout_cb(EV_P_ struct ev_timer *w, int revents)
 {
-    timeout_t *timer = (timeout_t*)w;
-    run_timeout_t run = timer->run;
+    timeout_t *timer = (timeout_t *)w;
+    run_timeout_f run = timer->run;
     void* data = timer->data;
     timeout_release(timer);
 
@@ -353,7 +353,7 @@ static void timeout_cb(EV_P_ struct ev_timer *w, int revents)
     }
 }
 
-timeout_t *start_timer(int milliseconds, run_timeout_t runner, void *data)
+timeout_t *start_timer(int milliseconds, run_timeout_f runner, void *data)
 {
     timeout_t *timer = NULL;
     float timeout = ((float)milliseconds) / 1000.;
@@ -417,8 +417,8 @@ static void exit_cb(EV_P_ struct ev_signal *w, int event)
     ev_unloop(EV_A_ EVUNLOOP_ALL);
 }
 
-int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, refresh_t refresh, void* config)
+int server_loop(start_client_f starter, delete_client_f deleter,
+                run_client_f runner, refresh_f refresh, void *config)
 {
     struct ev_signal ev_sighup;
     struct ev_signal ev_sigint;

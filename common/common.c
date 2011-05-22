@@ -287,11 +287,11 @@ int common_setup(const char* pidfilename, bool unsafe, const char* runas_user,
 
 #include "array.h"
 
-ARRAY(exitcall_t)
+ARRAY(exitcall_f)
 
-static A(exitcall_t) __exit = ARRAY_INIT;
+static A(exitcall_f) __exit = ARRAY_INIT;
 
-void common_register_exit(exitcall_t exitcall)
+void common_register_exit(exitcall_f exitcall)
 {
     array_add(__exit, exitcall);
 }

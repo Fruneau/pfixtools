@@ -49,17 +49,17 @@ PARRAY(client_t)
 PARRAY(timeout_t);
 PARRAY(listener_t)
 
-typedef void *(*start_listener_t)(void);
-typedef void  (*delete_client_t)(void*);
-typedef void *(*start_client_t)(listener_t*);
-typedef int   (*run_client_t)(client_t*, void*);
-typedef void  (*run_timeout_t)(void*);
-typedef bool	(*refresh_t)(void*);
+typedef void *(*start_listener_f)(void);
+typedef void  (*delete_client_f)(void*);
+typedef void *(*start_client_f)(listener_t*);
+typedef int   (*run_client_f)(client_t*, void*);
+typedef void  (*run_timeout_f)(void*);
+typedef bool  (*refresh_f)(void*);
 
 
 listener_t *start_listener(int port);
 
-client_t *client_register(int fd, run_client_t runner, void *data);
+client_t *client_register(int fd, run_client_f runner, void *data);
 void client_delete(client_t **client);
 void client_release(client_t *client);
 
@@ -72,12 +72,12 @@ buffer_t *client_input_buffer(client_t *client);
 buffer_t *client_output_buffer(client_t *client);
 void *client_data(client_t *client);
 
-timeout_t *start_timer(int milliseconds, run_timeout_t runner, void *data);
+timeout_t *start_timer(int milliseconds, run_timeout_f runner, void *data);
 void timer_cancel(timeout_t *timer);
 
 
-int server_loop(start_client_t starter, delete_client_t deleter,
-                run_client_t runner, refresh_t refresh, void *config);
+int server_loop(start_client_f starter, delete_client_f deleter,
+                run_client_f runner, refresh_f refresh, void *config);
 
 #endif
 

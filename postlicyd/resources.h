@@ -42,14 +42,14 @@
 
 #include "common.h"
 
-typedef void (*resource_destructor_t)(void *);
+typedef void (*resource_destructor_f)(void *);
 
 __attribute__((nonnull(2)))
 void *resource_get(const char *ns, const char *key);
 
 __attribute__((nonnull(2,3)))
 bool resource_set(const char *ns, const char *key, void *data,
-                  resource_destructor_t destructor);
+                  resource_destructor_f destructor);
 
 __attribute__((nonnull(1)))
 void resource_release(const char *ns, const char *key);

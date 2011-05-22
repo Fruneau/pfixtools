@@ -87,7 +87,7 @@ typedef enum {
 } dns_rcode_t;
 
 
-typedef void (*dns_result_callback_t)(dns_result_t *result, void *data);
+typedef void (*dns_result_callback_f)(dns_result_t *result, void *data);
 
 /** Run a DNS resolution for the given host with the given host and RRT
  */
@@ -99,19 +99,20 @@ bool dns_resolve(const char *hostname, dns_rrtype_t type,
  */
 __attribute__((nonnull(1,4)))
 bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
-               dns_result_callback_t callback, void *data);
+               dns_result_callback_f callback, void *data);
 
 /** Check the presence of the given IP in the given rbl.
  */
 __attribute__((nonnull(1,3)))
 bool dns_rbl_check(const char *rbl, uint32_t ip, dns_result_t *result,
-                  dns_result_callback_t callback, void *data);
+                  dns_result_callback_f callback, void *data);
 
 /** Check the presence of the given hostname in the given rhbl.
  */
 __attribute__((nonnull(1,2,3)))
-bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result,
-                   dns_result_callback_t callback, void *data);
+bool dns_rhbl_check(const char *rhbl, const char *hostname,
+                    dns_result_t *result, dns_result_callback_f callback,
+                    void *data);
 
 /** Use local DNS configuration (/etc/resolv.conf, /etc/hosts).
  */

@@ -45,7 +45,7 @@
 
 typedef struct dns_context_t {
     dns_result_t *result;
-    dns_result_callback_t call;
+    dns_result_callback_f call;
     void *data;
 } dns_context_t;
 ARRAY(dns_context_t);
@@ -144,7 +144,7 @@ bool dns_resolve(const char *hostname, dns_rrtype_t type, ub_callback_t callback
 }
 
 bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
-               dns_result_callback_t callback, void *data)
+               dns_result_callback_f callback, void *data)
 {
     dns_context_t *context = dns_context_acquire();
     context->result = result;
@@ -161,7 +161,7 @@ bool dns_check(const char *hostname, dns_rrtype_t type, dns_result_t *result,
 }
 
 bool dns_rbl_check(const char *rbl, uint32_t ip, dns_result_t *result,
-                   dns_result_callback_t callback, void *data)
+                   dns_result_callback_f callback, void *data)
 {
     char host[257];
     int len;
@@ -177,7 +177,7 @@ bool dns_rbl_check(const char *rbl, uint32_t ip, dns_result_t *result,
 }
 
 bool dns_rhbl_check(const char *rhbl, const char *hostname, dns_result_t *result,
-                    dns_result_callback_t callback, void *data)
+                    dns_result_callback_f callback, void *data)
 {
     char host[257];
     int len;

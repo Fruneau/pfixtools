@@ -66,10 +66,10 @@
 #define __tostr(x)  #x
 #define STR(x)      __tostr(x)
 
-typedef int  (*initcall_t)(void);
-typedef void (*exitcall_t)(void);
+typedef int  (*initcall_f)(void);
+typedef void (*exitcall_f)(void);
 
-void common_register_exit(exitcall_t exitcall);
+void common_register_exit(exitcall_f exitcall);
 void common_init(void);
 
 #define module_init(fn)                                                        \

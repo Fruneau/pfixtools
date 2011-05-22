@@ -154,7 +154,7 @@ rbldb_t *rbldb_create(const char *file, bool lock)
     if (res == NULL) {
         res = p_new(rbldb_resource_t, 1);
         resource_set("iplist", file, res,
-                     (resource_destructor_t)rbldb_resource_wipe);
+                     (resource_destructor_f)rbldb_resource_wipe);
     }
 
     db = p_new(rbldb_t, 1);
