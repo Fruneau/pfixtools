@@ -68,9 +68,8 @@ struct rate_entry_t {
 
 static rate_config_t *rate_config_new(void)
 {
-    const rate_config_t init = RATE_CONFIG_INIT;
     rate_config_t *rc = p_new(rate_config_t, 1);
-    *rc = init;
+    *rc = (rate_config_t)RATE_CONFIG_INIT;
     return rc;
 }
 
@@ -97,9 +96,9 @@ static bool rate_db_need_cleanup(time_t last_cleanup, time_t now, void *data)
 
 static bool rate_db_check_entry(const void *entry, size_t entry_len, time_t now, void *data)
 {
+    const size_t len = offsetof(struct rate_entry_t, entries);
     rate_config_t *config = data;
     const struct rate_entry_t *rate = entry;
-    static size_t len = (const char*)&rate->entries[0] - (const char*)rate;
     if (entry_len < len) {
         return false;
     }
@@ -188,12 +187,12 @@ static filter_result_t rate_filter(const filter_t *filter,
                                    const query_t *query,
                                    filter_context_t *context)
 {
+    static size_t entry_header_len = offsetof(struct rate_entry_t, entries);
     char key[BUFSIZ];
     const rate_config_t *config = filter->data;
     time_t now = time(NULL);
     size_t key_len, entry_len;
     struct rate_entry_t entry;
-    static size_t entry_header_len = (const char*)&entry.entries[0] - (const char*)&entry;
     p_clear(&entry, 1);
 
     key_len = query_format(key, sizeof(key), config->key_format, query);
