@@ -23,22 +23,22 @@ isyes() {
 }
 
 d_start() {
-    log_daemon_msg "Starting pidxtools"
+    log_daemon_msg "Starting pfixtools"
     if isyes "$SRSD_ENABLE" && test -x /usr/sbin/pfix-srsd; then
         start_daemon -p /var/run/pfixtools/srsd.pid \
             /usr/sbin/pfix-srsd $SRSD_OPTIONS       \
                 -p /var/run/pfixtools/srsd.pid      \
                 "$SRSD_DOMAIN" "$SRSD_SECRETS"
-        log_progress_msg "pidx-srsd"
+        log_progress_msg "pfix-srsd"
     fi
     log_end_msg 0
 }
 
 d_stop() {
-    log_daemon_msg "Stopping pidxtools"
+    log_daemon_msg "Stopping pfixtools"
     if isyes "$SRSD_ENABLE"; then
         killproc -p /var/run/pfixtools/srsd.pid pfix-srsd
-        log_progress_msg "pidx-srsd"
+        log_progress_msg "pfix-srsd"
     fi
     log_end_msg 0
 }
