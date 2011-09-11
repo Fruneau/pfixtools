@@ -43,11 +43,16 @@ file_stats() {
 
 # Rsync a rbl file
 getfile() {
-    url="$1"
-    out="$2"
+    out="$1"
+    url="$2"
+    proxy="$3"
 
     mtime_before=$(file_stats "$out")
-    rsync --no-motd -q -t -T "$tmp" "$url" "$out" || return 1
+    if [ -z "$proxy" ]; then
+        rsync --no-motd -q -t -T "$tmp" "$url" "$out" || return 1
+    else
+        RSYNC_CONNECT_PROG="$proxy" rsync --no-motd -q -t -T "$tmp" "$url" "$out" || return 1
+    fi
     mtime_after=$(file_stats "$out")
 
     # The file has changed
@@ -76,11 +81,28 @@ init
 
 cd "$spool" || die "Can't cd to $spool"
 
-for line in $(grep -v "^#" "$conf" | grep '=') ; do
-    url=${line/*=/}
-    out=${line/=*/}
-    getfile $url $out || echo "error downloading file $out from $url"
-done
+while read line ; do
+    # Strip comment from lines
+    line=${line%%\#*}
+    if [ -z "$line" ]; then
+        continue ;
+    fi
+    # Sample line:
+    # cbl.abuseat.org=rsync://rsync.cbl.abuseat.org/cbl/list.txt[ssh -l sync -i /home/sync/.ssh/id_cbl_rsync host nc %H 873]
+    # Split line before and after first = sign
+    out=${line%%=*}
+    rest=${line#*=}
+    # Url is the second field
+    url=${rest%%[*}
+    # Then look for proxy in the third field
+    if [ -n "${rest/$url/}" ]; then
+        proxy=${rest#*\[}
+        proxy=${proxy%%\]*} # Take what's inside [] and kill the rest
+    else
+        proxy=""
+    fi
+    getfile "$out" "$url" "$proxy" || echo "error downloading file $out from $url"
+done < "$conf"
 
 fini
 exit 0
