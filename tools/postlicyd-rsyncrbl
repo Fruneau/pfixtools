@@ -74,7 +74,7 @@ pidfile="$3"
 
 init
 
-cd "$spool" || die "Can't cd to $spool"
+cd "$spool" || die "Can't cd to $spool"
 
 for line in $(grep -v "^#" "$conf" | grep '=') ; do
     url=${line/*=/}
