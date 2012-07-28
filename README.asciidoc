@@ -13,10 +13,10 @@ The project currently includes two daemons:
 Download
 --------
 
-The sources are availble from the [http://git.mymind.fr/?p=pfixtools.git;a=summary git repository of the project].
+The sources are availble from link:/Fruneau/pfixtools[github].
 
-* https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.8[version 0.8] (October 26th, 2009)
-* latest sources: https://github.com/Fruneau/pfixtools/tarball/master[pfixtools snapshot]
+* link:/Fruneau/pfixtools/tarball/pfixtools-0.8[version 0.8] (October 26th, 2009)
+* latest sources: link:/Fruneau/pfixtools/tarball/master[pfixtools snapshot]
 * from git: `git clone https://github.com/Fruneau/pfixtools.git`
 
 Previous versions (see [browser:ChangeLog]):
