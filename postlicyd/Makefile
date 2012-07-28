@@ -36,7 +36,11 @@
 include ../mk/tc.mk
 
 PROGRAMS  = postlicyd
-DOCS      = postlicyd.8 postlicyd.conf.5
+DOCS      = postlicyd.8 postlicyd.conf.5 postlicyd.conf-strlist.5 \
+			postlicyd.conf-iplist.5  postlicyd.conf-greylist.5 \
+			postlicyd.conf-rate.5    postlicyd.conf-match.5 \
+			postlicyd.conf-counter.5 postlicyd.conf-spf.5 \
+			postlicyd.conf-hang.5    postlicyd.conf-srs.5
 GENERATED = policy_tokens.h policy_tokens.c \
 						filter_tokens.h filter_tokens.c \
 						hook_tokens.h hook_tokens.c \

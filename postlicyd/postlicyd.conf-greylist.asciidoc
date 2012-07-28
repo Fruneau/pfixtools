@@ -1,0 +1,107 @@
+postlicyd.conf-greylist(5)
+========================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-greylist - configuration of the greylist filter of postlicyd
+
+SYNOPSIS
+--------
+The greylister uses a quite common greylist algorithm (mainly inspired from
+ link:http://postgrey.schweikert.ch/[postgrey]). It uses 2 files to store its
+ databases. The first one is for the greylisting database
+ ('path/prefix_greylist.db', the second one is for the autowhitelister
+ ('path/prefix_whitelist.db'), where +path+ and +prefix+ are two parameters of
+ the filter.
+
+PARAMETERS
+----------
+The valid parameters are:
++path = path ;+::
+    Directory where the database is stored. This parameter is mandatory
+
++prefix = string ;+::
+    String prepended to the name of the database files. Default one is empty.
+ You may choose the set a prefix if you want to setup several greylisters.
+
++lookup_by_host = boolean ;+::
+    When performing a lookup, if a the hostname contains the last number of
+ the IP, then the IP is used by the greylister. In the other case, we use the
+ IP used is the IP of a domain that contains this IP. If this flag is set to
+ true, the domain behaviour is disabled, and matching is always performed with
+ the IP of the host. Default value is false.
+
++no_sender = boolean ;+::
+    Greylisting is performed on a tuple (+client_address+, +sender+,
+ +recipient+). If this option is set to true, the tuple only contains the
+ client address (modified as explained in +lookup_by_host+ and the recipient.
+ Default value is false (do include the sender).
+
++no_recipient = boolean ;+::
+    same as +no_sender+ but excludes the +recipient+ from the tuple. Default
+ value is false. You must set this value to true if you want to use a
+ greylister before +MAIL FROM+ is received.
+
++delay = integer ;+::
+    number a tuple is greylisted (this is the number of seconds before a
+ retrial with the same tuple can be accepted. Default value is 300 (5 minutes).
+
++retry_window = integer ;+::
+    number of seconds we wait for a retry. If a retrial happen after the
+ +retry_window+ expired, the client is greylisted (again). Default value is
+ 172800 (2 days).
+
++client_awl = integer ;+::
+    number of times a client must pass the greylister before being whitelisted.
+ Default value is 5.
+
++max_age = integer ;+::
+    maximum age of an entry in the database. Too old entries are automatically
+ deleted. Default value is 108000 (30 hours).
+
++cleanup_period = integer ;+::
+    minimum number of seconds between 2 cleanups of the database. The cleanup
+ of the database is very important since it removes useless entries and do a
+ compaction of the database. This makes lookups faster and reduces the memory
+ consumption of the greylister.
+
++normalize_sender = boolean ;+::
+    by default, the greylister do not use the +sender+ address as is: it runs
+ a normalizer on it to remove username extension (in +username+ext@example.com+,
+ the normalizer produces +username@example.com+) and factorize number
+ (+toto1736849@example.com+ is normalized to +toto#@example.com+). You can
+ choose to disable this behaviour using this parameter. As a consequence, the
+ greylister might be more aggressive. +
+  this parameter has been introduced in +postlicyd+ 0.8.
+
+RESULTS
+-------
+The filter can returns the following values:
+
+* if the client is whitelisted, returns +whitelist+
+* if the client is greylisted, returns +greylist+
+
+EXAMPLE
+-------
+----
+# Perform greylisting
+greylist {
+  type   = greylist;
+
+  # configuration
+  path   = /var/spool/postlicyd/;
+  prefix = greylist_;
+
+  # hooks
+  on_greylist  = postfix:DEFER_IF_PERMIT optional text;
+  on_whitelist = postfix:OK;
+}
+----
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

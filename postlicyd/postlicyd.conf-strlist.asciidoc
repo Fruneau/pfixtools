@@ -1,0 +1,109 @@
+postlicyd.conf-strlist(5)
+========================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-strlist - configuration of the strlist filter of postlicyd
+
+SYNOPSIS
+--------
+The behaviour of +strlist+ filter is very close to +iplist+. The main
+ difference is that +strlist+ performs lookup on emails or domain name. As
+ for +iplist+, +strlist+ support both DNS lookup to RHBL and lookup in
+ text/plain files. The static list of strings can have 2 formats. The first
+ one is the rbldns zone file format. The second one is a list of strings, one
+ per line. In this second case, line starting with a # are ignored. A line can
+ be either a string or a regexp. A regexp is identified by the fact it is
+ delimited by slashes. Regexps must be anchored (either left (+^+) if prefix
+ match is activated, or right (+$+) if suffix match is activated):
+
+This short example shows a list of strings designed to match the suffix of a
+ domain name:
+----
+# This is a list of strings
+.mydomain.org
+.yourdomain.org
+
+# This is a regexp match, to match suffix, we anchor the regexp on the right
+/\.(.*)domain\.org$/
+----
+
+PARAMETERS
+----------
++strlist+ supports the following parameters:
+
++file = (no)?lock:order:weight:filename ;+::
+   This parameter is the same as the +file+ parameter of
+ linkgit:postlicyd.conf-iplist[5]. So, I'll only explain the +order+ parameter.
+ The order describes the kind of matching to use. The matching can be done
+ either from the beginning of the string (prefix) or from its end (suffix), it
+ can match the whole string or only a part. Valid values for +order+ are:
++prefix+:::
+    the whole string is in the file (matching done from the start of the
+ string). If the file contains a regexp, it must be anchored on the left (+^+).
++partial-prefix+:::
+    a prefix of the string is in the file. If the file contains a regexp, it
+ must be anchored on the left (+^+)
++suffix+:::
+    the whole string is in the file (matching done from the end of the
+ string). If the file contains a regexp, it must be anchored on the right (+$+).
++partial-suffix+:::
+    a suffix of the string is in the file. If the file contains a regexp, it
+ must be anchored on the right ($)
+
++rbldns = (no)?lock:weight:filename ;+::
+  This build a list of strings from a rbldns zone file. This support both
+ suffix (+*.domain+) formats and fully qualified domains.
+
++dns = weight:hostname ;+::
+    Use the given RHBL with the given +weight+.
+
++soft_threshold = score ;+::
+   Minimum score that triggers a +soft_match+ result. The score is an integer,
+ default value is 1.
+
++hard_threshold = score ;+::
+   Minimum score that triggers a +hard_match+ result. The score is an integer,
+ default value is 1.
+
++fields = field(,field)* ;+::
+   List the fields of the query that are matched against the lists. You can
+ match 2 kinds of fields (you cannot match fields of more than one of these
+ types in a filter, no space allowed in this parameter):
+
+** hostnames: +helo_name+, +client_name+, +reverse_client_name+,
+ +sender_domain+ and +recipient_domain+
+** emails: +sender+ and +recipient+
+
+RESULTS
+-------
+
+See linkgit:postlicyd.conf-iplist[5]
+
+EXAMPLE
+-------
+----
+{{{
+# Whitelist some clients
+client_whitelist {
+  type  = strlist;
+
+  # configuration
+  file    = lock:1:suffix:/var/spool/postlicyd/client_whitelist;
+  rbldns  = lock:1:/va/spool/postlicyd/abuse.rfc-ignorant.org;
+  fields  = client_name,sender_domain,helo_name;
+
+  # hooks
+  on_hard_match = postfix:OK;
+  on_fail       = spamhaus_and_abuseat;
+}
+}}}
+----
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

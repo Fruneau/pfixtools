@@ -1,0 +1,50 @@
+postlicyd.conf-hang(5)
+========================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-hang - configuration of the hang filter of postlicyd
+
+SYNOPSIS
+--------
+The +hang+ filter is a very simple filter. It wait until a specified amout of
+ millisecond ellapsed. Since postfix waits for a reply of postlicyd before
+ answering the SMTP client, this can be used to simulate a hang in postfix.
+ Hang on connection has been reported to discourage some spambot with very
+ short read timeouts.
+
+This filter type has been introduced in +postlicyd+ 0.7.
+
+PARAMETERS
+----------
+Its parameters are:
+
++timeout_ms = integer ;+::
+    Number of milliseconds the filter will hang.
+
+RESULTS
+-------
+It has only one possible exit: +timeout+, so, you must provide a +on_timeout+
+ hook.
+
+EXAMPLE
+-------
+----
+hang {
+  type = hang;
+
+  # Wait 1.5 seconds before giving an answer
+  timeout_ms = 1500;
+
+  #
+  on_timeout = postfix:DUNNO;
+}
+----
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

@@ -1,5 +1,7 @@
 postlicyd.conf(5)
 =================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
 
 NAME
 ----
@@ -8,47 +10,318 @@ postlicyd.conf - the postlicyd configuration file format.
 
 SYNOPSIS
 --------
-postlicyd.conf
+linkgit:postlicyd[8] configuration file describes the automaton that
+ +postlicyd+ evaluates each time it receives a query from postfix.
+ The automaton is a list of independent filters, each filter has a name, a
+ type, some specific configuration, and some exit points. The configuration
+ file also contains some global configuration variables.
+
+This page tries to give a comprehensive description of what can be done with
+ 'postlicyd.conf'.
+
+FORMAT DESCRIPTION
+------------------
+In this page, when describing the format of the file, I'll often use the
+ following terms:
+
++name_token+::
+    A name token is a string that only contains alphanumerical characters and
+ underscores and that stats with a letter.
+----
+name_token := [[:alpha:]][[:alnum:]_]*
+----
+
++value_token+::
+    A value token is either a C-like string (between double quotes) or a _raw_
+ string (without quotes) that starts at the first non-blank character and ends
+ at the last non-blank character before reaching a semi-colon +";"+
+----
+value_token := cstring | rawstring
+cstring := "([^[:blank:]\"]|\n|\r|\\|\" )*"
+rawstring := ([^[:blank:];][^;]*[^[:blank:];]|[^[:blank:];])
+----
+
++parameter+::
+    A lot of elements of the configuration file are in the form:
+----
+parameter := name_token = value_token ;
+----
+
++query_format_string+::
+    A query format is a +value_token+ that contains named placeholders in the
+ form +$\{name_token}+. The name token must identify a field of the query, as
+ described in next section. When a query format is interpreted, the
+ placeholders are replaced with the value of the field for the current query.
+
+When a blank character is found while not in a +value_token+, it is ignored.
+ When a +#+ is found while not in a +value_token+, the rest of the line is
+ interpreted like a blank character.
 
 
-DESCRIPTION
------------
+QUERIES
+-------
+A query is a list of identifiers sent by postfix to postlicyd that give
+ information on the current SMTP transaction. The list of valid identifiers is
+ listed on http://www.postfix.org/SMTPD_POLICY_README.html#protocol[postfix
+ website]. To this list, postlicyd adds shortcuts to get the domain part of
+ the sender address (+sender_domain+) and the domain part of the
+ recipient address (+recipient_domain+).
 
-TODO
++postlicyd+ 0.8 introduces two new parameters: +normalized_client+ that is
+ either the IP of the client (+client_addresss+) if the +client_name+ looks
+ like it belongs to a pool of dialup or the +client_address+/24 (in IPv4),
+ and +normalized_sender+ that contains the +sender+ email after removal of
+ the +VERP+ extension (+username+machin+ => +username+) and replacement of the
+ trailing digits from the username by a +#+. This two extra-parameters were
+ previously available only in the greylister.
+
+The query contains an +instance+ name that identify the SMTP transaction.
+ +postlicyd+ uses this instance to build a context: as long as on the same
+ connection, the queries sent to +postlicyd+ use the same +instance+ name, the
+ context is preserved. In simpler language: as long as in the same SMTP
+ transaction, +postlicyd+ keeps a context between queries. This can be used
+ to perform actions when +DATA+ is received based on informations from +RCPT+.
+ This is illustrated in the 'postlicyd(8)' page.
+
+The context of a query contains 64 counters (identified by their index from 0
+ to 63). When the context is created, the counters are all set to 0. The
+ counters can only handle unsigned integers. As described in the following
+ sections, counters can be updated by post-actions and interpreted by filters
+ of type +counter+.
 
 
-FILE FORMAT
------------
+FILTERS
+-------
 
-Entry points
+A filter describes a node of the automaton. A filter is a function that takes
+ the query and its context as input and gives a reply. A filter will modify
+ neither the query nor the context, but you can choose to modify the context
+ as a postaction of a filter.
+
+Syntax
+~~~~~~
+
+The syntax of a filter looks like:
+----
+filter_name {
+  type = filter_type;
+
+  parameters
+
+  hooks
+}
+----
+
++filter_name+::
+    The filter name is a +name_token+. It must be globally uniq (a name cannot
+ be shared between several filters). It is used to identify the filter.
+
++filter_type+::
+    The filter is one of the supported type that will be described in this
+ document.
+
++parameters+::
+  The parameters are a set (potentially empty) of +parameter+ tokens. This
+ parameters describe the configuration variables of the filter. This document
+ contains a detailed description of configuration variables available for each
+ filter type.
+
++hooks+:
+    The hooks are a set of +parameter+ token with special names. The name of
+ the parameter starts with +on_+ followed by the name of reply while the value
+ of the parameter describes an action. Let's give an example. Suppose a filter
+ that can reply +match+, then I must define a hook called +on_match+ with the
+ action to be executed when the filter replies +match+. A filter must contain
+ a hook for all reachable reply. The format of the action is described in the
+ following parameter.
+
+Post actions
 ~~~~~~~~~~~~
-TODO
+
+A post-action is the action executed when a filter gives it reply. An action
+ can be divided in two independent parts:
+
+* alter context
+* what to do next?
+
+The syntax is:
+----
+action := (alter_context)next
+----
+
+The context alteration is a suite of actions to perform. Currently, it can be
+ one of the following actions:
+----
+alter_context := (post_action:)*
+post_action := (counter|warn)
+----
+
+* +counter = counter:id:amount+: update the counter with +id+ by adding the
+ given +amount+
+* +warn = warn:message+: log a warning. The message must be a +query_format+
+ string without any colon (+:+)
+
++next+ describes the next node of the automaton. This can be either another
+ filter or an exit node. To identify another filter, just use its name:
+----
+# When filter replies "match" execute "other_filter_name" as following node of the automaton
+on_match = other_filter_name;
+----
+
++next+ can also be describes an exit: we give a reply to postfix:
+----
+# When filter replies "match" reply to postfix
+on_match = postfix:DUNNO;
+
+# When filter replies "fail" reply 550 to postfix and add a description
+on_fail = postfix:550 Sorry but you not allowed to send mail with ${sender_domain};
+----
+
+The format to give an answer to postfix is:
+----
+next := postfix:code( explanation)?
+----
+
++code+::
+    Code is a policy answer. Valid answers are listed in
+ linkgit:access[5,http://www.postfix.org/access.5.html] of postfix.
+
++explanation+::
+  The explanation is optional (depending on the code, as described in the
+ linkgit:access[5,http://www.postfix.org/access.5.html] man page). It is a
+ +query_format_string+.
 
 
-Filters
-~~~~~~~
-TODO
+Here are a few examples of valid hooks:
+----
+# If filter replies "whitelist", go to the filter named "whitelist".
+on_whitelist = whitelist;
+
+# If filter replies "match", replies "REJECT" with explanation "Blacklisted" to postfix.
+on_match = postfix:REJECT Blacklisted;
+
+# If filter replies "fail", replies "450" with explanation containing the domain of the MAIL FROM smtp command.
+on_fail  = postfix:450 Greylisted, see http://www.example.org/${sender_domain}.html;
+
+# if filter replies "error", increments counter 0 and reply "DUNNO" to postfix.
+on_error = counter:0:1:postfix:DUNNO;
+
+# if filter replies "match", add 10 to the 63th counter and go to filter named whitelist.
+on_match = counter:63:10:whitelist;
+
+# if filter replies "greylist", log the IP
+on_greylist = warn:The IP ${client_address} is greylisted:postfix:DUNNO;
+----
+
+Filter types
+~~~~~~~~~~~~
+
++iplist+ (linkgit:postlicyd.conf-iplist[5])::
+    Matching against a RBL or a static list of IPs
++strlist+ (linkgit:postlicyd.conf-strlist[5])::
+    Matching against a RHBL or a static list of strings.
++greylist+ (linkgit:postlicyd.conf-greylist[5])::
+    Greylister.
++rate+ (linkgit:postlicyd.conf-rate[5])::
+    Rate control.
++match+ (linkgit:postlicyd.conf-match[5])::
+    Simple boolean expressions evaluation.
++counter+ (linkgit:postlicyd.conf-counter[5])::
+    Querying the counters inside the context of the query.
++spf+ (linkgit:postlicyd.conf-spf[5])::
+    Sender Policy Framework.
++hang+ (linkgit:postlicyd.conf-hang[5])::
+    Wait a few milliseconds.
++srs+ (linkgit:postlicyd.conf->srs[5])::
+    Check SRS validity of the recipient address.
+
+GLOBAL CONFIGURATION
+--------------------
+
+Entry Points
+~~~~~~~~~~~~
+An automaton must have (at least) one entry point. In +postlicyd+, you can
+ specify the entry point for several automaton since, you may define an
+ automaton per state of the SMTP transation. The syntax is very simple
+ +parameter+:
+----
+state = filter_name;
+----
+
++state+ is one of the following:
+
++client_filter+::
+    entry point when +postlicyd+ is called at connection time (from postfix'
+ +smtpd_client_restrictions+), once per connection
++helo_filter+::
+    entry point when +postlicyd+ is called on +HELO+/+EHLO+ command (from
+ postfix' +smtpd_helo_restrictions+), once per transaction
++sender_filter+::
+    entry point when +postlicyd+ is called on +MAIL FROM+ command (from
+ postfix' +smtpd_sender_restrictions+), once per transaction
++recipient_filter+::
+    entry point when +postlicyd+ is called on +RCPT TO+ command (from postfix'
+ +smtpd_recipient_restrictions+), once per recipient
++data_filter+::
+    entry point when +postlicyd+ is called on +DATA+ command (from postfix'
+ +smtpd_data_restrictions+), once per transaction
++end_of_data_filter+::
+    entry point when +postlicyd+ is called at the end of data transfer (from
+ postfix' +stmpd_end_of_data_restrictions+), once per transaction
++etrn_filter+::
+    entry point when +postlicyd+ is called on +ETRN+ command (from postfix'
+ +smtpd_etrn_restrictions+)
++verify_filter+::
+    entry point when +postlicyd+ is called on +VRFY+ command.
+
+The value of these parameters is the name of a filter.
+
+NOTE: if +smtpd_delay_reject+ is set to +yes+ in default postfix configuration.
+ You must set it to +no+ to use +client_filter+, +helo_filter+ or
+ +sender_filter+.
 
 
+Misc. Options
+~~~~~~~~~~~~~
 
-SEE ALSO
---------
++port = integer ;+::
+    Port the which +postlicyd+ is bound. The default value is 10000. If the
+ port is also specified as a command line parameter, then the value specified
+ on command line overides this parameter. +
+You must restart [wiki:postlicyd] to change the port (reload does not affect the port).
 
-The builtin postlicyd modules are documented in the following manpages:
++log_format = query_format_string ;+::
+  Format of the log printed in syslog in default log level. In default log
+ level, postlicyd prints one line per query in syslog, this parameter let you
+ chose the format of this line. The value of this parameter is a
+ +query_format_string+. +
+ Default value of this parameter may change from one version of +postlicyd+ to
+ another. Since +postlicyd+ 0.6, the default value is:
+----
+request client=${client_name}[${client_address}] from=<${sender}> to=<${recipient}> at ${protocol_state}
+----
 
-* IP Lists in linkgit:postlicyd-iplist[5];
++use_resolv_path = path ;+::
+    If you want DNS lookup to be reforwarded to a resolver, you can specify a
+ 'resolv.conf' like file. This is optionnally and not recommended since
+ postlicyd lookup are mostly useless for other users and so, this will polute
+ the cache of your resolver and increase its latency. The default value is not
+ to use a 'resolv.conf' file. +
+You must restart +postlicyd+ to change this parameter. +
+This parameter is available as of +postlicyd+ 0.7.
 
-* String Lists in linkgit:postlicyd-strlist[5];
-
-* Greylisting in linkgit:postlicyd-greylist[5];
-
-* Matching plugins in linkgit:postlicyd-match[5];
-
-* Counting plugin in linkgit:postlicyd-counter[5].
-
++include_explanation = boolean ;+::
+  In addition to their answers, the filters can produce an explanation in the
+ form of a short text. By default, this text is ignored by +postlicyd+ but you
+ can choose to append this explanation in the answer sent back to postfix.
+ Only the explanation of the last filter (the one which triggers the
+ +postfix:+ answer) is taken into account, and if no explanation is produced,
+ nothing is appended to you answer. This parameter can be useful when using
+ the +spf+ filter since +SPF+ natively supports explanations. +
+This parameter has been introduced in +postlicyd+ 0.8.
 
 COPYRIGHT
 ---------
-Copyright 2009 the Postfix Tools Suite Authors. License BSD.
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
 
 // vim:filetype=asciidoc:tw=78

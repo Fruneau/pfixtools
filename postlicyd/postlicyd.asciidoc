@@ -1,10 +1,12 @@
 postlicyd(8)
 ============
+:doctype: manpage
+include:../mk/asciidoc.conf[]
 
 NAME
 ----
 
-`postlicyd` - A postfix versatile Policy Daemon from the Postfix Tools Suite
+postlicyd - A postfix versatile Policy Daemon from the Postfix Tools Suite
 
 
 SYNOPSIS
@@ -16,8 +18,77 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-TODO
++postlicyd+ is a very flexible policy daemon for postfix. It can be used as a
+ replacement for tools like whitelister and postgrey. It is able to access
+ R(H)BL databases by DNS or by directly reading rbldns zone files.
 
+Features
+~~~~~~~~
+
+configuration tree::
+    The configuration of postlicyd is a tree of filters. You choose what
+ action to run after each filter depending on its result. The actions can be
+ either running another filter or sending an
+ link:http://www.postfix.org/access.5.html[answer to postfix]
+ (+OK+, +DUNNO+, +REJECT+, +HOLD+, ...).
+several entry points::
+    a single +postlicyd+ daemon bound to a single tcp port can handle the
+ requests from multiple restriction levels (+RCPT+ time, +DATA+ time, +HELO+
+ time, ...). Each restriction level is associated to an entry point in the
+ configuration tree.
+session tracking::
+    Filters are not limited to the current SMTP command, they can be used to
+ make a decision that depends on an email session: thanks to this tracking,
+ you can reject a mail at DATA-time because there were too many errors at
+ RCPT-time.
+greylisting::
+    Because it is written in C instead of perl, and because it uses
+ tokyocabinet instead of BerkeleyDB, the greylisting of postlicyd is very fast
+ and can process many thousand of requests per second. The database cleanup is
+ also faster (20 times faster for 1,000,000 of triplets) and the database
+ storage is more compact.
+r(h)bl::
+    +postlicyd+ can perform r(h)bl lookups using DNS (with the efficient DNS
+ resolution and caching of unbound), or by directly loading rbl data from a
+ rbldns zone file. Local lookup is highly encouraged since it dramatically
+ reduces the lookup latency. postlicyd uses very efficient and compact
+ ram-based lookup structures for the lookups allowing several millions of
+ lookups per second in RBL zones, and several hundred of thousands of lookups
+ per second in RHBL zones.
+spf::
+    +postlicyd+ supports +SPF+ (Sender Policy Framework). This is a DNS based
+ authentication mechanism for emails. Even if SPF is slow (it may perform up
+ to 30 DNS lookup per query), it is a powerful solution to limit phishing.
+rate control::
+    +postlicyd+ can apply policy depending on the emission rate of a server, a
+ network, an recipient address...
+custom matching::
+    the lookup structures used for the lookup in rhbl zone files can also be
+ used to build filters against a custom set of data: matching the sender or
+ the recipient address against a list of emails, whitelisting (or
+ blacklisting) a list of hostnames... You can also give condition on the
+ fields of the link:http://www.postfix.org/SMTPD_POLICY_README.html#protocol[policy query]:
+ match "stress" against "yes" to change the behaviour of postlicyd when
+ postfix is in link:http://www.postfix.org/STRESS_README.html["stress" mode],
+ match "client" against "unknown" to apply a specific filter when the client
+ has no reverse DNS...
+
+Resources
+~~~~~~~~~
+
++postlicyd+ is designed for speed and efficiency. The program itself has a
+ very small memory footprint, but because it keeps its lookup structures in
+ RAM, the memory consumption depends on the configuration. Follows a
+ description of memory consumption of the filters:
+
+*Memory usage:
+** IP lookup tables: +1MB \+ (2 * nb of IP)+
+** String lookup tables: from 80% to 150% of the size of the file.
+** Greylist: \~100MB for 1,000,000 of entries.
+*Performances of the lookup tables on a Celeron 1.2GHz:
+** IP lookup table: 23,800,000 lookups per second
+** String lookup tables: 1,600,000 lookups per second (depends on the depth of the search).
+** Greylisting: performances of tokyocabinet (depends on the number of entries).
 
 OPTIONS
 -------
@@ -46,6 +117,259 @@ the `conf` argument shall be a path to a valid linkgit:postlicyd.conf[5] file.
 -u::
     Work in unsafe mode: don't drop privileges when running as root.
 
+
+CONFIGURATION
+-------------
+
+The sources include an example configuration 'example/postlicyd.conf' that
+ describes all the available options. You can read the page linkgit:postlicyd.conf[5]
+ for description of postlicyd.conf format and a comprehensive list of
+ configuration options.
+
+This section describes a small list of configuration for +postlicyd+, giving a
+ preview of some of its capabilities.
+
+Simple greylister
+~~~~~~~~~~~~~~~~~
+
+This example describe the configuration of postlicyd and postfix to run a
+ simple greylister.
+
+'/etc/pfixtools/postlicyd.conf':
+-----
+# Description of the greylister
+greylist {              # name of the filter
+  type = greylist;      # type of the filter
+
+  # where to store the database
+  path   = /var/spool/pfixtools;
+  prefix = greylist_;
+  # Use default limits and timeouts
+
+  # The greylist filters can reply either greylist or whitelist
+  # Answer is greylist: send a temporary error.
+  on_greylist  = postfix:450 Greylisted;
+  # Answer is whitelist: run following restrictions of postfix
+  on_whitelist = postfix:DUNNO;
+}
+
+# Run the filter named "greylist" on recipient_restriction
+recipient_filter = greylist;
+
+# Port of the daemon
+port             = 10000;
+----
+
+'/etc/postfix/main.cf':
+----
+smtpd_recipient_restrictions =
+  permit_mynetworks
+  reject_unauth_destination
+  check_policy_service inet:127.0.0.1:10000
+  permit
+----
+
+The following figure shows the behaviour. There's nothing complicated in this
+ configuration, so the figure is quite useless, but it will make more sense
+ for the following examples.
+
+image::images/simple-greylist.png["Graphic view of the configuration",width=400px]
+
+Selective greylister
+~~~~~~~~~~~~~~~~~~~~
+
+This second example shows how you can build a selective greylister with~
++postlicyd+. This configuration whitelist clients with a reverse DNS that are
+ not listed in R(H)BL. Other clients go through the greylister.
+
+
+'/etc/pfixtools/postlicyd.conf':
+----
+# Filter client without reverse DNS.
+unknown_clients {
+  type = match;
+
+  condition = client_name =i unknown; # The client name is the string 'unknown'
+
+  # The condition matched, greylist the client
+  on_match = greylist;
+  # The condition didn't match, lookup for the client in r(h)bl
+  on_fail  = rbl;
+}
+
+# Lookup in RBLs
+rbl {
+  type = iplist;
+
+  # We have a local copy of the rbldns zone file of cbl.abuseat.org
+  # So use this copy.
+  rbldns = nolock:1:/var/spool/pfixtools/cbl.abuseat.org;
+
+  # dul.dnsbl.sorbs.net. does not provide a rsync service, so use dns
+  dns = 1:dul.dnsbl.sorbs.net;
+
+  # One of the filter matched, the client is listed in a rbl, go to greylist
+  on_hard_match = greylist;
+
+  # Nothing matched, try rhbl
+  on_fail = rhbl;
+}
+
+# Lookup in RHBLs
+rhbl {
+  type = strlist;
+
+  # Search if the domain of the sender is listed
+  fields = sender_domain;
+
+  # We have rsynced the zone files of rfc-ignorant... use them directly
+  rbldns = nolock:1:/var/spool/pfixtools/bogusmx.rfc-ignorant.org;
+  rbldns = nolock:1:/var/spool/pfixtools/dsn.rfc-ignorant.org;
+
+  # The sender domain is listed
+  on_hard_match = greylist;
+
+  # It didn't matched? whitelist the client
+  on_fail = postfix:DUNNO;
+}
+
+# Greylister
+greylist {
+  type = greylist;
+
+  # where to store the database
+  path   = /var/spool/pfixtools;
+  prefix = greylist_;
+  # Use default limits and timeouts
+
+  # The greylist filters can reply either greylist or whitelist
+  # Answer is greylist: send a temporary error.
+  on_greylist  = postfix:450 Greylisted;
+  # Answer is whitelist: run following restrictions of postfix
+  on_whitelist = postfix:DUNNO;
+}
+
+# Entry point is the head of the tree.
+recipient_filter = unknown_clients;
+port = 10000;
+----
+
+'/etc/postfix/main.cf':
+----
+smtpd_recipient_restrictions =
+  permit_mynetworks
+  reject_unauth_destination
+  check_policy_service inet:127.0.0.1:10000
+  permit
+----
+
++postlicyd+ comes with a tool that helps downloading rbl zone files. This
+ tools requires a very simple configuration file that describes the sources of
+ rbldns zone files.
+
+'/etc/pfixtools/postlicyd-rsyncrbl.conf':
+----
+# RBL list
+cbl.abuseat.org=rsync://rsync.cbl.abuseat.org/cbl/list.txt
+
+# RHBL list
+bogusmx.rfc-ignorant.org=rsync://ns0.rfc-ignorant.org/rfcirbl/bogusmx.rfc-ignorant.org
+dsn.rfc-ignorant.org=rsync://ns0.rfc-ignorant.org/rfcirbl/dsn.rfc-ignorant.org
+----
+
+crontab entry:
+----
+15 */12 * * * root /usr/local/bin/postlicyd-rsyncrbl /etc/pfixtools/postlicyd-rsyncrbl.conf \
+             /var/spool/pfixtools/ /var/run/postlicyd.pid
+----
+
+And the graph for those who don't wan't to understand the configuration file:
+
+image::images/selective-greylist.png["Graphic view of the configuration",width=400px]
+
+Data time greylister
+~~~~~~~~~~~~~~~~~~~~
+
+This third example, shows how to use session tracking to build a cleverer
+ greylister that can reject a mail at data time if one of the recipient is
+ greylisted.
+
+'/etc/pfixtools/postlicyd.conf':
+----
+# Description of the greylister
+greylist {              # name of the filter
+  type = greylist;      # type of the filter
+
+  # where to store the database
+  path   = /var/spool/pfixtools;
+  prefix = greylist_;
+  # Use default limits and timeouts
+
+  # The greylist filters can reply either greylist or whitelist
+  # Answer is greylist: increment the counter 0 and send a temporary error.
+  on_greylist  = counter:0:1postfix:450 Greylisted;
+  # Answer is whitelist: run following restrictions of postfix
+  on_whitelist = postfix:DUNNO;
+}
+
+# Check the state of the counter at data-time
+post_greylist {
+  type = counter;
+
+  # Use the counter 0, the one we incremented in the greylist filter
+  counter = 0;
+
+  # The counter was not 0? Greylist
+  on_hard_match = postfix:450 Greylisted;
+
+  # The counter was 0, ignore
+  on_fail = postfix:DUNNO;
+}
+
+# Run the filter named "greylist" on recipient_restriction
+recipient_filter = greylist;
+# Run the filter named "post_greylist" on data_restriction
+data_filter = post_greylist;
+
+# Port of the daemon
+port             = 10000;
+----
+
+'/etc/postfix/main.cf':
+----
+smtpd_recipient_restrictions =
+  permit_mynetworks
+  reject_unauth_destination
+  check_policy_service inet:127.0.0.1:10000
+  permit
+
+smtpd_data_restrictions =
+  check_policy_service inet:127.0.0.1:10000
+----
+
+image::images/datatime-greylist.png["Graphic view of the configuration",width=400px]
+
+The following SMTP transaction shows the effect of this configuration: the
+ mail is rejected at DATA-time because one of the recipient has been rejected.
+
+----
+220 mx.example.net ESMTP
+HELO sender.example.net
+250 mx.example.net
+MAIL FROM: <sender@example.net>
+250 2.1.0 Ok
+RCPT TO: <not-greylisted@example.net>
+250 2.1.5 Ok
+RCPT TO: <greylisted@example.net>
+450 4.7.1 <greylisted@example.net>: Recipient address rejected: Greylisted
+DATA
+450 4.7.1 <DATA>: Data command rejected: Greylisted
+----
+
+This example aims at giving a preview of the use of mail-session counters. The
+ same behaviour could be achieved by returning 421 to postfix when greylisting
+ a recipient since this return code causes the connection to be closed by
+ postfix.
 
 COPYRIGHT
 ---------

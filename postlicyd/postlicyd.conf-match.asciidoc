@@ -1,0 +1,71 @@
+postlicyd.conf-match(5)
+========================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-match - configuration of the match filter of postlicyd
+
+SYNOPSIS
+--------
+The match filter defines a list of conditions to be matched against the fields
+ of the query.
+
+PARAMETERS
+----------
++match_all = boolean ;+::
+    if true, the filter matches only if all the conditions match.
+
++condition = field_name OP value ;+::
+    defines a condition for the given field of the query. For operators that
+ supports values, the value is either a +query_format_string+ or a regexp
+ (between slashes with a i modifier for case-insensitive matches). Valid
+ operators are:
+
+** +EQUALS+ or +==+: +field_name+ is strictly equal to value
+** +EQUALS_i+ or +=i+: +field_name+ is case insensitively equal to value
+** +DIFFERS+ or +!=+: +field_name+ is not equal to value
+** +DIFFERS_i+ or +!i+: +field_name+ is not case insensitively equal to value
+** +CONTAINS+ or +>=+: +field_name+ contains value
+** +CONTAINS_i+ or +>i+: +field_name+ contains case insensitively value
+** +CONTAINED+ or +<=+: +field_name+ is contained by value
+** +CONTAINED_i+ or +<i+: +field_name+ is contained case insensitively by value
+** +EMPTY+ or +#=+: +field_name+ is empty or not set
+** +NOTEMPTY+ or +#i+: +field_name+ is not empty
+** +MATCH+ or +=~+: +field_name+ matches the following regexp
+** +DONTMATCH+ or +!~+: +field_name+ does not match the following regexp
+
+RESULTS
+-------
+Possible return values are:
+
+* +match+ if +match_all+ is false and at least one condition matched
+* +match+ if +match_all+ is true and all the conditions matched
+* else +fail+
+
+EXAMPLE
+-------
+----
+# match one of the condition: "stress mode activated",
+# "client_name contains debian.org" or "recipient is empty" 
+match {
+  type = match;
+
+  # configuration
+  match_all = false;
+  condition = stress == yes;
+  condition = client_name >= debian.org;
+  condition = recipient #=;
+
+  # hook
+  on_match = postfix:OK;
+  on_fail = counter:0:1:greylist;
+}
+----
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

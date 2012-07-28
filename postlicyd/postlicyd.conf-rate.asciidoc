@@ -1,0 +1,107 @@
+postlicyd.conf-rate(5)
+========================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-rate - configuration of the rate filter of postlicyd
+
+SYNOPSIS
+--------
+This filter defines a rate control process. This filter uses a circular buffer
+ of at most 128 slots (so, the resolution of this filter is 1 second if the
+ +delay+ is smaller than 128 seconds or delay/128 else). This filter matches
+ if at least +soft_match+ requests occurred during the last +delay+ seconds.
+
+PARAMETERS
+----------
+Valid parameters are:
+
++key = query_format ;+::
+    defines the format of the key. This parameter is mandatory. Some examples
+ of keys are:
+** +$\{client_address}+: control the emission rate of an IP address.
+** +$\{sender}+: control the emission rate of an email address.
+** +$\{client_address}/$\{sender}+: control the emission rate of a pair (IP, email)
+** ...
+
++delay = integer ;+::
+    number of seconds a hit remains valid.
+
++path = path ;+::
+    Directory where the database is stored. This parameter is mandatory
+
++prefix = string ;+::
+    String prepended to the name of the database files. Default one is empty.
+ You may choose the set a prefix if you want to setup several rate controls.
+ All the entries of a database must have the same +delay+ value, so you can
+ use the same database for several +rate+ filter with the same +delay+ value.
+ However, in most cases, you should prefer to use a database per filter.
+
++soft_threshold = integer ;+::
+    number of hits during the last +delay+ seconds that triggers a +soft_match+.
+ Default value is 1, so, by default, every hit triggers at least a +soft_match+.
+
++hard_threshold = integer ;+::
+    number of hits during the last +delay+ seconds that triggers a
+ +hard_match+. Default value is 1, so, by default, every hit triggers a
+ +hard_match+.
+
++cleanup_period = integer ;+::
+    minimum number of seconds between two database cleanups. The default value
+ is 86400 seconds (one day).
+
+RESULTS
+-------
+This filter can returns the following values (in this order of processing):
+
+* if the number of hits is greater or equals to the hard threshold
+** if the previous number of hits was greater or equals to hard threshold,
+ returns +hard_match+.
+** else, return +hard_match_start+
+* if the number of hits is greater or equals to the soft threshold,
+ returns +soft_match+.
+** if the previous number of hits was greater or equals to soft threshold,
+ returns +soft_match+.
+** else, return +soft_match_start+
+* else, returns +fail+.
+
+The following hook are aliased:
+* if +hard_match_start+ is triggered and +on_hard_match_start+ is not defined,
+ +on_hard_match+ is called
+* if +soft_match_start+ is triggered and +on_soft_match_start+ is not defined,
+ +on_soft_match+ is called
+* if +soft_match+ is triggered and +on_soft_match+ is not defined,
+ +on_hard_match+ is called
+
+This filter is available in +postlicyd+ 0.8 and later.
+
+EXAMPLE
+-------
+----
+# Limit the number of emails sent by an IP to 1000 per hour.
+# If the rate exceed 100 per hour, use filter hang to reduce the emission rate of the IP
+rate {
+  type = rate;
+
+  # configuration
+  path = /var/spool/pfixtools;
+  prefix = hour_;
+  hard_threshold = 1000;
+  soft_threshold = 100;
+  key = ${client_address};
+  delay = 3600;
+
+  # Hooks
+  on_hard_match = warn:IP ${client_address} is sending too many emails:postfix:421 Two many mails from your ip: ${client_address};
+  on_soft_match = warn:IP ${client_address} is sending many emails:hang
+  on_fail = spf;
+}
+----
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

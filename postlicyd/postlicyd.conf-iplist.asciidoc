@@ -1,0 +1,103 @@
+postlicyd.conf-iplist(5)
+========================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-iplist - configuration of the iplist filter of postlicyd
+
+
+SYNOPSIS
+--------
+This filter try to match the +client_address+ with a list of IPs. This list
+can be either a RBL or a static of IPs in a text/plain file or in a rbldns
+zone file. An iplist filter can match the +client_address+ against several
+list at once, with a different weight for each list. It then produce a score
+that is the sum of the weight of all matching lists. Then, this score is
+compared to a soft and a hard threshold.
+
+PARAMETERS
+----------
+
+This filter accept the following parameters:
+
++file = (no)?lock:weight:filename ;+::
+    Use the given file as a static IP list. This file can be either a rbldns
+ zone file or a text/plain file with an IP per line. Lines starting with a +#+
+ are ignored.
++(no)?lock+:::
+    tells linkgit:postlicyd[8] whether or not the list should be locked in memory.
++weight+:::
+    is the weight of this list in the matching process (as previously decribed).
+
++rbldns = (no)?lock:weight:filename ;+::
+   In current version of linkgit:postlicyd[8], this is an alias for +file+.
+ This can be used to make the configuration file clearer when using rbldns
+ zone files.
+
++dns = weight:hostname ;+::
+   Use the given RBL with the given +weight+.
+
++soft_threshold = score ;+::
+   Minimum score that triggers a +soft_match+ result. The score is an integer,
+ default value is 1.
+
++hard_threshold = score ;+::
+   Minimum score that triggers a +hard_match+ result. The score is an integer,
+ default value is 1.
+
+When the processing of this filter starts, all static lists are evaluated
+ first. If the score reaches the +hard_threshold+, processing is interrupted,
+ and the result is returned. If the static lists do not give a result, all the
+ DNS lookup are performed at once, in parallel. When all the DNS lookup
+ terminates, the score is updated and give the result.
+
+RESULTS
+-------
+
+Result is computed as follows (first match wins):
+
+* if the +client_address+ cannot be parsed, the filter returns +error+
+* if no list is available or all the lists returned an error (only DNS lookups
+ can be in error), returns +error+
+* if the score is greater or equal to the +hard_threshold+, returns +hard_match+
+* if the score is greater or equal to the +soft_threshold+, returns +soft_match+
+* else, return +fail+
+
+Starting with +postlicyd+ 0.7, if no hook is defined for some return values,
+ result is automatically forwarded to another hook. In the case of iplist,
+ the following forwarding are defined:
+
+* if +error+ is triggered and no +on_error+ is defined, +on_fail+ is called.
+* if +soft_match+ is triggered and no +on_soft_match+ is defined,
+ +on_hard_match+ is called.
+
+EXAMPLE
+-------
+----
+{{{
+# Lookup in a rbl
+spamhaus_and_abuseat {
+  type   = iplist;
+
+  # configuration
+  file   = lock:10:/var/spool/postlicyd/rbl.spamhaus.org;
+  file   = lock:1:/var/spool/postlicyd/cbl.abuseat.org;
+  soft_threshold = 1;
+  hard_threshold = 11;
+
+  # hooks
+  on_soft_match = greylist;
+  on_hard_match = postfix:REJECT optional text;
+  on_fail       = postfix:OK;
+  on_error      = postfix:DUNNO;
+}
+}}}
+----
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

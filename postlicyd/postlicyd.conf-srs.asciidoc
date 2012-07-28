@@ -1,0 +1,39 @@
+postlicyd.conf-srs(5)
+=====================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-srs - configuration of the SRS filter of postlicyd
+
+SYNOPSIS
+--------
+This +srs+ allow early elimination of invalid +SRS+ emails.
+
+This filter type has been introduced in +postlicyd+ 0.9.
+
+PARAMETERS
+----------
+Its parameters are:
+
++bounce_domain = string ;+::
+    Domain of the bounces.
+
++secret_file = path ;+::
+    File with the SRS secret. This file can the same as the one used by
+linkgit:pfix-srsd[8,../pfix-srsd/pfix-srsd.html].
+
+RESULTS
+-------
+Possible results are:
+
+* +none+: The recipient is not a bounce and the SRS filter cannot be applied to it.
+* +match+: The recipient is a bounce and it's a valid SRS-encoded address.
+* +fail+: The recipient is a bounce but it's not a valid SRS-encoded address.
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

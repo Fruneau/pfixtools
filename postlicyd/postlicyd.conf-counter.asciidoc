@@ -1,0 +1,65 @@
+postlicyd.conf-counter(5)
+========================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-counter - configuration of the counter filter of postlicyd
+
+SYNOPSIS
+--------
+Trig an action depending on the value of a counter. This is a very simple
+ filter.
+
+PARAMETERS
+----------
++counter = id ;+::
+    Set the counter to use (see the query section of this page for a
+ description of the counters).
+
++soft_threshold = integer ;+::
+    minimum value of the counter that triggers a soft match. Default value is 1.
+
++hard_threshold = integer ;+::
+  minimum value of the counter that triggers a hard match. Default value is 1.
+
+RESULTS
+-------
+This filter can returns the following values (in this order of processing):
+
+* if counter value is greater or equals to the hard threshold, returns +hard_match+.
+* if counter value is greater or equals to the soft threshold, returns +soft_match+.
+* else, returns +fail+.
+
+Starting with +postlicyd+ 0.7, if no hook is defined for some return values,
+ result is automatically forwarded to another hook. In the case of +counter+,
+ the following forwarding are defined:
+
+* if +soft_match+ is triggered and no +on_soft_match+ is defined,
+ +on_hard_match+ is called.
+
+EXAMPLE
+-------
+----
+# match if the counter 0 value is greater than 8, or between 5 and 7
+counter {
+  type = counter;
+
+  # configuration
+  counter        = 0;
+  hard_threshold = 8;
+  soft_threshold = 5;
+
+  # hook
+  on_hard_match = postfix:REJECT ${sender_domain};
+  on_soft_match = greylist;
+  on_fail       = counter:1:10:match;
+}
+----
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

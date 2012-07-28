@@ -1,0 +1,78 @@
+postlicyd.conf-spf(5)
+=====================
+:doctype: manpage
+include:../mk/asciidoc.conf[]
+
+NAME
+----
+postlicyd.conf-spf - configuration of the SPF filter of postlicyd
+
+SYNOPSIS
+--------
+The +spf+ filter performs +SPF+ lookup, as described by
+ link:http://www.ietf.org/rfc/rfc4408.txt[RFC4408]. +SPF+ is a mechanism
+ designed to authenticate the sender of an email: the owner of the domain
+ provides a list of IP that can send email from his domain. +SPF+ uses the
+ record of type +TXT+ from the DNS of the domain. It can also use a specific
+ record of type +SPF+ (+RRTYPE 99+). This filter support both of them but its
+ default behaviour is to avoid the query for the +SPF+ record since hardly no
+ domain uses it. +SPF+ is an algorithm quite complicated that can give 7
+ different results.
+
+This filter appears in +postlicyd+ 0.7.
+
+PARAMETERS
+----------
+This filter supports the following parameters:
+
++use_spf_record = boolean ;+::
+    As explained previously, the filter do not perform lookup for the +SPF+
+ record by default. If this option is set to +true+, the lookup is performed
+ in parallel of the lookup for the +TXT+ record. The default value is +false+.
+
++check_helo = boolean ;+::
+    If this parameter is true, the filter will check the +HELO+ identity
+ instead of the +MAIL+ domain.
+
+RESULTS
+-------
+Possible results are:
+
++none+::
+    no record is published or no checkable domain could be determined.
++neutral+::
+    the domain owner has explicitly stated that he cannot or does not want to
+ assert whether the IP address is authorized. The RFC states that this *MUST*
+ be treated exactly like the +none+ result. If +on_neutral+ is not provided
+ and +neutral+ is returned, +on_none+ is called.
++pass+::
+    the client is authorized to inject mail with the given identity. Further
+ policy checks can proceed with confidence in the legitimate use of the identity.
++fail+::
+    this is an explicit statement that the client is not authorized to use the
+ domain in the given identity. You can choose to mark the mail based on this
+ or to reject it outright. The RFC states that if you choose to reject the
+ mail, you _SHOULD_ use an SMTP reply code of 550.
++soft_fail+::
+    the domain believes the host is not authorized but is not willing to make
+ that strong of a statement. This result should be treated as somewhere
+ between +fail+ and +neutral+. If +on_soft_fail+ is not provided,
+ +on_fail+ is called.
++temp_error+::
+    a transient error was encountered while performing the check. You can
+ choose to accept or temporarily reject the message. If +on_temp_error+ is not
+ provided, +on_none+ is called.
++perm_error+::
+    an error condition that requires manual intervention to be resolved has
+ been encountered (e.g.: invalid SPF records, inclusion or redirection). If
+ the domain owner uses macros, this may be result of a checked identity with
+ an unexpected format. If +on_perm_error+ is not provided, +on_none+ is called.
+
+So, you *MUST* at least provide the following hooks: +on_none+, +on_pass+
+ and +on_fail+.
+
+COPYRIGHT
+---------
+Copyright 2009-2012 the Postfix Tools Suite Authors. License BSD.
+
+// vim:filetype=asciidoc:tw=78

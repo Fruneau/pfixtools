@@ -1,10 +1,13 @@
 pfix-srsd(8)
 ============
+:doctype: manpage
+include:../mk/asciidoc.conf[]
 
 NAME
 ----
 
-`pfix-srsd` - Postfix tcp_table(5) srsd lookup service
+pfix-srsd - Postfix linkgit:tcp_table[5,http://www.postfix.org/tcp_table.5.html]
+srsd lookup service
 
 
 SYNOPSIS
@@ -16,7 +19,8 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-pfix-srsd is designed to provide as a Postfix tcp_table(5), a way to rewrite
+pfix-srsd is designed to provide as a Postfix
+linkgit:tcp_table[5,http://www.postfix.org/tcp_table.5.html], a way to rewrite
 addresses using the http://www.libsrs2.org/docs/index.html[SRS] scheme. It
 supports both encoding and decoding of such addresses.
 
@@ -44,18 +48,18 @@ Command line switches
     Show the help
 
 -d <port>::
-    Change the port `pfix-srsd` is listening to for SRS 'decoding' purposes
+    Change the port +pfix-srsd+ is listening to for SRS 'decoding' purposes
     (default is 10002).
 
 -e <port>::
-    Change the port `pfix-srsd` is listening to for SRS 'encoding' purposes
+    Change the port +pfix-srsd+ is listening to for SRS 'encoding' purposes
     (default is 10001).
 
 -f::
-    Do not daemonize `pfix-srsd` on startup.
+    Do not daemonize +pfix-srsd+ on startup.
 
 -p <path>::
-    Path to the pidfile where `pfix-srsd` will maintain its pid. Default is to
+    Path to the pidfile where +pfix-srsd+ will maintain its pid. Default is to
     not use any pidfile.
 
 -u::
