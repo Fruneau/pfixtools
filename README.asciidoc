@@ -7,7 +7,7 @@ particular why all the major Postfix Tools are written in plain C.
 
 This suite contains at the time of the writing, two major tools.
 
-link:/Fruneau/pfixtools/pfix-srsd/pfix-srsd.html[+pfix-srsd+]::
+link:/Fruneau/pfixtools/pfix-srsd/pfix-srsd.asciidoc[+pfix-srsd+]::
     this daemon brings SRS to postfix using its
     linkgit:tcp_table[5,http://www.postfix.org/tcp_table.5.html] mechanism. It
     allows plugging +SRS+ into
@@ -15,7 +15,7 @@ link:/Fruneau/pfixtools/pfix-srsd/pfix-srsd.html[+pfix-srsd+]::
     linkgit:transport[5,http://www.postfix.org/transport.5.html] rewrites
     quite easily.
 
-link:/Fruneau/pfixtools/postlicyd/postlicyd.html[+postlicyd+]::
+link:/Fruneau/pfixtools/postlicyd/postlicyd.asciidoc[+postlicyd+]::
     this is a postfix policy daemon. It includes greylisting, rbl lookups,
     counters, SMTP session tracking, in a way that allow very fine grained
     schemes. It's for example quite easy to reject a mail just at the
@@ -23,7 +23,7 @@ link:/Fruneau/pfixtools/postlicyd/postlicyd.html[+postlicyd+]::
     or even the `MAIL FROM` commands.
 +
 Its configuration file is described in
-link:postlicyd/postlicyd.conf.html[postlicyd.conf].
+link:/Fruneau/pfixtools/postlicyd/postlicyd.conf.asciidoc[postlicyd.conf].
 
 Download
 --------
