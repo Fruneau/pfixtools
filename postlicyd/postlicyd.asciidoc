@@ -81,11 +81,11 @@ Resources
  RAM, the memory consumption depends on the configuration. Follows a
  description of memory consumption of the filters:
 
-*Memory usage:
-** IP lookup tables: +1MB \+ (2 * nb of IP)+
+* Memory usage:
+** IP lookup tables: 1MB + (2 * nb of IP)
 ** String lookup tables: from 80% to 150% of the size of the file.
-** Greylist: \~100MB for 1,000,000 of entries.
-*Performances of the lookup tables on a Celeron 1.2GHz:
+** Greylist: ~100MB for 1,000,000 of entries.
+* Performances of the lookup tables on a Celeron 1.2GHz:
 ** IP lookup table: 23,800,000 lookups per second
 ** String lookup tables: 1,600,000 lookups per second (depends on the depth of the search).
 ** Greylisting: performances of tokyocabinet (depends on the number of entries).

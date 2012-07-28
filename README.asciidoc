@@ -1,14 +1,29 @@
 pfixtools
 =========
 
-The pfixtools project is a collection of postfix-related tools. The pfixtools are written in C.
+pfixtools is a suite of tools aiming at complementing postfix, to make it even
+more customizable, while keeping really high performance levels. This is in
+particular why all the major Postfix Tools are written in plain C.
 
-The project currently includes two daemons:
+This suite contains at the time of the writing, two major tools.
 
-`pfix-srsd`::
-    pfix-srsd is a tcptable lookup service for postfix which performs SRS encoding and decoding.
-`postlicyd`::
-    postlicyd is a very flexible policy daemon for postfix. It can be used as a replacement for tools like whitelister and postgrey. It is able to access R(H)BL databases by DNS or by directly reading rbldns zone files. It also supports SPF and provides rate control policies.
+link:pfix-srsd/pfix-srsd.html[+pfix-srsd+]::
+    this daemon brings SRS to postfix using its
+    linkgit:tcp_table[5,http://www.postfix.org/tcp_table.5.html] mechanism. It
+    allows plugging +SRS+ into
+    linkgit:canonical[5,http://www.postfix.org/canonical.5.html] or
+    linkgit:transport[5,http://www.postfix.org/transport.5.html] rewrites
+    quite easily.
+
+link:postlicyd/postlicyd.html[+postlicyd+]::
+    this is a postfix policy daemon. It includes greylisting, rbl lookups,
+    counters, SMTP session tracking, in a way that allow very fine grained
+    schemes. It's for example quite easy to reject a mail just at the
+    `SMTP` `DATA` command using results from filtering done at the `RCPT TO`
+    or even the `MAIL FROM` commands.
++
+Its configuration file is described in
+link:postlicyd/postlicyd.conf.html[postlicyd.conf].
 
 Download
 --------
