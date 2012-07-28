@@ -4,20 +4,20 @@ pfix-srsd(8)
 NAME
 ----
 
-pfix-srsd - Postfix tcp_table(5) srsd lookup service
+`pfix-srsd` - Postfix tcp_table(5) srsd lookup service
 
 
 SYNOPSIS
 --------
 
-pfix-srsd [options] domain secrets
+`pfix-srsd [options] domain secrets`
 
 
 DESCRIPTION
 -----------
 
 pfix-srsd is designed to provide as a Postfix tcp_table(5), a way to rewrite
-addresses using the SRS (http://www.libsrs2.org/docs/index.html) scheme. It
+addresses using the http://www.libsrs2.org/docs/index.html[SRS] scheme. It
 supports both encoding and decoding of such addresses.
 
 

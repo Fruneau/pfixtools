@@ -41,7 +41,7 @@ prefix      ?= /usr/local
 LDFLAGSBASE += $(if $(DARWIN),-L/opt/local/lib,-Wl,-warn-common)
 CFLAGSBASE  += --std=gnu99 -I../ -I../common $(if $(DARWIN),-I/opt/local/include,)
 ASCIIDOC     = asciidoc -f $(__DIR__)/asciidoc.conf -d manpage \
-	       -apft_version=$(shell git-describe)
+	       -apft_version=$(shell git describe)
 XMLTO        = xmlto -m $(__DIR__)/callouts.xsl
 MAN_SECTIONS = 1 2 3 4 5 6 7 8 9
 
@@ -51,9 +51,9 @@ INSTALL_PROGS = $(addprefix install-,$(PROGRAMS))
 
 all: $(GENERATED) $(LIBS) $(PROGRAMS) $(TESTPROGAMS)
 
-DOCS_SRC  = $(foreach s,$(MAN_SECTIONS),$(patsubst %.$(s),%.txt,$(filter %.$(s),$(DOCS))))
-DOCS_HTML = $(DOCS_SRC:.txt=.html)
-DOCS_XML  = $(DOCS_SRC:.txt=.xml)
+DOCS_SRC  = $(foreach s,$(MAN_SECTIONS),$(patsubst %.$(s),%.asciidoc,$(filter %.$(s),$(DOCS))))
+DOCS_HTML = $(DOCS_SRC:.asciidoc=.html)
+DOCS_XML  = $(DOCS_SRC:.asciidoc=.xml)
 doc: $(DOCS) $(DOCS_HTML)
 
 install: all $(INSTALL_PROGS)
@@ -102,10 +102,10 @@ headers:
 
 $(LIBS): %: %.a
 
-$(DOCS_HTML): %.html: %.txt
+$(DOCS_HTML): %.html: %.asciidoc
 	$(ASCIIDOC) -b xhtml11 -o $@ $<
 
-$(DOCS_XML): %.xml: %.txt
+$(DOCS_XML): %.xml: %.asciidoc
 	$(ASCIIDOC) -b docbook -o $@ $<
 
 %.1 %.2 %.3 %.4 %.5 %.6 %.7 %.8 %.9: %.xml

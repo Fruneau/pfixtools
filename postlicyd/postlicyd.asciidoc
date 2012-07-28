@@ -4,13 +4,13 @@ postlicyd(8)
 NAME
 ----
 
-postlicyd - A postfix versatile Policy Daemon from the Postfix Tools Suite
+`postlicyd` - A postfix versatile Policy Daemon from the Postfix Tools Suite
 
 
 SYNOPSIS
 --------
 
-postlicyd [options] conf
+`postlicyd [options] conf`
 
 
 DESCRIPTION
