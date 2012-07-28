@@ -1,0 +1,87 @@
+pfixtools
+=========
+
+The pfixtools project is a collection of postfix-related tools. The pfixtools are written in C.
+
+The project currently includes two daemons:
+
+`pfix-srsd`::
+    pfix-srsd is a tcptable lookup service for postfix which performs SRS encoding and decoding.
+`postlicyd`::
+    postlicyd is a very flexible policy daemon for postfix. It can be used as a replacement for tools like whitelister and postgrey. It is able to access R(H)BL databases by DNS or by directly reading rbldns zone files. It also supports SPF and provides rate control policies.
+
+Download
+--------
+
+The sources are availble from the [http://git.mymind.fr/?p=pfixtools.git;a=summary git repository of the project].
+
+* https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.8[version 0.8] (October 26th, 2009)
+* latest sources: https://github.com/Fruneau/pfixtools/tarball/master[pfixtools snapshot]
+* from git: `git clone https://github.com/Fruneau/pfixtools.git`
+
+Previous versions (see [browser:ChangeLog]):
+
+* https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.7[version 0.7] (September 15th, 2009)
+* https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.6[version 0.6] (February 26th, 2009)
+* https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.5[version 0.5] (November 11th, 2008)
+* https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.4[version 0.4] (October 17th, 2008)
+
+Installation
+------------
+
+Supported platforms
+~~~~~~~~~~~~~~~~~~~
+
+The pfixtools have been currently successfully compiled and installed on the following platorms:
+
+* Linux: gentoo, debian etch, debian lenny, arch linux
+* MacOS X 10.5 (Leopard), 10.6 (Snow Leopard)
+
+Known bugs:
+
+* dns lookup crashed on debian lenny due to a bug in the version of libunbound shipped in the distribution. A workaround is to manually install a more recent version of the library (known to work with libunbound 1.4).
+
+Other platforms might work with some Makefile tuning if gcc is available.
+
+Requirements
+~~~~~~~~~~~~
+
+The following libraries are required to build and run the pfixtools:
+
+* http://software.schmorp.de/pkg/libev.html[libev]
+* http://www.libsrs2.org/[libsrs2]
+* http://tokyocabinet.sourceforge.net/index.html[tokyocabinet] _(`postlicyd` only)_
+* http://unbound.net/index.html[libunbound] _(`postlicyd` only)_
+* http://www.pcre.org/[libpcre] _(`postlicyd` only)_
+
+The following are build-time dependencies:
+
+* gcc: 4.0 or later
+* pkg-config _(`postlicyd` only)_
+* gperf _(`postlicyd` only)_
+* libpcre3 _(`postlicyd` only)_
+* xmlto, docbook-xsl and asciidoc to build the documentation (this is only a stub of documentation)
+
+Compilation
+~~~~~~~~~~~
+
+To install the pfixtools, just run `make all doc` and `sudo make install`.
+
+If you don't want to compile all the tools, you can run `make toolname` and `sudo make install-toolname`. You can also specify the installation prefix and a sandbox path `sudo make install prefix=/my/prefix DESTDIR=/my/sandbox`.
+
+Legal
+-----
+
+These programs are free softwares distributed AS IS. Please refer to the link:LICENSE[LICENSE file] for details.
+
+Authors:
+
+* link:/MadCoder[Pierre Habouzit] (c) 2006-2009: common library, pfix-srsd
+* link:/Fruneau[Florent Bruneau] (c) 2008-2010: common library, postlicyd
+
+Contributors:
+
+* link:/aaugustin[Aymeric Augustin] (c) 2008: postgrey to postlicyd tool
+* link:/ebzao[Nicolas Aupetit] (c) 2008: debian packaging
+* http://vincent.m4z.org/[Vincent Zanotti] (c) 2009: build fixes
+* Michael Scherer (c) 2009: build fixes
