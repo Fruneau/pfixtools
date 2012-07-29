@@ -34,9 +34,8 @@
 ############################################################################
 
 LIBS  = lib
-GENERATED = spf_tokens.h spf_tokens.c
 
-lib_SOURCES = str.c buffer.c common.c trie.c file.c dns.c utils.c spf.c server.c regexp.c $(GENERATED)
+lib_SOURCES = str.c buffer.c common.c trie.c file.c utils.c server.c regexp.c $(GENERATED)
 
 all:
 

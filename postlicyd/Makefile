@@ -42,15 +42,17 @@ DOCS      = postlicyd.8 postlicyd.conf.5 postlicyd.conf-strlist.5 \
 			postlicyd.conf-counter.5 postlicyd.conf-spf.5 \
 			postlicyd.conf-hang.5    postlicyd.conf-srs.5
 GENERATED = policy_tokens.h policy_tokens.c \
-						filter_tokens.h filter_tokens.c \
-						hook_tokens.h hook_tokens.c \
-						param_tokens.h param_tokens.c
+			filter_tokens.h filter_tokens.c \
+			hook_tokens.h hook_tokens.c \
+			param_tokens.h param_tokens.c \
+			spf_tokens.h spf_tokens.c
 
 LIBS = libpostlicyd
 
 FILTERS		= $(shell grep '^filter_declare' filter.c | sed -e 's/filter_declare(\(.*\)).*/\1.c/')
 
-libpostlicyd_SOURCES = filter.c config.c query.c resources.c db.c $(FILTERS) $(GENERATED)
+libpostlicyd_SOURCES = filter.c config.c query.c resources.c db.c dns.c \
+					   spf-proto.c $(FILTERS) $(GENERATED)
 
 postlicyd_SOURCES = main-postlicyd.c libpostlicyd.a ../common/lib.a
 postlicyd_LIBADD  = $(TC_LIBS) -lev -lpcre -lunbound -lsrs2

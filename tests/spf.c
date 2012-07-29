@@ -47,7 +47,7 @@
  *  The IP of the nameserver may change in the future.                         *
  * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-#include "spf.h"
+#include <postlicyd/spf.h>
 #include "server.h"
 
 typedef struct spf_test_t {
