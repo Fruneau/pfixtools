@@ -33,11 +33,11 @@
 #   see AUTHORS and source files for details                               #
 ############################################################################
 
-include ../mk/tc.mk
+include ../common/mk/tc.mk
 
 TESTS = trie regexp spf rbl filters greylist qf
 TESTLIBS=$(TC_LIBS) -lunbound -lev -lpcre -lsrs2
 
 all:
 
-include ../mk/common.mk
+include ../common/mk/common.mk

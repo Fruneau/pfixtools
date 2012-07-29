@@ -66,4 +66,4 @@ install-postlicyd-conf:
 
 ###########################################################################}}}
 
-include mk/common.mk
+include common/mk/common.mk

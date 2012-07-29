@@ -43,4 +43,4 @@ all:
 
 test: $(TESTS)
 
-include ../mk/common.mk
+include ../common/mk/common.mk

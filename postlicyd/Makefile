@@ -33,7 +33,7 @@
 #   see AUTHORS and source files for details                               #
 ############################################################################
 
-include ../mk/tc.mk
+include ../common/mk/tc.mk
 
 PROGRAMS  = postlicyd
 DOCS      = postlicyd.8 postlicyd.conf.5 postlicyd.conf-strlist.5 \
@@ -63,4 +63,4 @@ hook_tokens.c hook_tokens.h: $(FILTERS)
 param_tokens.c param_tokens.h: $(FILTERS) config.c
 filter_tokens.c filter_tokens.h: $(FILTERS)
 
-include ../mk/common.mk
+include ../common/mk/common.mk
