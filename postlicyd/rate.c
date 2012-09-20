@@ -158,7 +158,7 @@ static void rate_filter_destructor(filter_t *filter)
     filter->data = NULL;
 }
 
-static inline int rate_slot_for_delay(int t, int delay)
+static inline int rate_slot_for_delay(int t, int delay, bool up)
 {
     if (t >= delay || t < 0) {
         return -1;
@@ -166,7 +166,11 @@ static inline int rate_slot_for_delay(int t, int delay)
     if (delay < RATE_MAX_SLOTS) {
         return t;
     }
-    return (t * RATE_MAX_SLOTS) / delay;
+    if (up) {
+        return ((t * RATE_MAX_SLOTS) + delay - 1) / delay;
+    } else {
+        return (t * RATE_MAX_SLOTS) / delay;
+    }
 }
 
 static inline int rate_delay_for_slot(int slot, int delay)
@@ -207,46 +211,55 @@ static filter_result_t rate_filter(const filter_t *filter,
     }
     entry.delay = config->delay;
 
-    uint32_t last_total = 0;
-    time_t old_end = entry.ts + config->delay;
-    time_t new_start = now - config->delay + 1;
-    int total = 1;
-    if (old_end <= new_start) {
+    uint32_t last_total = entry.last_total;
+    time_t   new_start = now - config->delay + 1;
+    int      total = 1;
+    int      start_slot;
+
+    if (new_start <= entry.ts) {
+        start_slot = 0;
+    } else {
+        start_slot = rate_slot_for_delay(new_start - entry.ts,
+                                         config->delay, true);
+    }
+
+    if (start_slot < 0) {
         debug("rate entry obsolete, initialize a new one");
         entry.ts = now;
         entry.active_entries = 1;
         entry.entries[0] = 1;
+        last_total = 0;
     } else {
-        int slot = rate_slot_for_delay(new_start - entry.ts, config->delay);
-        int first_active_slot = -1;
-        last_total = entry.last_total;
-        if (slot < 0) {
-            slot = 0;
-        }
-        for (int i = slot ; i < entry.active_entries ; ++i) {
-            if (first_active_slot < 0 && entry.entries[i] != 0) {
-                first_active_slot = i;
+        bool found_active = false;
+
+        for (int i = start_slot ; i < entry.active_entries ; i++) {
+            if (!found_active && entry.entries[i] != 0) {
+                start_slot = i;
+                found_active = true;
             }
             total += entry.entries[i];
         }
-        debug("analysis gives: active_entries=%d, first_active=%d, hits=%d",
-              entry.active_entries, first_active_slot, total);
-        if (first_active_slot < 0) {
+
+        debug("analysis gives: active_entries=%d, first_slot=%d (%d) hits=%d",
+              entry.active_entries, start_slot, found_active, total);
+
+        if (!found_active) {
             entry.ts = now;
             entry.active_entries = 1;
             entry.entries[0] = 1;
-        } else if (first_active_slot >= 0) {
-            if (first_active_slot > 0) {
-                entry.ts += rate_delay_for_slot(first_active_slot,
-                                                config->delay);
-                memmove(entry.entries, &entry.entries[first_active_slot],
-                        2 * (entry.active_entries - first_active_slot));
-                entry.active_entries -= first_active_slot;
+        } else {
+            if (start_slot > 0) {
+                entry.ts += rate_delay_for_slot(start_slot, config->delay);
+                entry.active_entries -= start_slot;
+                memmove(entry.entries, &entry.entries[start_slot],
+                        2 * entry.active_entries);
             }
+
             int current_slot = rate_slot_for_delay(now - entry.ts,
-                                                   entry.delay);
+                                                   entry.delay, false);
             debug("rate current entry belongs to slot %d", current_slot);
             assert(current_slot < RATE_MAX_SLOTS);
+            assert(current_slot >= 0);
             if (current_slot >= entry.active_entries) {
                 p_clear(&entry.entries[entry.active_entries],
                         current_slot - entry.active_entries);
