@@ -1,13 +1,16 @@
-version 0.9
+version 0.9                                                       Sep 22, 2012
 
   * all:
     NEW: add support for long options                                      FRU
     NEW: provide consistent command line arguments                         FRU
+    CHA: common and build system now in a submodule                        FRU
 
   * postlicyd:
     NEW: query format learns ${field[part]} pattern                        FRU
     NEW: new srs filter                                                    FRU
+    NEW: support postfix 2.9+ new ccert_pubkey_fingerprint parameter       FRU
     FIX: crash in the greylister when client_address is missing            FRU
+    FIX: crash missing rotation of rate limiter leading to a crash         FRU
 
 ------------------------------------------------------------------------------
 version 0.8                                                       Oct 26, 2009

@@ -29,12 +29,13 @@ Download
 
 The sources are availble from link:/Fruneau/pfixtools[github].
 
-* link:/Fruneau/pfixtools/tarball/pfixtools-0.8[version 0.8] (October 26th, 2009)
+* link:/Fruneau/pfixtools/tarball/pfixtools-0.9[version 0.9] (September 22th, 2012)
 * latest sources: link:/Fruneau/pfixtools/tarball/master[pfixtools snapshot]
 * from git: `git clone https://github.com/Fruneau/pfixtools.git`
 
 Previous versions (see [browser:ChangeLog]):
 
+* https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.7[version 0.8] (October 22th, 2009)
 * https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.7[version 0.7] (September 15th, 2009)
 * https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.6[version 0.6] (February 26th, 2009)
 * https://github.com/Fruneau/pfixtools/tarball/pfixtools-0.5[version 0.5] (November 11th, 2008)
