@@ -161,6 +161,9 @@ exit 0
 # postfix 2.5+
 ## stress
 #
+# postfix 2.9+
+## ccert_pubkey_fingerprint
+#
 # request value
 ## smtpd_access_policy
 #

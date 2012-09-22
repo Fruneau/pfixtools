@@ -101,6 +101,9 @@ typedef struct query_t {
     /* postfix 2.5+ */
     clstr_t stress;
 
+    /* postfix 2.9+ */
+    clstr_t ccert_pubkey_fingerprint;
+
     const char *eoq;
 
     char n_sender[256];

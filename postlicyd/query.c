@@ -119,6 +119,7 @@ bool query_parse(query_t *query, char *p)
             CASE(ENCRYPTION_KEYSIZE,  encryption_keysize);
             CASE(ETRN_DOMAIN,         etrn_domain);
             CASE(STRESS,              stress);
+            CASE(CCERT_PUBKEY_FINGERPRINT, ccert_pubkey_fingerprint);
 #undef CASE
 
           case PTK_SENDER:
@@ -304,6 +305,7 @@ const clstr_t *query_field_for_id(const query_t *query, postlicyd_token id)
       CASE(ENCRYPTION_KEYSIZE, encryption_keysize)
       CASE(ETRN_DOMAIN, etrn_domain)
       CASE(STRESS, stress)
+      CASE(CCERT_PUBKEY_FINGERPRINT, ccert_pubkey_fingerprint);
 #undef CASE
       case PTK_NORMALIZED_SENDER:
         if (query->normalized_sender.len == 0) {
