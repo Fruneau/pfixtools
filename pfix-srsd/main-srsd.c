@@ -108,6 +108,25 @@ static char *urldecode(char *s, char *end)
     return s;
 }
 
+static void buffer_addurlencoded(buffer_t *buf, const char *p)
+{
+    static int hexdigit[16] = {
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    };
+
+    while (*p) {
+        if (*p == '%' || !isprint(*p) || isspace(*p)) {
+            buffer_addch(buf, '%');
+            buffer_addch(buf, hexdigit[(unsigned char)*p >> 4]);
+            buffer_addch(buf, hexdigit[(*p) & 0x0f]);
+        } else {
+            buffer_addch(buf, *p);
+        }
+        p++;
+    }
+}
+
 static int process_srs(client_t *srsd, void* vconfig)
 {
     srs_config_t *config = vconfig;
@@ -172,7 +191,7 @@ static int process_srs(client_t *srsd, void* vconfig)
 
         if (err == SRS_SUCCESS) {
             buffer_addstr(obuf, "200 ");
-            buffer_addstr(obuf, buf);
+            buffer_addurlencoded(obuf, buf);
         } else {
             switch (SRS_ERROR_TYPE(err)) {
               case SRS_ERRTYPE_CONFIG:
