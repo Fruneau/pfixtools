@@ -1,5 +1,8 @@
 Installation instruction for pfixtools
 
+0) Initialize ``common'' submodule
+    git submodule update -i
+
 1)  Install dependencies; you will need at least the following packages:
         gperf, libbz2-dev, libsrs2-dev, libssl-dev, libev-dev, libtokyocabinet-dev, libunbound-dev, libpcre3-dev, pkg-config
     For the documentation, you'll need:
