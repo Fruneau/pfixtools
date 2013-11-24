@@ -288,6 +288,15 @@ bool filter_test(const filter_t *filter, const query_t *query,
                     param->value_len, param->value);                         \
      } break
 
+#define FILTER_PARAM_PARSE_INT_PRESENCE(Param, Dest)                         \
+    case ATK_ ## Param: {                                                    \
+        char *next;                                                          \
+        (Dest) = strtol(param->value, &next, 10);                            \
+        PARSE_CHECK(!*next, "invalid %s value %.*s", atokens[ATK_ ## Param], \
+                    param->value_len, param->value);                         \
+        (Dest ## _present) = true;                                            \
+     } break
+
 #define FILTER_PARAM_PARSE_BOOLEAN(Param, Dest)                              \
     case ATK_ ## Param: {                                                    \
         if (param->value_len == 1 && param->value[0] == '1') {               \

@@ -69,6 +69,8 @@ struct config_t {
      * The parameter from CLI override the parameter from configuration file.
      */
     uint16_t port;
+    bool port_present;
+    char *socketfile;
 
     /* Log message.
      */
