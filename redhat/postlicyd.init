@@ -8,6 +8,13 @@
 # Short-Description: pfixtools Policy Daemon backend for Postfix
 ### END INIT INFO
 
+# Original source I believe is:
+# http://www.christophfischer.com/linux/15-mailserver/56-sender-rewriting-scheme-srs-fuer-postfix-unter-debian
+# If not, please let me know ASAP and I can update this!
+
+# Updated by Jason Woods <devel@jasonwoods.me.uk> Sun Nov 24
+# - Improved the start/stop/status/reload/restart commands to use RedHat's scripts
+
 # source function library
 . /etc/rc.d/init.d/functions
 
