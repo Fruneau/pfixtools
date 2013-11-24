@@ -28,9 +28,9 @@ RESULTS
 -------
 Possible results are:
 
-* +none+: The recipient is not a bounce and the SRS filter cannot be applied to it.
-* +match+: The recipient is a bounce and it's a valid SRS-encoded address.
-* +fail+: The recipient is a bounce but it's not a valid SRS-encoded address.
+* +none+: The recipient is not in the bounce domain and the SRS filter cannot be applied to it.
+* +match+: The recipient is in the bounce domain and it's a valid SRS-encoded address.
+* +fail+: The recipient is in the bounce domain but it's not a valid SRS-encoded address.
 
 EXAMPLE
 -------
