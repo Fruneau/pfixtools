@@ -1,0 +1,77 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          postlicyd
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $local_fs $remote_fs
+# Default-Start:     2 3 5
+# Default-Stop:      0 1 6
+# Short-Description: pfixtools Policy Daemon backend for Postfix
+### END INIT INFO
+
+# source function library
+. /etc/rc.d/init.d/functions
+
+POSTLICYD_CONFIG="/etc/pfixtools/postlicyd.conf"
+DAEMON="/usr/sbin/postlicyd"
+PID_FILE="/var/run/postlicyd/postlicyd.pid"
+
+if [ ! -f $POSTLICYD_CONFIG ]; then
+	exit 1
+fi
+
+# Generate random secret automatically if the file is not there
+if [ ! -f /etc/pfixtools/pfix-srsd-secrets ]; then
+	( </dev/urandom tr -dc '_\-A-Za-z0-9' | head -c128; echo ) >/etc/pfixtools/pfix-srsd-secrets
+fi
+
+test -x $DAEMON || exit 0
+
+case "$1" in
+	start)
+		echo -n "Starting Postfix Policy Daemon: "
+		status -p $PID_FILE $DAEMON &>/dev/null
+		RC=$?
+		if [ $RC -eq 0 ]; then
+			success
+		else
+			$DAEMON -p $PID_FILE -U postlicy -G postlicy $POSTLICYD_CONFIG
+			RC=$?
+			[ $RC -eq 0 ] && success || failure
+		fi
+		echo
+	;;
+	stop)
+		echo -n "Stopping Postfix Policy Daemon: "
+		killproc -p $PID_FILE $DAEMON
+		RC=$?
+		echo
+	;;
+	status)
+		echo "Postfix Policy Daemon status:"
+		status -p $PID_FILE $DAEMON
+		RC=$?
+	;;
+	restart)
+		echo -n "Checking postlicyd configuration:"
+		$DAEMON -c $POSTLICYD_CONFIG
+		RC=$?
+		if [ $RC -eq 0 ]; then
+			success
+			echo
+			$0 stop; $0 start
+		else
+			failure
+			echo
+		fi
+	;;
+	reload)
+		echo -n "Reloading Postfix Policy Daemon: "
+		killproc -p $PID_FILE $DAEMON -HUP
+		RC=$?
+		echo
+	;;
+	*)
+		echo "Usage: $0 start|stop|status|reload|restart"
+		exit 1
+	;;
+esac
