@@ -108,7 +108,12 @@ the `conf` argument shall be a path to a valid linkgit:postlicyd.conf[5] file.
     Do not daemonize `postlicyd` on startup.
 
 -l <port>::
-    Change the port `postlicyd` will listen to. (Default: 10000).
+    Change the port `postlicyd` will listen to. Overrides configuration file.
+	(Default 10000 if no port or socket file is specified in the configuration file or
+    on the command line).
+
+-L <file>::
+	Unix socket file that postlicyd will listen to. Overrides configuration file.
 
 -p <path>::
     Path to the pidfile where `postlicyd` will maintain its pid. Default is to
