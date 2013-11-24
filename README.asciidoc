@@ -100,3 +100,4 @@ Contributors:
 * link:/ebzao[Nicolas Aupetit] (c) 2008: debian packaging
 * http://vincent.m4z.org/[Vincent Zanotti] (c) 2009: build fixes
 * Michael Scherer (c) 2009: build fixes
+* https://github.com/driskell[Jason Woods]: socketmap protocol / socketfiles and others
