@@ -87,21 +87,6 @@ static void query_stopper(void *data)
     }
 }
 
-static inline void *xmalloc_srs(size_t size) {
-    void *mem;
-    mem = malloc(size);
-    if (!mem)
-        abort();
-    return mem;
-}
-
-static inline void *xrealloc_srs(void *ptr, size_t newsize) {
-    ptr = realloc(ptr, newsize);
-    if (!ptr)
-        abort();
-    return ptr;
-}
-
 static bool config_refresh(void *mconfig)
 {
     _G.refresh = true;
@@ -392,7 +377,7 @@ int main(int argc, char *argv[])
     notice("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     // Fail on memory
-    srs_set_malloc( xmalloc_srs, xrealloc_srs, free );
+    srs_set_malloc( xmalloc_unsigned, xrealloc_unsigned, free );
 
     if ( user == NULL )
         user = DEFAULT_RUNAS_USER;
@@ -437,12 +422,12 @@ int main(int argc, char *argv[])
     pidfile_refresh();
 
     if (_G.config->socketfile) {
-        if (start_listener_unix(_G.config->socketfile) == NULL)
+        if (start_unix_listener(_G.config->socketfile) == NULL)
             return EXIT_FAILURE;
     }
 
     if (_G.config->port_present) {
-        if (start_listener(_G.config->port) == NULL)
+        if (start_tcp_listener(_G.config->port) == NULL)
             return EXIT_FAILURE;
     }
 

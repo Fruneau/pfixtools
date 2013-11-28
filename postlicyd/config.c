@@ -519,7 +519,7 @@ bool config_check(const char *file)
 
     bool ret;
 
-	if ((ret = config_reload(config)))
+    if ((ret = config_reload(config)))
         notice("Configuration is good!");
 
     config_delete(&config);
