@@ -115,21 +115,6 @@ static void *srsd_starter_tcp(listener_t *server)
     return server;
 }
 
-static inline void *xmalloc_srs(size_t size) {
-    void *mem;
-    mem = malloc(size);
-    if (!mem)
-        abort();
-    return mem;
-}
-
-static inline void *xrealloc_srs(void *ptr, size_t newsize) {
-    ptr = realloc(ptr, newsize);
-    if (!ptr)
-        abort();
-    return ptr;
-}
-
 /* Processing {{{1
  */
 
@@ -176,29 +161,22 @@ static void buffer_addurlencoded(buffer_t *buf, const char *p)
 static int netstring_calc_length(size_t num, const char *str, va_list args)
 {
     size_t len = strlen(str), i;
-    for (i = 1; i < num; len += strlen(va_arg(args, char *)), i++);
+    for (i = 1; i < num; i++) {
+        len += strlen(va_arg(args, char *));
+    }
     return len;
 }
 
 static void netstring_encode_and_send(buffer_t *buf, size_t len, size_t num, const char *str, va_list args)
 {
-    size_t d, i, j;
-    char lenbuf[65], t;
-
-    for (i = 0; len != 0; d = len % 10, lenbuf[i] = '0' + d, len = (len - d) / 10, i++);
-    lenbuf[i] = 0;
-    for (j = 0, d = i - 1; j < d; t = lenbuf[d], lenbuf[d] = lenbuf[j], lenbuf[j] = t, j++, d--);
-
-    buffer_addstr(buf, lenbuf);
-    buffer_addch(buf, ':');
-
-    buffer_addstr(buf, str);
-    for (i = 1; i < num; buffer_addstr(buf, va_arg(args, char *)), i++);
-
+    buffer_addf(buf, '%zu:%s', len, str);
+    for (i = 1; i < num; i++) {
+        buffer_addstr(buf, va_arg(args, char *))
+    }
     buffer_addch(buf, ',');
 }
 
-static inline void netstring_send(buffer_t *buf, size_t num, const char *str, ...)
+static void netstring_send(buffer_t *buf, size_t num, const char *str, ...)
 {
     size_t len;
     va_list args;
@@ -212,7 +190,7 @@ static inline void netstring_send(buffer_t *buf, size_t num, const char *str, ..
     va_end(args);
 }
 
-static inline int netstring_send_limit(buffer_t *buf, size_t limit, size_t num, const char *str, ...)
+static int netstring_send_limit(buffer_t *buf, size_t limit, size_t num, const char *str, ...)
 {
     size_t len;
     va_list args;
@@ -242,158 +220,159 @@ static int process_srs_socketmap(client_t *srsd, void* vconfig)
         return -1;
 
     while (ibuf->len) {
-
         char *co, *p;
 
         switch (context->state) {
-
-            default:
-            case SOCKETMAP_STATE_LENGTH:
-                // Netstring messages are of the form <length>:<string>,
-                co = strchr(ibuf->data, ':');
-                if (!co) {
-                    if (ibuf->len > BUFSIZ) {
-                        err("invalid netstring received: missing length terminator");
-                        return -1;
-                    }
-                    goto skipend;
-                } else if (co == ibuf->data) {
-                    err("invalid netstring received: no length provided");
+          default:
+          case SOCKETMAP_STATE_LENGTH:
+            // Netstring messages are of the form <length>:<string>,
+            co = strchr(ibuf->data, ':');
+            if (!co) {
+                if (ibuf->len > BUFSIZ) {
+                    err("invalid netstring received: missing length terminator");
                     return -1;
                 }
+                goto skipend;
+            } else if (co == ibuf->data) {
+                err("invalid netstring received: no length provided");
+                return -1;
+            }
 
-                for (p = ibuf->data, context->addrlen = 0; *p >= '0' && *p <= '9' && context->addrlen < SOCKETMAP_MAX_QUERY; context->addrlen = (context->addrlen * 10) + (*p - 0x30), p++);
+            for (p = ibuf->data, context->addrlen = 0; *p >= '0' && *p <= '9' && context->addrlen < SOCKETMAP_MAX_QUERY; p++) {
+                context->addrlen *= 10;
+                context->addrlen += *p - 0x30;
+            }
 
-                if (p != co) {
-                    err("invalid netstring received: invalid length digit '%c'", *p);
-                    return -1;
-                }
+            if (p != co) {
+                err("invalid netstring received: invalid length digit '%c'", *p);
+                return -1;
+            }
 
-                if (context->addrlen > SOCKETMAP_MAX_QUERY) {
-                    err("invalid netstring received: length %zu is invalid - (max is "STR(SOCKETMAP_MAX_QUERY)")", context->addrlen);
-                    return -1;
-                }
+            if (context->addrlen > SOCKETMAP_MAX_QUERY) {
+                err("invalid netstring received: length %zu is invalid - (max is "STR(SOCKETMAP_MAX_QUERY)")", context->addrlen);
+                return -1;
+            }
 
-                context->state = SOCKETMAP_STATE_NAME;
+            context->state = SOCKETMAP_STATE_NAME;
 
-                buffer_consume(ibuf, co - ibuf->data + 1);
-                break;
+            buffer_consume(ibuf, co - ibuf->data + 1);
+            break;
 
-            case SOCKETMAP_STATE_NAME:
-                if (ibuf->len > context->addrlen) {
-                    if (ibuf->data[context->addrlen] != ',') {
-                        err("invalid netstring received: missing netstring terminator");
-                        return -1;
-                    }
-                }
-
-                // The message sent by postfix contains a table name followed by a space
-                // This table name will tell us whether to encode or decode
-                co = strchr(ibuf->data, ' ');
-                if (!co) {
-                    if (ibuf->len > context->addrlen) {
-                        warn("invalid request received: missing socketmap name terminator");
-                        netstring_send(obuf, 1, "PERM Invalid request");
-                        goto skip;
-                    }
-                    goto skipend;
-                } else if (co == ibuf->data) {
-                    warn("invalid request received: no socketmap name provided");
-                    netstring_send(obuf, 1, "PERM Invalid request");
-                    goto skip;
-                }
-
-                size_t len = co - ibuf->data;
-                if (len > context->addrlen) {
-                    warn("invalid request received: missing socketmap name terminator");
-                    netstring_send(obuf, 1, "PERM Invalid request");
-                    goto skip;
-                }
-
-                // Slightly dirty since we modify the buffer
-                ibuf->data[len] = 0;
-
-                if (strcmp(ibuf->data, "srsencoder") == 0) {
-                    context->name = SOCKETMAP_NAME_ENCODER;
-                } else if (strcmp(ibuf->data, "srsdecoder") == 0) {
-                    context->name = SOCKETMAP_NAME_DECODER;
-                } else {
-                    warn("invalid socketmap name received: %s", ibuf->data);
-                    netstring_send(obuf, 1, "PERM Invalid request");
-                    goto skip;
-                }
-
-                context->state = SOCKETMAP_STATE_ADDRESS;
-                context->addrlen -= len + 1;
-
-                buffer_consume(ibuf, len + 1);
-                break;
-
-            case SOCKETMAP_STATE_ADDRESS:
-                // Waiting for the full netstring to arrive, terminated by comma
-                if (ibuf->len < context->addrlen + 1) {
-                    goto skipend;
-                }
-
+          case SOCKETMAP_STATE_NAME:
+            if (ibuf->len > context->addrlen) {
                 if (ibuf->data[context->addrlen] != ',') {
                     err("invalid netstring received: missing netstring terminator");
                     return -1;
                 }
+            }
 
-                if (context->addrlen == 0) {
-                    warn("empty request received");
-                    netstring_send(obuf, 1, "NOTFOUND ");
+            // The message sent by postfix contains a table name followed by a space
+            // This table name will tell us whether to encode or decode
+            co = strchr(ibuf->data, ' ');
+            if (!co) {
+                if (ibuf->len > context->addrlen) {
+                    warn("invalid request received: missing socketmap name terminator");
+                    netstring_send(obuf, 1, "PERM Invalid request");
                     goto skip;
                 }
+                goto skipend;
+            } else if (co == ibuf->data) {
+                warn("invalid request received: no socketmap name provided");
+                netstring_send(obuf, 1, "PERM Invalid request");
+                goto skip;
+            }
 
-                // Slightly dirty since we modify the buffer, but it properly terminates the address in place with no copying necessary
-                ibuf->data[context->addrlen] = 0;
+            size_t len = co - ibuf->data;
+            if (len > context->addrlen) {
+                warn("invalid request received: missing socketmap name terminator");
+                netstring_send(obuf, 1, "PERM Invalid request");
+                goto skip;
+            }
 
-                char *buf;
-                int err;
+            // Slightly dirty since we modify the buffer
+            ibuf->data[len] = 0;
 
-                if (context->name == SOCKETMAP_NAME_DECODER) {
-                    if (config->ignore_ext) {
-                        size_t dlen = config->domainlen;
+            if (strcmp(ibuf->data, "srsencoder") == 0) {
+                context->name = SOCKETMAP_NAME_ENCODER;
+            } else if (strcmp(ibuf->data, "srsdecoder") == 0) {
+                context->name = SOCKETMAP_NAME_DECODER;
+            } else {
+                warn("invalid socketmap name received: %s", ibuf->data);
+                netstring_send(obuf, 1, "PERM Invalid request");
+                goto skip;
+            }
 
-                        if (context->addrlen <= dlen || ibuf->data[context->addrlen - 1 - dlen] != '@' ||
-                            memcmp(ibuf->data + context->addrlen - dlen, config->domain, dlen))
-                        {
-                            netstring_send(obuf, 2, "OK ", ibuf->data);
-                            goto skip;
-                        }
+            context->state = SOCKETMAP_STATE_ADDRESS;
+            context->addrlen -= len + 1;
+
+            buffer_consume(ibuf, len + 1);
+            break;
+
+          case SOCKETMAP_STATE_ADDRESS:
+            // Waiting for the full netstring to arrive, terminated by comma
+            if (ibuf->len < context->addrlen + 1) {
+                goto skipend;
+            }
+
+            if (ibuf->data[context->addrlen] != ',') {
+                err("invalid netstring received: missing netstring terminator");
+                return -1;
+            }
+
+            if (context->addrlen == 0) {
+                warn("empty request received");
+                netstring_send(obuf, 1, "NOTFOUND ");
+                goto skip;
+            }
+
+            // Slightly dirty since we modify the buffer, but it properly terminates the address in place with no copying necessary
+            ibuf->data[context->addrlen] = 0;
+
+            char *buf;
+            int err;
+
+            if (context->name == SOCKETMAP_NAME_DECODER) {
+                if (config->ignore_ext) {
+                    size_t dlen = config->domainlen;
+
+                    if (context->addrlen <= dlen || ibuf->data[context->addrlen - 1 - dlen] != '@' ||
+                        memcmp(ibuf->data + context->addrlen - dlen, config->domain, dlen))
+                    {
+                        netstring_send(obuf, 2, "OK ", ibuf->data);
+                        goto skip;
                     }
-                    err = srs_reverse_alloc(config->srs, &buf, ibuf->data);
-                } else {
-                    err = srs_forward_alloc(config->srs, &buf, ibuf->data, config->domain);
                 }
+                err = srs_reverse_alloc(config->srs, &buf, ibuf->data);
+            } else {
+                err = srs_forward_alloc(config->srs, &buf, ibuf->data, config->domain);
+            }
 
-                if (err == SRS_SUCCESS) {
-                    if (netstring_send_limit(obuf, SOCKETMAP_MAX_QUERY, 2, "OK ", buf) != 0) {
-                        netstring_send(obuf, 1, "PERM The SRS response would exceed the maximum socketmap response length");
-                    }
-                    free( buf );
-                } else {
-                    switch (SRS_ERROR_TYPE(err)) {
-                      case SRS_ERRTYPE_CONFIG:
-                        netstring_send(obuf, 2, "PERM ", srs_strerror(err));
-                        break;
-                      default:
-                        netstring_send(obuf, 2, "NOTFOUND ", srs_strerror(err));
-                        break;
-                    }
+            if (err == SRS_SUCCESS) {
+                if (netstring_send_limit(obuf, SOCKETMAP_MAX_QUERY, 2, "OK ", buf) != 0) {
+                    netstring_send(obuf, 1, "PERM The SRS response would exceed the maximum socketmap response length");
                 }
+                free( buf );
+            } else {
+                switch (SRS_ERROR_TYPE(err)) {
+                  case SRS_ERRTYPE_CONFIG:
+                    netstring_send(obuf, 2, "PERM ", srs_strerror(err));
+                    break;
+                  default:
+                    netstring_send(obuf, 2, "NOTFOUND ", srs_strerror(err));
+                    break;
+                }
+            }
 
-skip:
-                context->state = SOCKETMAP_STATE_LENGTH;
-                buffer_consume(ibuf, context->addrlen + 1);
-                break;
+          skip:
+            context->state = SOCKETMAP_STATE_LENGTH;
+            buffer_consume(ibuf, context->addrlen + 1);
+            break;
 
         }
 
     }
 
-skipend:
+  skipend:
     if (obuf->len) {
         client_io_rw(srsd);
     }
@@ -695,7 +674,7 @@ int main(int argc, char *argv[])
     notice("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
 
     // Fail on memory
-    srs_set_malloc( xmalloc_srs, xrealloc_srs, free );
+    srs_set_malloc( xmalloc_unsigned, xrealloc_unsigned, free );
 
     _G.config.domain = argv[optind];
     _G.config.domainlen = strlen(_G.config.domain);
@@ -719,18 +698,18 @@ int main(int argc, char *argv[])
 
     if (_G.socketmap) {
 
-        if (socketfile && start_listener_unix(socketfile) == NULL)
+        if (socketfile && start_unix_listener(socketfile) == NULL)
             return EXIT_FAILURE;
 
-        if (port_set && start_listener(port) == NULL)
+        if (port_set && start_tcp_listener(port) == NULL)
             return EXIT_FAILURE;
 
     } else {
 
-        if ((_G.encoder_ptr = start_listener(port_enc)) == NULL)
+        if ((_G.encoder_ptr = start_tcp_listener(port_enc)) == NULL)
             return EXIT_FAILURE;
 
-        if ((_G.decoder_ptr = start_listener(port_dec)) == NULL)
+        if ((_G.decoder_ptr = start_tcp_listener(port_dec)) == NULL)
             return EXIT_FAILURE;
 
     }
