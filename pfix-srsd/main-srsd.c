@@ -238,9 +238,13 @@ static int process_srs_socketmap(client_t *srsd, void* vconfig)
                 return -1;
             }
 
-            for (p = ibuf->data, context->addrlen = 0; *p >= '0' && *p <= '9' && context->addrlen < SOCKETMAP_MAX_QUERY; p++) {
+            context->addrlen = 0;
+            for (p = ibuf->data; *p >= '0' && *p <= '9'; p++) {
                 context->addrlen *= 10;
                 context->addrlen += *p - 0x30;
+                if ( context->addrlen >= SOCKETMAP_MAX_QUERY ) {
+                    break;
+                }
             }
 
             if (p != co) {
@@ -257,7 +261,6 @@ static int process_srs_socketmap(client_t *srsd, void* vconfig)
 
             buffer_consume(ibuf, co - ibuf->data + 1);
             break;
-
           case SOCKETMAP_STATE_NAME:
             if (ibuf->len > context->addrlen) {
                 if (ibuf->data[context->addrlen] != ',') {
@@ -307,7 +310,6 @@ static int process_srs_socketmap(client_t *srsd, void* vconfig)
 
             buffer_consume(ibuf, len + 1);
             break;
-
           case SOCKETMAP_STATE_ADDRESS:
             // Waiting for the full netstring to arrive, terminated by comma
             if (ibuf->len < context->addrlen + 1) {
@@ -367,7 +369,6 @@ static int process_srs_socketmap(client_t *srsd, void* vconfig)
             context->state = SOCKETMAP_STATE_LENGTH;
             buffer_consume(ibuf, context->addrlen + 1);
             break;
-
         }
 
     }
