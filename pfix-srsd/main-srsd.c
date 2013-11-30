@@ -169,7 +169,7 @@ static int netstring_calc_length(size_t num, const char *str, va_list args)
 
 static void netstring_encode_and_send(buffer_t *buf, size_t len, size_t num, const char *str, va_list args)
 {
-    buffer_addf(buf, '%zu:%s', len, str);
+    buffer_addf(buf, "%zu:%s", len, str);
     for (int i = 1; i < num; i++) {
         buffer_addstr(buf, va_arg(args, char *))
     }
