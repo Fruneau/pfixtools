@@ -46,13 +46,13 @@ Command line switches
 ~~~~~~~~~~~~~~~~~~~~~
 
 -P tcp|socketmap::
-	The protocol to use, either tcp or socketmap. Default is tcp.
+    The protocol to use, either tcp or socketmap. Default is tcp.
 
 -s <sep>::
-	Change the character used as srs separator (+, - or =). Default is =.
+    Change the character used as srs separator (+, - or =). Default is =.
 
 -I::
-	When decoding, do not touch emails from outside of +domain+.
+    When decoding, do not touch emails from outside of +domain+.
 
 -p <path>::
     Path to the pidfile where +pfix-srsd+ will maintain its pid. Default is to
@@ -62,16 +62,16 @@ Command line switches
     Work in unsafe mode: don't drop privileges when running as root.
 
 -U::
-	Specify the user to drop privileges to when running as root. Default is nobody.
+    Specify the user to drop privileges to when running as root. Default is nobody.
 
 -G::
-	Specify the group to drop privileges to when running as root. Default is nobody.
+    Specify the group to drop privileges to when running as root. Default is nobody.
 
 -f::
     Do not daemonize +pfix-srsd+ on startup.
 
 -v::
-	Increase logging level.
+    Increase logging level.
 
 -h::
     Show the help.
@@ -91,10 +91,10 @@ Command line switches for socketmap protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -l <port>::
-	TCP port to listen to for requests.
+    TCP port to listen to for requests.
 
 -L <file>::
-	Unix socket to listent o for requests.
+    Unix socket to listent o for requests.
 
 When neither port or socketfile are specified, the socketmap default is port 10001.
 The socketmap protocol provides two socketmap names, 'srsencoder' and 'srsdecoder'.

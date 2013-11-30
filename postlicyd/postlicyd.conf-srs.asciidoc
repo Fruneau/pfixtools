@@ -37,22 +37,22 @@ EXAMPLE
 The following example filter setup checks for bounces and validates the bounce domain and SRS address.
 
 ----
-# First	we check the sender is empty, meaning it's a bounce: MAIL FROM:	<>
+# First we check the sender is empty, meaning it's a bounce: MAIL FROM: <>
 check_srs_bounce {
-	type = match;
-	condition = sender #=;
-	on_match = check_srs_hash;
-	on_fail	= postfix:DUNNO;
+    type = match;
+    condition = sender #=;
+    on_match = check_srs_hash;
+    on_fail = postfix:DUNNO;
 }
 
 # Now we check the bounce domain matches, and the hash is valid, with the SRS filter
 check_srs_hash {
-	type = srs;
-	bounce_domain = bounces.example.com;
-	secret_file = /etc/pfixtools/pfix-srsd-secrets;
-	on_match = postfix:DUNNO;
-	on_none	= postfix:REJECT Invalid bounce domain;
-	on_fail = postfix:REJECT Invalid sender for SRS bounces;
+    type = srs;
+    bounce_domain = bounces.example.com;
+    secret_file = /etc/pfixtools/pfix-srsd-secrets;
+    on_match = postfix:DUNNO;
+    on_none = postfix:REJECT Invalid bounce domain;
+    on_fail = postfix:REJECT Invalid sender for SRS bounces;
 }
 
 # SRS is checked at smtpd_recipient_restrictions
@@ -63,10 +63,10 @@ To activate this you may have something such as the following in postfix's main.
 
 ----
 smtpd_recipient_restrictions =
-	permit_mynetworks,
-	permit_sasl_authenticated,
-	check_policy_service unix:/var/run/postlicyd/postlicyd.sock,
-	reject_unauth_destination
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    check_policy_service unix:/var/run/postlicyd/postlicyd.sock,
+    reject_unauth_destination
 ----
 
 COPYRIGHT
