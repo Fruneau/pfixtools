@@ -109,7 +109,7 @@ pfix-srsd -U pfix-srs -G pfix-srs -P socketmap -L /var/run/pfix-srsd.sock
 The postfix configuration could be something like this:
 ----
 recipient_canonical_maps = hash:/etc/postfix/pfixnosrs, socketmap:unix:/var/run/pfix-srsd.sock:srsdecoder
-recipient_canonical_classes = envelope_recipient
+recipient_canonical_classes = envelope_recipient, header_recipient
 sender_canonical_maps = hash:/etc/postfix/pfixnosrs, socketmap:unix:/var/run/pfix-srsd.sock:srsencoder
 sender_canonical_classes = envelope_sender
 ----
@@ -121,7 +121,7 @@ pfix-srsd -U pfix-srs -G pfix-srs
 The postfix configuration could be something like this:
 ----
 recipient_canonical_maps = hash:/etc/postfix/pfixnosrs, tcp:127.0.0.1:10002
-recipient_canonical_classes = envelope_recipient
+recipient_canonical_classes = envelope_recipient, header_recipient
 sender_canonical_maps = hash:/etc/postfix/pfixnosrs, tcp:127.0.0.1:10001
 sender_canonical_classes = envelope_sender
 ----
