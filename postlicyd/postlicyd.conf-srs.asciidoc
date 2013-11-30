@@ -65,6 +65,16 @@ To activate this you may have something such as the following in postfix's main.
 smtpd_recipient_restrictions =
     permit_mynetworks,
     permit_sasl_authenticated,
+    check_policy_service tcp:127.0.0.1:10000,
+    reject_unauth_destination
+----
+
+When using a unix socket file it may look like this instead:
+
+----
+smtpd_recipient_restrictions =
+    permit_mynetworks,
+    permit_sasl_authenticated,
     check_policy_service unix:/var/run/postlicyd/postlicyd.sock,
     reject_unauth_destination
 ----
