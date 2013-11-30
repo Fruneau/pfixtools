@@ -6,8 +6,8 @@ include:../mk/asciidoc.conf[]
 NAME
 ----
 
-pfix-srsd - Postfix [tcp_table](http://www.postfix.org/tcp_table.5.html)
-and [socketmap_table](http://www.postfix.org/socketmap_table.5.html)
+pfix-srsd - Postfix http://www.postfix.org/tcp_table.5.html[tcp_table]
+and http://www.postfix.org/socketmap_table.5.html[socketmap_table]
 srsd lookup service
 
 
@@ -20,8 +20,8 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-pfix-srsd is designed to provide a Postfix [tcp_table](http://www.postfix.org/tcp_table.5.html)
-or [socketmap_table](http://www.postfix.org/socketmap_table.5.html) that can rewrite
+pfix-srsd is designed to provide a Postfix http://www.postfix.org/tcp_table.5.html[tcp_table]
+or http://www.postfix.org/socketmap_table.5.html[socketmap_table] that can rewrite
 addresses using the http://www.libsrs2.org/docs/index.html[SRS] scheme. It
 supports both encoding and decoding of such addresses.
 
