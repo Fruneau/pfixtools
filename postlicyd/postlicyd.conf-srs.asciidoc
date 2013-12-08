@@ -28,9 +28,56 @@ RESULTS
 -------
 Possible results are:
 
-* +none+: The recipient is not a bounce and the SRS filter cannot be applied to it.
-* +match+: The recipient is a bounce and it's a valid SRS-encoded address.
-* +fail+: The recipient is a bounce but it's not a valid SRS-encoded address.
+* +none+: The recipient is not in the bounce domain and the SRS filter cannot be applied to it.
+* +match+: The recipient is in the bounce domain and it's a valid SRS-encoded address.
+* +fail+: The recipient is in the bounce domain but it's not a valid SRS-encoded address.
+
+EXAMPLE
+-------
+The following example filter setup checks for bounces and validates the bounce domain and SRS address.
+
+----
+# First we check the sender is empty, meaning it's a bounce: MAIL FROM: <>
+check_srs_bounce {
+    type = match;
+    condition = sender #=;
+    on_match = check_srs_hash;
+    on_fail = postfix:DUNNO;
+}
+
+# Now we check the bounce domain matches, and the hash is valid, with the SRS filter
+check_srs_hash {
+    type = srs;
+    bounce_domain = bounces.example.com;
+    secret_file = /etc/pfixtools/pfix-srsd-secrets;
+    on_match = postfix:DUNNO;
+    on_none = postfix:REJECT Invalid bounce domain;
+    on_fail = postfix:REJECT Invalid sender for SRS bounces;
+}
+
+# SRS is checked at smtpd_recipient_restrictions
+recipient_filter = check_srs_bounce;
+----
+
+To activate this you may have something such as the following in postfix's main.cf:
+
+----
+smtpd_recipient_restrictions =
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    check_policy_service tcp:127.0.0.1:10000,
+    reject_unauth_destination
+----
+
+When using a unix socket file it may look like this instead:
+
+----
+smtpd_recipient_restrictions =
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    check_policy_service unix:/var/run/postlicyd/postlicyd.sock,
+    reject_unauth_destination
+----
 
 COPYRIGHT
 ---------

@@ -82,6 +82,7 @@ config_param_register("verify_filter");
 /* Where to bind the server.
  */
 config_param_register("port");
+config_param_register("socketfile");
 
 
 /* Format of the log message.
@@ -125,6 +126,8 @@ static void config_wipe(config_t *config)
     }
     array_deep_wipe(config->filters, filter_wipe);
     array_deep_wipe(config->params, filter_params_wipe);
+    config->port_present = false;
+    p_delete(&config->socketfile);
     p_delete(&config->log_format);
     p_delete(&config->resolv_conf);
     _G.config = NULL;
@@ -429,7 +432,8 @@ static bool config_build_structure(config_t *config)
           CASE(VERIFY,      VRFY)
           CASE(ETRN,        ETRN)
 #undef    CASE
-          FILTER_PARAM_PARSE_INT(PORT, config->port);
+          FILTER_PARAM_PARSE_INT_PRESENCE(PORT, config->port);
+          FILTER_PARAM_PARSE_STRING(SOCKETFILE, config->socketfile, true);
           FILTER_PARAM_PARSE_STRING(LOG_FORMAT, config->log_format, true);
           FILTER_PARAM_PARSE_STRING(USE_RESOLV_CONF,
                                     config->resolv_conf, true);
@@ -439,6 +443,12 @@ static bool config_build_structure(config_t *config)
         }
     }
     array_deep_wipe(config->params, filter_params_wipe);
+
+    // Sockaddr_un cannot store more than 107 characters (it is char[108])
+    if (config->socketfile && strlen(config->socketfile) > 107) {
+        err("socketfile is too long, maximum length is 107 characters");
+        return false;
+    }
 
     if (config->log_format && !query_format_check(config->log_format)) {
         err("invalid log format: \"%s\"", config->log_format);
@@ -507,7 +517,10 @@ bool config_check(const char *file)
     config_t *config = config_new();
     config->filename = file;
 
-    bool ret = config_parse(config) && config_build_structure(config);
+    bool ret;
+
+    if ((ret = config_reload(config)))
+        notice("Configuration is good!");
 
     config_delete(&config);
     return ret;

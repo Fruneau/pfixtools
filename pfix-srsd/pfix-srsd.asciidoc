@@ -6,7 +6,8 @@ include:../mk/asciidoc.conf[]
 NAME
 ----
 
-pfix-srsd - Postfix linkgit:tcp_table[5,http://www.postfix.org/tcp_table.5.html]
+pfix-srsd - Postfix http://www.postfix.org/tcp_table.5.html[tcp_table]
+and http://www.postfix.org/socketmap_table.5.html[socketmap_table]
 srsd lookup service
 
 
@@ -19,8 +20,8 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-pfix-srsd is designed to provide as a Postfix
-linkgit:tcp_table[5,http://www.postfix.org/tcp_table.5.html], a way to rewrite
+pfix-srsd is designed to provide a Postfix http://www.postfix.org/tcp_table.5.html[tcp_table]
+or http://www.postfix.org/socketmap_table.5.html[socketmap_table] that can rewrite
 addresses using the http://www.libsrs2.org/docs/index.html[SRS] scheme. It
 supports both encoding and decoding of such addresses.
 
@@ -44,19 +45,14 @@ secrets::
 Command line switches
 ~~~~~~~~~~~~~~~~~~~~~
 
--h::
-    Show the help
+-P tcp|socketmap::
+    The protocol to use, either tcp or socketmap. Default is tcp.
 
--d <port>::
-    Change the port +pfix-srsd+ is listening to for SRS 'decoding' purposes
-    (default is 10002).
+-s <sep>::
+    Change the character used as srs separator (+, - or =). Default is =.
 
--e <port>::
-    Change the port +pfix-srsd+ is listening to for SRS 'encoding' purposes
-    (default is 10001).
-
--f::
-    Do not daemonize +pfix-srsd+ on startup.
+-I::
+    When decoding, do not touch emails from outside of +domain+.
 
 -p <path>::
     Path to the pidfile where +pfix-srsd+ will maintain its pid. Default is to
@@ -65,6 +61,70 @@ Command line switches
 -u::
     Work in unsafe mode: don't drop privileges when running as root.
 
+-U::
+    Specify the user to drop privileges to when running as root. Default is nobody.
+
+-G::
+    Specify the group to drop privileges to when running as root. Default is nobody.
+
+-f::
+    Do not daemonize +pfix-srsd+ on startup.
+
+-v::
+    Increase logging level.
+
+-h::
+    Show the help.
+
+Command line switches for tcp protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-e <port>::
+    Change the port +pfix-srsd+ is listening to for SRS 'encoding' purposes
+    (default is 10001).
+
+-d <port>::
+    Change the port +pfix-srsd+ is listening to for SRS 'decoding' purposes
+    (default is 10002).
+
+Command line switches for socketmap protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-l <port>::
+    TCP port to listen to for requests.
+
+-L <file>::
+    Unix socket to listent o for requests.
+
+When neither port or socketfile are specified, the socketmap default is port 10001.
+The socketmap protocol provides two socketmap names, 'srsencoder' and 'srsdecoder'.
+Use these in your postfix configuration file to state what action needs to be performed.
+
+EXAMPLES
+--------
+To use pfix-srsd with the socketmap table protocol over a unix socket file:
+----
+pfix-srsd -U pfix-srs -G pfix-srs -P socketmap -L /var/run/pfix-srsd.sock
+----
+The postfix configuration could be something like this:
+----
+recipient_canonical_maps = hash:/etc/postfix/pfixnosrs, socketmap:unix:/var/run/pfix-srsd.sock:srsdecoder
+recipient_canonical_classes = envelope_recipient, header_recipient
+sender_canonical_maps = hash:/etc/postfix/pfixnosrs, socketmap:unix:/var/run/pfix-srsd.sock:srsencoder
+sender_canonical_classes = envelope_sender
+----
+
+To use pfix-srsd with the tcp table protocol over TCP:
+----
+pfix-srsd -U pfix-srs -G pfix-srs
+----
+The postfix configuration could be something like this:
+----
+recipient_canonical_maps = hash:/etc/postfix/pfixnosrs, tcp:127.0.0.1:10002
+recipient_canonical_classes = envelope_recipient, header_recipient
+sender_canonical_maps = hash:/etc/postfix/pfixnosrs, tcp:127.0.0.1:10001
+sender_canonical_classes = envelope_sender
+----
 
 COPYRIGHT
 ---------

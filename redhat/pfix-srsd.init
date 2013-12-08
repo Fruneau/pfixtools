@@ -1,0 +1,70 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          pfix-srsd
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $local_fs $remote_fs
+# Default-Start:     2 3 5
+# Default-Stop:      0 1 6
+# Short-Description: pfixtools SRS Daemon backend for Postfix
+### END INIT INFO
+
+# Original source I believe is:
+# http://www.christophfischer.com/linux/15-mailserver/56-sender-rewriting-scheme-srs-fuer-postfix-unter-debian
+# If not, please let me know ASAP and I can update this!
+
+# Updated by Jason Woods <devel@jasonwoods.me.uk> Sun Nov 24
+# - Improved the start/stop/status/reload/restart commands to use RedHat's scripts
+
+# source function library
+. /etc/rc.d/init.d/functions
+
+PFIXSRSD_CONFIG="/etc/pfixtools/pfix-srsd.conf"
+DAEMON="/usr/sbin/pfix-srsd"
+PID_FILE="/var/run/pfix-srsd/pfix-srsd.pid"
+
+if [ -f $PFIXSRSD_CONFIG ]; then
+	. $PFIXSRSD_CONFIG
+else
+	exit 1
+fi
+
+# Generate random secret automatically if the file is not there
+if [ ! -f /etc/pfixtools/pfix-srsd-secrets ]; then
+	( </dev/urandom tr -dc '_\-A-Za-z0-9' | head -c128; echo ) >/etc/pfixtools/pfix-srsd-secrets
+fi
+
+test -x $DAEMON || exit 0
+
+case "$1" in
+	start)
+		echo -n "Starting Postfix SRS Daemon: "
+		status -p $PID_FILE $DAEMON &>/dev/null
+		RC=$?
+		if [ $RC -eq 0 ]; then
+			success
+		else
+			$DAEMON -p $PID_FILE -U pfix-srs -G pfix-srs $OPTIONS $DOMAIN $SECRETS
+			RC=$?
+			[ $RC -eq 0 ] && success || failure
+		fi
+		echo
+	;;
+	stop)
+		echo -n "Stopping Postfix SRS Daemon: "
+		killproc -p $PID_FILE $DAEMON
+		RC=$?
+		echo
+	;;
+	status)
+		echo "Postfix SRS Daemon status:"
+		status -p $PID_FILE $DAEMON
+		RC=$?
+	;;
+	restart | reload)
+		$0 stop; $0 start
+	;;
+	*)
+		echo "Usage: $0 start|stop|status|reload|restart"
+		exit 1
+	;;
+esac

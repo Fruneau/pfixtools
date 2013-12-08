@@ -42,6 +42,9 @@
 
 #include "buffer.h"
 #include "common.h"
+
+#include <srs2.h>
+
 #include "policy_tokens.h"
 #include "server.h"
 #include "config.h"
@@ -50,8 +53,8 @@
 #define DAEMON_NAME             "postlicyd"
 #define DAEMON_VERSION          PFIXTOOLS_VERSION
 #define DEFAULT_PORT            10000
-#define RUNAS_USER              "nobody"
-#define RUNAS_GROUP             "nogroup"
+#define DEFAULT_RUNAS_USER      NOBODY_USER
+#define DEFAULT_RUNAS_GROUP     NOGROUP_GROUP
 
 DECLARE_MAIN
 
@@ -299,8 +302,12 @@ static void usage(void)
 {
     fputs("usage: "DAEMON_NAME" [options] config\n"
           "\n"
+          "If neither -l or -L are specified and the configuration file also does not contain any port\n"
+          "or socketfile directives, the default will be to listen on tcp port "STR(DEFAULT_PORT)".\n"
+          "\n"
           "Options:\n"
-          "    -l|--port <port>              port to listen to\n"
+          "    -l|--port <port>              port to listen to, overrides configuration\n"
+          "    -L|--socketfile <file>        unix socket to listen to, overrides configuration\n"
           "    -c|--check-conf               only check configuration\n"
           COMMON_DAEMON_OPTION_HELP,
           stderr);
@@ -313,22 +320,27 @@ int main(int argc, char *argv[])
     COMMON_DAEMON_OPTION_PARAMS;
     int port = DEFAULT_PORT;
     bool port_from_cli = false;
+    const char *socketfile = NULL;
     bool check_conf = false;
 
     struct option longopts[] = {
         COMMON_DAEMON_OPTION_LIST,
         { "check-conf", no_argument, NULL, 'c' },
         { "port", required_argument, NULL, 'l' },
+        { "socketfile", required_argument, NULL, 'L' },
         { NULL, 0, NULL, 0 }
     };
 
     for (int c = 0; (c = getopt_long(argc, argv,
-                                     COMMON_DAEMON_OPTION_SHORTLIST "cl:",
+                                     COMMON_DAEMON_OPTION_SHORTLIST "cl:L:",
                                      longopts, NULL)) >= 0;) {
         switch (c) {
           case 'l':
             port = atoi(optarg);
             port_from_cli = true;
+            break;
+          case 'L':
+            socketfile = optarg;
             break;
           case 'c':
             check_conf = true;
@@ -344,10 +356,33 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    // Sockaddr_un cannot store more than 107 characters (it is char[108])
+    if (socketfile && strlen(socketfile) > 107) {
+        fputs("The socketfile specified for -L cannot be more than 107 characters in length\n\n", stderr);
+        usage();
+        return EXIT_FAILURE;
+    }
+
     if (check_conf) {
+        // Just to make sure we read the config file as if we were run normally
+        if (!unsafe) {
+            if (drop_privileges(user, group) < 0) {
+                crit("unable to drop privileges");
+                return EXIT_FAILURE;
+            }
+        }
         return config_check(argv[optind]) ? EXIT_SUCCESS : EXIT_FAILURE;
     }
+
     notice("%s v%s...", DAEMON_NAME, DAEMON_VERSION);
+
+    // Fail on memory
+    srs_set_malloc( xmalloc_unsigned, xrealloc_unsigned, free );
+
+    if ( user == NULL )
+        user = DEFAULT_RUNAS_USER;
+    if ( group == NULL )
+        user = DEFAULT_RUNAS_GROUP;
 
     if (pidfile_open(pidfile) < 0) {
         crit("unable to write pidfile %s", pidfile);
@@ -355,7 +390,7 @@ int main(int argc, char *argv[])
     }
 
     if (!unsafe) {
-        if (drop_privileges(RUNAS_USER, RUNAS_GROUP) < 0) {
+        if (drop_privileges(user, group) < 0) {
             crit("unable to drop privileges");
             return EXIT_FAILURE;
         }
@@ -365,8 +400,18 @@ int main(int argc, char *argv[])
     if (_G.config == NULL) {
         return EXIT_FAILURE;
     }
-    if (port_from_cli || _G.config->port == 0) {
+
+    // If we specified socketfile on cmd line, override what's in config
+    if (socketfile) {
+        p_delete(&_G.config->socketfile);
+        _G.config->socketfile = strdup(socketfile);
+    }
+
+    // If we specified port on cmd line, override what's in config if it's there
+    // If it's not in config, set it anyway so it sets to default, but only if we didn't specify a socketfile
+    if (port_from_cli || (!_G.config->port_present && !_G.config->socketfile)) {
         _G.config->port = port;
+        _G.config->port_present = true;
     }
 
     if (daemonize && daemon_detach() < 0) {
@@ -376,12 +421,24 @@ int main(int argc, char *argv[])
 
     pidfile_refresh();
 
-    if (start_listener(_G.config->port) == NULL) {
-        return EXIT_FAILURE;
-    } else {
-        return server_loop(query_starter, query_stopper,
-                           policy_run, config_refresh, _G.config);
+    if (_G.config->socketfile) {
+        if (start_unix_listener(_G.config->socketfile) == NULL)
+            return EXIT_FAILURE;
     }
+
+    if (_G.config->port_present) {
+        if (start_tcp_listener(_G.config->port) == NULL)
+            return EXIT_FAILURE;
+    }
+
+    int ret = server_loop(query_starter, query_stopper, policy_run, config_refresh, _G.config);
+
+    // Cleanup socket file
+    if (_G.config->socketfile) {
+        unlink(_G.config->socketfile);
+    }
+
+    return ret;
 }
 
 /* vim:set et sw=4 sts=4 sws=4: */
