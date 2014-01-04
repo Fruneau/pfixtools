@@ -23,11 +23,11 @@ This suite contains at the time of the writing, two major tools.
 
 linkgit:pfix-srsd[8,pfix-srsd/pfix-srsd.html]::
     this daemon brings SRS to postfix using its
-    linkgit:tcp_table[5,http://www.postfix.org/tcp_table.5.html] mechanism. It
+    link:http://www.postfix.org/tcp_table.5.html[tcp_table(5)] or
+    link:http://www.postfix.org/socketmap_table.5.html[socketmap_table(5)] mechanisms. It
     allows plugging +SRS+ into
-    linkgit:canonical[5,http://www.postfix.org/canonical.5.html] or
-    linkgit:transport[5,http://www.postfix.org/transport.5.html] rewrites
-    quite easily.
+    link:http://www.postfix.org/canonical.5.html[canonical(5)] or
+    link:http://www.postfix.org/transport.5.html[transport(5)] rewrites quite easily.
 
 linkgit:postlicyd[8,postlicyd/postlicyd.html]::
     this is a postfix policy daemon. It includes greylisting, rbl lookups,

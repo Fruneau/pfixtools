@@ -340,7 +340,7 @@ static int process_srs_socketmap(client_t *srsd, void* vconfig)
                     if (context->addrlen <= dlen || ibuf->data[context->addrlen - 1 - dlen] != '@' ||
                         memcmp(ibuf->data + context->addrlen - dlen, config->domain, dlen))
                     {
-                        netstring_send(obuf, 2, "OK ", ibuf->data);
+                        netstring_send(obuf, 1, "NOTFOUND External domains are ignored");
                         goto skip;
                     }
                 }
@@ -431,9 +431,7 @@ static int process_srs_tcp(client_t *srsd, void* vconfig)
                 if (q - p <= dlen || q[-1 - dlen] != '@' ||
                     memcmp(q - dlen, config->domain, dlen))
                 {
-                    buffer_addstr(obuf, "200 ");
-                    buffer_add(obuf, p, q - p);
-                    buffer_addch(obuf, '\n');
+                    buffer_addstr(obuf, "400 external domains are ignored\n");
                     goto skip;
                 }
             }
