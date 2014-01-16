@@ -382,7 +382,7 @@ int main(int argc, char *argv[])
     if ( user == NULL )
         user = DEFAULT_RUNAS_USER;
     if ( group == NULL )
-        user = DEFAULT_RUNAS_GROUP;
+        group = DEFAULT_RUNAS_GROUP;
 
     if (pidfile_open(pidfile) < 0) {
         crit("unable to write pidfile %s", pidfile);

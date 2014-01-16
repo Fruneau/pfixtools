@@ -692,7 +692,7 @@ int main(int argc, char *argv[])
     if (user == NULL)
         user = DEFAULT_RUNAS_USER;
     if (group == NULL)
-        user = DEFAULT_RUNAS_GROUP;
+        group = DEFAULT_RUNAS_GROUP;
 
     if (common_setup(pidfile, unsafe, user, group, daemonize) != EXIT_SUCCESS)
         return EXIT_FAILURE;
