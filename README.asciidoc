@@ -9,7 +9,8 @@ This suite contains at the time of the writing, two major tools.
 
 link:/Fruneau/pfixtools/tree/master/pfix-srsd/pfix-srsd.asciidoc[+pfix-srsd+]::
     this daemon brings SRS to postfix using its
-    link:http://www.postfix.org/tcp_table.5.html[tcp_table(5)] mechanism. It
+    link:http://www.postfix.org/tcp_table.5.html[tcp_table(5)] or
+    link:http://www.postfix.org/socketmap_table.5.html[socketmap_table(5)] mechanisms. It
     allows plugging +SRS+ into
     link:http://www.postfix.org/canonical.5.html[canonical(5)] or
     link:http://www.postfix.org/transport.5.html[transport(5)] rewrites quite easily.
@@ -49,7 +50,7 @@ Supported platforms
 
 The pfixtools have been currently successfully compiled and installed on the following platorms:
 
-* Linux: gentoo, debian etch, debian lenny, arch linux
+* Linux: gentoo, debian etch, debian lenny, arch linux, centos 6.x
 * MacOS X 10.5 (Leopard), 10.6 (Snow Leopard)
 
 Known bugs:
