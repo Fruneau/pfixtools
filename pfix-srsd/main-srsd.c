@@ -431,7 +431,7 @@ static int process_srs_tcp(client_t *srsd, void* vconfig)
                 if (q - p <= dlen || q[-1 - dlen] != '@' ||
                     memcmp(q - dlen, config->domain, dlen))
                 {
-                    buffer_addstr(obuf, "400 external domains are ignored\n");
+                    buffer_addstr(obuf, "500 external domains are ignored\n");
                     goto skip;
                 }
             }
