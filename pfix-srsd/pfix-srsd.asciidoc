@@ -94,7 +94,7 @@ Command line switches for socketmap protocol
     TCP port to listen to for requests.
 
 -L <file>::
-    Unix socket to listent o for requests.
+    Unix socket to listen to for requests.
 
 When neither port or socketfile are specified, the socketmap default is port 10001.
 The socketmap protocol provides two socketmap names, 'srsencoder' and 'srsdecoder'.
