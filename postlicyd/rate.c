@@ -33,10 +33,6 @@
 /*   see AUTHORS and source files for details                               */
 /****************************************************************************/
 
-/*
- * Copyright © 2009 Florent Bruneau
- */
-
 #include "filter.h"
 #include "db.h"
 

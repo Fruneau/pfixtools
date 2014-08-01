@@ -33,11 +33,6 @@
 /*   see AUTHORS and source files for details                               */
 /****************************************************************************/
 
-/*
- * Copyright © 2005-2007 Pierre Habouzit
- * Copyright © 2008 Florent Bruneau
- */
-
 #include <getopt.h>
 
 #include "common.h"

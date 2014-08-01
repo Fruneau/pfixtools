@@ -33,10 +33,6 @@
 /*   see AUTHORS and source files for details                               */
 /****************************************************************************/
 
-/*
- * Copyright © 2009 Florent Bruneau
- */
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! *
  *  To run the test, you must have a resolv.conf in your current directoy with *
  *  the following content:                                                     *

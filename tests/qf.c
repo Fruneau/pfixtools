@@ -33,10 +33,6 @@
 /*   see AUTHORS and source files for details                               */
 /****************************************************************************/
 
-/*
- * Copyright © 2008 Florent Bruneau
- */
-
 #include <common/common.h>
 #include <common/file.h>
 #include <postlicyd/query.h>

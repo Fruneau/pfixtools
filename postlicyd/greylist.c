@@ -33,11 +33,6 @@
 /*   see AUTHORS and source files for details                               */
 /****************************************************************************/
 
-/*
- * Copyright © 2007 Pierre Habouzit
- * Copyright © 2008-2009 Florent Bruneau
- */
-
 #include "filter.h"
 #include "common.h"
 #include "str.h"

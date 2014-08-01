@@ -33,11 +33,6 @@
 /*   see AUTHORS and source files for details                               */
 /****************************************************************************/
 
-/*
- * Copyright © 2007 Pierre Habouzit
- * Copyright © 2008 Florent Bruneau
- */
-
 #include "query.h"
 #include "policy_tokens.h"
 #include "str.h"

@@ -33,10 +33,6 @@
 /*   see AUTHORS and source files for details                               */
 /****************************************************************************/
 
-/*
- * Copyright © 2008-2009 Florent Bruneau
- */
-
 #ifndef PFIXTOOLS_DNS_H
 #define PFIXTOOLS_DNS_H
 
