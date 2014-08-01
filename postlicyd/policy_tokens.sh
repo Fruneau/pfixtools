@@ -164,6 +164,9 @@ exit 0
 # postfix 2.9+
 ## ccert_pubkey_fingerprint
 #
+# postfix 2.12+
+## client_port
+#
 # request value
 ## smtpd_access_policy
 #
