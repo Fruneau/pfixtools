@@ -65,7 +65,7 @@ To activate this you may have something such as the following in postfix's main.
 smtpd_recipient_restrictions =
     permit_mynetworks,
     permit_sasl_authenticated,
-    check_policy_service tcp:127.0.0.1:10000,
+    check_policy_service inet:127.0.0.1:10000,
     reject_unauth_destination
 ----
 
