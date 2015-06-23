@@ -75,7 +75,7 @@ The following are build-time dependencies:
 * gcc: 4.0 or later
 * pkg-config _(`postlicyd` only)_
 * gperf _(`postlicyd` only)_
-* libpcre3 _(`postlicyd` only)_
+* libpcre3
 * xmlto, docbook-xsl and asciidoc to build the documentation (this is only a stub of documentation)
 
 Compilation
