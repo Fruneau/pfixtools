@@ -279,7 +279,7 @@ static bool spf_validate_domain(const char* restrict domain)
 }
 
 static bool spf_query(spf_t *spf, const char* query, dns_rrtype_t rtype,
-                      ub_callback_t cb)
+                      ub_callback_type cb)
 {
     buffer_reset(&_G.query_buffer);
     buffer_addstr(&_G.query_buffer, query);

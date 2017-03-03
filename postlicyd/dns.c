@@ -123,7 +123,7 @@ static int dns_handler(client_t *event, void *config)
 }
 
 bool dns_resolve(const char *hostname, dns_rrtype_t type,
-                 ub_callback_t callback, void *data)
+                 ub_callback_type callback, void *data)
 {
     if (_G.ctx == NULL) {
         _G.ctx = ub_ctx_create();
