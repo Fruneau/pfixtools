@@ -89,7 +89,7 @@ typedef void (*dns_result_callback_f)(dns_result_t *result, void *data);
  */
 __attribute__((nonnull(1,3,4)))
 bool dns_resolve(const char *hostname, dns_rrtype_t type,
-                 ub_callback_t callback, void *data);
+                 ub_callback_type callback, void *data);
 
 /** Fetch the DNS record of the given type.
  */
